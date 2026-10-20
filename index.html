@@ -508,7 +508,7 @@ const SP={
 
   async login(){
     try{
-      const r=await this.msalApp.loginPopup({scopes:['User.Read','Sites.ReadWrite.All','Sites.Manage.All']});
+      const r=await this.msalApp.loginPopup({scopes:['User.Read','Sites.ReadWrite.All']});
       this.account=r.account;return true;
     }catch(e){console.error('MSAL login:',e);return false}
   },
