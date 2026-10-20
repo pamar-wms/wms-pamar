@@ -485,7 +485,8 @@ const SP={
     'solicitudes','usuarios','reservas','medidores','movmedidores','config',
     'notificaciones','consultas','remitosMed','remitosDev','pendMedDespachos'],
 
-  init(){
+  _initialized:false,
+  async init(){
     try{
       this.msalApp=new msal.PublicClientApplication({
         auth:{
@@ -495,6 +496,8 @@ const SP={
         },
         cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
       });
+      await this.msalApp.initialize();
+      this._initialized=true;
       const accts=this.msalApp.getAllAccounts();
       if(accts.length)this.account=accts[0];
       this.siteId=localStorage.getItem('sp_siteId')||null;
@@ -631,6 +634,11 @@ async function msLogin(){
   const btn=document.getElementById('ms-login-btn');
   const st=document.getElementById('ms-status');
   btn.disabled=true;
+
+  if(!SP._initialized){
+    btn.textContent='Inicializando…';
+    await SP.init();
+  }
 
   if(!SP.isLoggedIn()){
     btn.textContent='Conectando…';
@@ -4506,25 +4514,26 @@ function updateStats(){
 /* ══════════════════════════════════════════════════════════
    INIT
    ══════════════════════════════════════════════════════════ */
-SP.init();
 seed();
 migratePermisos();
 buildNav();
 
-// If already authenticated with Microsoft, auto-sync on load
-if(SP.isLoggedIn()){
-  const stEl=document.getElementById('ms-status');
-  const btnEl=document.getElementById('ms-login-btn');
-  stEl.textContent='✓ '+SP.getName();stEl.style.color='var(--edenor)';
-  if(SP.ready){
-    stEl.textContent='Sincronizando…';stEl.style.color='var(--gray)';
-    SP.pullAll().then(n=>{
-      seed();migratePermisos();
-      stEl.innerHTML='✓ Conectado · '+n+' tablas';stEl.style.color='var(--edenor)';
-      btnEl.innerHTML='✓ Conectado a SharePoint';btnEl.style.background='var(--edenor)';
-    }).catch(e=>{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'});
+// Initialize MSAL and check if already authenticated
+SP.init().then(()=>{
+  if(SP.isLoggedIn()){
+    const stEl=document.getElementById('ms-status');
+    const btnEl=document.getElementById('ms-login-btn');
+    stEl.textContent='✓ '+SP.getName();stEl.style.color='var(--edenor)';
+    if(SP.ready){
+      stEl.textContent='Sincronizando…';stEl.style.color='var(--gray)';
+      SP.pullAll().then(n=>{
+        seed();migratePermisos();
+        stEl.innerHTML='✓ Conectado · '+n+' tablas';stEl.style.color='var(--edenor)';
+        btnEl.innerHTML='✓ Conectado a SharePoint';btnEl.style.background='var(--edenor)';
+      }).catch(e=>{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'});
+    }
   }
-}
+}).catch(e=>console.warn('SP init error:',e));
 </script>
 </body>
 </html>
