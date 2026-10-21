@@ -1215,6 +1215,9 @@ function saveMaterial(editId){
     reqEdenor:document.getElementById('m-reqEdenor').checked
   };
   if(!d.matricula||!d.descripcion){toast('Completá matrícula y descripción','err');return}
+  // Validar matrícula duplicada
+  var dup=DB.getAll('materiales').find(r=>r.matricula===d.matricula&&r.id!==editId);
+  if(dup){toast('⚠ Ya existe un material con matrícula '+d.matricula,'err');return}
   if(editId)DB.update('materiales',editId,d);else DB.add('materiales',d);
   closeModal();toast(editId?'Material actualizado':'Material creado');go('materiales');
 }
@@ -2216,7 +2219,7 @@ SCREENS.devoluciones=()=>{
 let devItems=[];
 function addDevolucion(){
   devItems=[];
-  const obras=DB.getAll('obras').map(o=>o.nombre);
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
   const sups=DB.getAll('supervisores').map(s=>(s.nombre+' '+s.apellido).trim());
   const cuads=DB.getAll('cuadrillas').map(c=>(c.nombre+' '+c.apellido).trim());
   openModal(`<h3>↩️ Nueva devolución</h3>
@@ -2307,7 +2310,7 @@ SCREENS.traspasos=()=>{
 let trItems=[];
 function addTraspaso(){
   trItems=[];
-  const obras=DB.getAll('obras').map(o=>o.nombre);
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
   const sups=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
   openModal(`<h3>🔄 Nuevo traspaso</h3>
     <div class="fgrid">
@@ -3348,7 +3351,7 @@ SCREENS.stockfull=()=>{
 
 // ─── MOVIMIENTOS POR OBRA ────────────────
 SCREENS.movobra=()=>{
-  const obras=DB.getAll('obras').map(o=>o.nombre);
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">📋</div><div><h1>Movimientos por Obra</h1><p>Todo lo despachado a una obra</p></div></div>
     <div class="toolbar">
