@@ -686,17 +686,28 @@ async function msLogin(){
   if(!SP.siteId){
     st.textContent='Buscando sitios SharePoint…';st.style.color='var(--gray)';
     try{
-      const sites=await SP.discoverSites();
-      if(!sites.length){st.textContent='⚠ No se encontraron sitios';st.style.color='#c0392b';btn.disabled=false;return}
-      if(sites.length===1){
-        await SP.setupSite(sites[0].id);
+      // First try direct access to WMS site
+      var wmsSiteId=null;
+      try{
+        var wmsD=await SP.gGet('/sites/pamarsacifya.sharepoint.com:/sites/WMS');
+        if(wmsD&&wmsD.id)wmsSiteId=wmsD.id;
+      }catch(ew){console.warn('WMS direct:',ew)}
+      // If we got WMS site directly, use it without picker
+      if(wmsSiteId){
+        await SP.setupSite(wmsSiteId);
       }else{
-        showSitePicker(sites);return;
+        var sites=[];
+        try{sites=await SP.discoverSites();}catch(ed){console.warn('discover:',ed)}
+        if(!sites.length){st.textContent='⚠ No se encontraron sitios. Pedí permisos de acceso al sitio WMS en SharePoint.';st.style.color='#c0392b';btn.disabled=false;return}
+        if(sites.length===1){
+          await SP.setupSite(sites[0].id);
+        }else{
+          showSitePicker(sites);return;
+        }
       }
     }catch(e){
       if(e.message&&e.message.includes('403')){
         st.textContent='⚠ Permiso denegado. Cerrando sesión para re-autorizar…';st.style.color='#c0392b';
-        // Clear everything and force re-login with consent
         localStorage.clear();
         setTimeout(()=>location.reload(),2000);
         return;
