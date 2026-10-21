@@ -563,8 +563,14 @@ const SP={
   gPatch(u,b){return this._fetch('PATCH',u,b)},
 
   async discoverSites(){
-    const d=await this.gGet('/sites?search=*&$top=50');
-    return(d.value||[]).filter(s=>s.webUrl&&!s.webUrl.includes('my.sharepoint.com'));
+    var sites=[];
+    try{const d=await this.gGet('/sites?search=*&$top=50');
+    sites=(d.value||[]).filter(s=>s.webUrl&&!s.webUrl.includes('my.sharepoint.com'));}catch(e){console.warn('search sites:',e)}
+    // Also try to get the WMS site directly by hostname+path
+    try{const wms=await this.gGet('/sites/pamarsacifya.sharepoint.com:/sites/WMS');
+    if(wms&&wms.id){var found=false;for(var i=0;i<sites.length;i++){if(sites[i].id===wms.id){found=true;break;}}
+    if(!found)sites.unshift(wms);}}catch(e){console.warn('WMS site direct:',e)}
+    return sites;
   },
 
   async setupSite(sId){
