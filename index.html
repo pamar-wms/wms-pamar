@@ -497,6 +497,11 @@ const SP={
         cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
       });
       await this.msalApp.initialize();
+      // Handle redirect response (returns from Microsoft login page)
+      try{
+        const resp=await this.msalApp.handleRedirectPromise();
+        if(resp&&resp.account){this.account=resp.account;}
+      }catch(e){console.warn('Redirect handle:',e)}
       this._initialized=true;
       const accts=this.msalApp.getAllAccounts();
       if(accts.length)this.account=accts[0];
@@ -508,8 +513,8 @@ const SP={
 
   async login(){
     try{
-      const r=await this.msalApp.loginPopup({scopes:['User.Read','Sites.ReadWrite.All']});
-      this.account=r.account;return true;
+      await this.msalApp.loginRedirect({scopes:['User.Read','Sites.ReadWrite.All']});
+      return true; // won't reach here, page redirects
     }catch(e){console.error('MSAL login:',e);return false}
   },
 
@@ -518,7 +523,7 @@ const SP={
     try{
       return(await this.msalApp.acquireTokenSilent({scopes:['Sites.ReadWrite.All'],account:this.account})).accessToken;
     }catch(e){
-      try{return(await this.msalApp.acquireTokenPopup({scopes:['Sites.ReadWrite.All'],account:this.account})).accessToken;}
+      try{await this.msalApp.acquireTokenRedirect({scopes:['Sites.ReadWrite.All'],account:this.account});return null;}
       catch(e2){console.error('Token:',e2);return null}
     }
   },
@@ -4518,12 +4523,14 @@ seed();
 migratePermisos();
 buildNav();
 
-// Initialize MSAL and check if already authenticated
+// Initialize MSAL and check if already authenticated (or returning from redirect)
 SP.init().then(()=>{
   if(SP.isLoggedIn()){
     const stEl=document.getElementById('ms-status');
     const btnEl=document.getElementById('ms-login-btn');
     stEl.textContent='✓ '+SP.getName();stEl.style.color='var(--edenor)';
+    btnEl.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Conectado';
+    btnEl.disabled=true;
     if(SP.ready){
       stEl.textContent='Sincronizando…';stEl.style.color='var(--gray)';
       SP.pullAll().then(n=>{
@@ -4531,6 +4538,9 @@ SP.init().then(()=>{
         stEl.innerHTML='✓ Conectado · '+n+' tablas';stEl.style.color='var(--edenor)';
         btnEl.innerHTML='✓ Conectado a SharePoint';btnEl.style.background='var(--edenor)';
       }).catch(e=>{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'});
+    } else {
+      // Logged in but no site yet — auto-discover
+      msLogin();
     }
   }
 }).catch(e=>console.warn('SP init error:',e));
