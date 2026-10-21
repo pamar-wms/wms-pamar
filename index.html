@@ -4554,7 +4554,16 @@ SP.init().then(()=>{
         seed();migratePermisos();
         stEl.innerHTML='✓ Conectado · '+n+' tablas';stEl.style.color='var(--edenor)';
         btnEl.innerHTML='✓ Conectado a SharePoint';btnEl.style.background='var(--edenor)';
-      }).catch(e=>{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'});
+      }).catch(e=>{
+        if(e.message&&e.message.includes('403')){
+          // Permission denied on cached site — reset and let user pick again
+          localStorage.removeItem('sp_siteId');localStorage.removeItem('sp_listId');
+          SP.siteId=null;SP.listId=null;SP.ready=false;
+          stEl.textContent='Seleccioná un sitio SharePoint';stEl.style.color='var(--gray)';
+          btnEl.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Elegir sitio SharePoint';
+          btnEl.disabled=false;
+        }else{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'}
+      });
     } else {
       // Logged in but no site yet — auto-discover
       msLogin();
