@@ -445,6 +445,7 @@
   <div class="statusbar">
     <span id="sb-user">Usuario: <b>Guillermo</b> (Control total)</span>
     <span id="sb-stats">Registros: <b>cargando…</b></span>
+    <span id="sb-sync" style="cursor:pointer;display:none" onclick="syncSP()" title="Sincronizar con SharePoint">🔄 Sincronizar</span>
     <span style="margin-left:auto">WMS PAMAR v1.0</span>
   </div>
 </div>
@@ -516,7 +517,7 @@ const SP={
       if(accts.length)this.account=accts[0];
       this.siteId=localStorage.getItem('sp_siteId')||null;
       this.listId=localStorage.getItem('sp_listId')||null;
-      if(this.siteId&&this.listId)this.ready=true;
+      if(this.siteId&&this.listId){this.ready=true;var sb=document.getElementById('sb-sync');if(sb)sb.style.display='';}
     }catch(e){console.warn('MSAL init:',e)}
   },
 
@@ -583,7 +584,7 @@ const SP={
     try{
       const ls=await this.gGet('/sites/'+this.siteId+'/lists');
       const found=(ls.value||[]).find(l=>l.displayName==='WMS_Data');
-      if(found){this.listId=found.id;localStorage.setItem('sp_listId',this.listId);this.ready=true;return}
+      if(found){this.listId=found.id;localStorage.setItem('sp_listId',this.listId);this.ready=true;var sb=document.getElementById('sb-sync');if(sb)sb.style.display='';return}
     }catch(e){}
     // Create list with TableData column
     const nl=await this.gPost('/sites/'+this.siteId+'/lists',{
@@ -591,7 +592,7 @@ const SP={
       list:{template:'genericList'},
       columns:[{name:'TableData',text:{allowMultipleLines:true,maxLength:0}}]
     });
-    this.listId=nl.id;localStorage.setItem('sp_listId',this.listId);this.ready=true;
+    this.listId=nl.id;localStorage.setItem('sp_listId',this.listId);this.ready=true;var sb=document.getElementById('sb-sync');if(sb)sb.style.display='';
   },
 
   async pullAll(){
@@ -621,20 +622,9 @@ const SP={
       if(this._itemCache[t]){
         await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
       }else{
-        // Search for existing item
-        try{
-          const ex=await this.gGet(base+"/items?$filter=fields/Title eq '"+t+"'&$expand=fields&$top=1");
-          if(ex.value&&ex.value.length){
-            this._itemCache[t]=ex.value[0].id;
-            await this.gPatch(base+'/items/'+ex.value[0].id+'/fields',{TableData:data});
-          }else{
-            const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
-            this._itemCache[t]=ni.id;
-          }
-        }catch(e){
-          const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
-          this._itemCache[t]=ni.id;
-        }
+        // No cached id — create new item (pullAll populates cache on next load)
+        const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
+        this._itemCache[t]=ni.id;
       }
     }catch(e){console.error('SP push '+t+':',e)}
     finally{
@@ -659,6 +649,22 @@ const SP={
     localStorage.removeItem('sp_siteId');localStorage.removeItem('sp_listId');
   }
 };
+
+/* Sync button for statusbar */
+async function syncSP(){
+  if(!SP.ready){toast('SharePoint no conectado','err');return}
+  const btn=document.getElementById('sb-sync');
+  btn.textContent='⏳ Sincronizando…';btn.style.pointerEvents='none';
+  try{
+    await SP.pushAll();
+    toast('✓ Datos sincronizados a SharePoint');
+    btn.textContent='🔄 Sincronizar';
+  }catch(e){
+    toast('⚠ Error al sincronizar: '+e.message,'err');
+    btn.textContent='🔄 Sincronizar';
+  }
+  btn.style.pointerEvents='auto';
+}
 
 /* Microsoft login flow (from login screen) */
 async function msLogin(){
