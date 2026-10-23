@@ -666,6 +666,110 @@ async function syncSP(){
   btn.style.pointerEvents='auto';
 }
 
+// ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
+const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJs6eURETO66H_Wf1DGQv8zW-HB2ANyKmjChrWDCo2PLGHPknQ/exec';
+async function exportarMaestros(){
+  const btn=event.target;
+  btn.disabled=true;btn.textContent='⏳ Exportando…';
+  try{
+    const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
+    const cuadrillas=DB.getAll('cuadrillas').map(c=>c.nombre);
+    const materiales=DB.getAll('materiales').map(m=>({matricula:m.matricula,descripcion:m.descripcion}));
+    await fetch(GSCRIPT_URL,{
+      method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'sync_maestros',obras,cuadrillas,materiales})
+    });
+    toast('✓ Datos exportados al formulario de cuadrillas');
+  }catch(e){
+    toast('⚠ Error al exportar: '+e.message,'err');
+  }
+  btn.disabled=false;btn.textContent='📤 Exportar datos para cuadrillas';
+}
+
+// ── AUTO-IMPORTAR SOLICITUDES DESDE GOOGLE SHEETS ──
+let _solPollTimer=null;
+let _solImporting=false;
+
+function solStartPolling(){
+  solStopPolling();
+  solImportarNuevas(); // una vez ahora
+  _solPollTimer=setInterval(solImportarNuevas, 60000); // cada 60 seg
+}
+function solStopPolling(){
+  if(_solPollTimer){clearInterval(_solPollTimer);_solPollTimer=null;}
+}
+
+async function solImportarNuevas(){
+  if(_solImporting) return;
+  _solImporting=true;
+  try{
+    const resp=await fetch(GSCRIPT_URL+'?action=solicitudes');
+    const data=await resp.json();
+    if(!data.solicitudes||!data.solicitudes.length){_solImporting=false;return;}
+
+    const existentes=DB.getAll('solicitudes');
+    const codigos=new Set(existentes.map(s=>s.codigo));
+    let nuevas=0;
+    const rowsImportadas=[];
+
+    for(const sol of data.solicitudes){
+      if(codigos.has(sol.codigo)) {
+        rowsImportadas.push(sol.row); // ya existe, marcar como importada
+        continue;
+      }
+      // Parsear materiales
+      let items=[];
+      try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
+
+      const nueva={
+        id:Date.now()+Math.floor(Math.random()*1000),
+        codigo:sol.codigo,
+        estado:'Pendiente',
+        urgencia:sol.urgencia||'Normal',
+        obra:sol.obra||'',
+        cuadrilla:sol.cuadrilla||'',
+        supervisor:sol.cuadrilla||'',
+        pidioUsuario:'Cuadrilla (formulario)',
+        fecha:sol.fecha||new Date().toLocaleString('es-AR'),
+        items:items.map(it=>({
+          matricula:it.matricula||'',
+          descripcion:it.descripcion||it.material||'',
+          cantidad:it.cantidad||0,
+          unidad:'u'
+        })),
+        obs:sol.observaciones||'',
+        esDime:false,
+        origen:'google_sheets'
+      };
+      existentes.push(nueva);
+      rowsImportadas.push(sol.row);
+      nuevas++;
+    }
+
+    if(nuevas>0){
+      DB.save('solicitudes',existentes);
+      toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
+      // Refrescar pantalla si estamos en solicitudes
+      if(document.querySelector('.sol-tabs')) go('solicitudes');
+    }
+
+    // Marcar como importadas en Google Sheets
+    if(rowsImportadas.length){
+      try{
+        await fetch(GSCRIPT_URL,{
+          method:'POST',mode:'no-cors',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'marcar_importadas',rows:rowsImportadas})
+        });
+      }catch(e){}
+    }
+  }catch(e){
+    console.log('Poll solicitudes error:',e);
+  }
+  _solImporting=false;
+}
+
 /* Microsoft login flow (from login screen) */
 async function msLogin(){
   const btn=document.getElementById('ms-login-btn');
@@ -1091,6 +1195,8 @@ function go(id,el){
   area.scrollTop=0;
   // post-render hooks
   if(POST_RENDER[id])POST_RENDER[id]();
+  // Auto-importar solicitudes de cuadrillas
+  if(id==='solicitudes'){solStartPolling();}else{solStopPolling();}
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1142,7 +1248,7 @@ function matAutoField(prefix){
    ══════════════════════════════════════════════════════════ */
 const SCREENS={};
 const POST_RENDER={
-  nuevasol:()=>renderNsItemsList(),
+  nuevasol:()=>{renderNsItemsList();nsObraChanged()},
   medingreso:()=>{miItems=[];document.getElementById('mi-serie')?.focus()},
   medsalida:()=>{msItems=[];document.getElementById('ms-serie')?.focus()},
   meddevol:()=>{mdItems=[];document.getElementById('md-serie')?.focus()}
@@ -1811,7 +1917,7 @@ SCREENS.reservas=()=>{
     const matCell=items.map(it=>`<div style="font-size:12px"><code>${it.matricula}</code> ${(it.descripcion||'').substring(0,25)} — <b>${fmtNum(it.cantidad)}</b></div>`).join('');
     return `<tr>
     <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${items.length} ítem(s)</td>
+    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.nroReserva||'—'}</td><td>${items.length} ítem(s)</td>
     <td>${matCell}</td><td>${r.obs||'—'}</td>
     <td class="act-btns"><button onclick="viewReserva(${r.id})" title="Ver detalle">👁️</button><button onclick="delRecord('reservas',${r.id},'reservas')">🗑️</button></td>
   </tr>`;
@@ -1820,8 +1926,8 @@ SCREENS.reservas=()=>{
     <div class="shead"><div class="sicon">📋</div><div><h1>Reservas por Obra</h1><p>Material previsto para cada obra — se valida al despachar</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addReserva()">＋ Nueva reserva</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Ítems</th><th>Materiales</th><th>Obs.</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="7" class="empty">Sin reservas</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>N° Reserva</th><th>Ítems</th><th>Materiales</th><th>Obs.</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="8" class="empty">Sin reservas</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -1832,6 +1938,7 @@ function addReserva(){
     <div class="fgrid">
       <div class="field"><label>Fecha</label><input type="date" id="res-fecha" value="${today()}"></div>
       <div class="field" style="position:relative"><label>Obra</label><input id="res-obra" autocomplete="off" placeholder="Escribí el nombre de la obra..." oninput="resObraSearch(this)" onkeydown="resObraKey(event)"><div id="res-obra-list" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:99;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div></div>
+      <div class="field"><label>N° Reserva / Pedido</label><input id="res-nro" placeholder="Ej: 4500012345"></div>
       <div class="field wide"><label>Observaciones</label><input id="res-obs" placeholder="Opcional"></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
@@ -1897,7 +2004,7 @@ function saveReserva(){
   if(!obra){toast('Seleccioná una obra','err');return}
   const validItems=resItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  DB.add('reservas',{fecha:document.getElementById('res-fecha').value,obra:obra,items:validItems,obs:(document.getElementById('res-obs')||{}).value||''});
+  DB.add('reservas',{fecha:document.getElementById('res-fecha').value,obra:obra,nroReserva:(document.getElementById('res-nro')||{}).value||'',items:validItems,obs:(document.getElementById('res-obs')||{}).value||''});
   closeModal();toast('Reserva registrada — '+validItems.length+' ítem(s)');go('reservas');
 }
 function viewReserva(id){
@@ -1905,7 +2012,7 @@ function viewReserva(id){
   const items=r.items||[];
   const tbody=items.map(it=>`<tr><td><code>${it.matricula}</code></td><td>${it.descripcion}</td><td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td></tr>`).join('');
   openModal(`<h3>📋 Reserva ${r.id}</h3>
-    <div class="fgrid"><div class="field"><label>Fecha</label><div>${fmtDate(r.fecha)}</div></div><div class="field"><label>Obra</label><div>${r.obra}</div></div></div>
+    <div class="fgrid"><div class="field"><label>Fecha</label><div>${fmtDate(r.fecha)}</div></div><div class="field"><label>Obra</label><div>${r.obra}</div></div>${r.nroReserva?`<div class="field"><label>N° Reserva / Pedido</label><div><b>${r.nroReserva}</b></div></div>`:''}</div>
     ${r.obs?'<p style="font-size:12px;color:var(--gray)">'+r.obs+'</p>':''}
     <table style="margin-top:10px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Cantidad</th></tr></thead><tbody>${tbody}</tbody></table>
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`);
@@ -2010,7 +2117,7 @@ SCREENS.despachos=()=>{
     <td class="idcell">${r.remito}</td>
     <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.area}</td><td>${pillRegion(r.region)}</td>
     <td>${r.cuadrilla}</td><td>${r.supervisor}</td>
-    <td class="act-btns"><button onclick="viewRemito(${r.id})" title="Ver remito">🧾</button></td>
+    <td class="act-btns"><button onclick="viewRemito(${r.id})" title="Ver remito">🧾</button>${isAdminLevel()?`<button onclick="delDespacho(${r.id})" title="Eliminar despacho" style="color:#c53727">🗑️</button>`:''}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🚚</div><div><h1>Despachos a Obra</h1><p>Al confirmar se descuenta stock y se genera el remito</p></div></div>
@@ -2164,6 +2271,12 @@ function saveDespacho(){
   DB.add('despachos',desp);
   closeModal();toast('Despacho registrado — '+remito);go('despachos');
 }
+function delDespacho(id){
+  if(!isAdminLevel()){toast('Solo superusuarios pueden eliminar despachos','err');return}
+  const r=DB.get('despachos',id);if(!r)return;
+  if(!confirm('¿Eliminar despacho '+r.remito+'?\n\nEsto eliminará el registro completo y revertirá el descuento de stock.'))return;
+  DB.del('despachos',id);toast('Despacho '+r.remito+' eliminado');go('despachos');
+}
 function viewRemito(id,back){
   const r=DB.get('despachos',id);if(!r)return;
   const obra=DB.getAll('obras').find(o=>o.nombre===r.obra);
@@ -2208,7 +2321,7 @@ SCREENS.devoluciones=()=>{
     const matCell=items.map(it=>`${it.matricula} · ${(it.descripcion||'').substring(0,22)} (${fmtNum(it.cantidad)}) ${it.estado==='Bueno – reingresa'?'<span class="pill ok">Reingresa</span>':'<span class="pill fin">Dañado</span>'}`).join('<br>');
     return `<tr>
     <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.cuadrilla||'—'}</td><td>${r.supervisor||'—'}</td>
+    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.area||'—'}</td><td>${r.cuadrilla||'—'}</td><td>${r.supervisor||'—'}</td>
     <td style="font-size:11px">${matCell}</td><td>${items.length} ítem${items.length>1?'s':''}</td>
     <td class="act-btns"><button onclick="delRecord('devoluciones',${r.id},'devoluciones')">🗑️</button></td>
   </tr>`;
@@ -2217,8 +2330,8 @@ SCREENS.devoluciones=()=>{
     <div class="shead"><div class="sicon">↩️</div><div><h1>Devoluciones de Obra</h1><p>Material que retorna al depósito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDevolucion()">＋ Registrar devolución</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Cuadrilla</th><th>Supervisor</th><th>Materiales</th><th>Ítems</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="8" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Cuadrilla</th><th>Supervisor</th><th>Materiales</th><th>Ítems</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -2231,7 +2344,8 @@ function addDevolucion(){
   openModal(`<h3>↩️ Nueva devolución</h3>
     <div class="fgrid">
       <div class="field"><label>Fecha</label><input type="date" id="dv-fecha" value="${today()}"></div>
-      <div class="field"><label>Obra origen</label><select id="dv-obra">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Obra origen</label><select id="dv-obra" onchange="dvObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Área</label><select id="dv-area"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
       <div class="field"><label>Cuadrilla</label><select id="dv-cuad"><option value="">— Seleccionar —</option>${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Supervisor</label><select id="dv-sup"><option value="">— Seleccionar —</option>${sups.map(s=>`<option>${s}</option>`).join('')}</select></div>
       <div class="field wide"><label>Observaciones</label><input id="dv-obs" placeholder="Opcional"></div>
@@ -2245,7 +2359,13 @@ function addDevolucion(){
     </div>
     <div id="dev-items-list" style="margin-top:6px"></div>
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveDevolucion()">💾 Registrar devolución</button></div>`);
-  setTimeout(()=>renderDevItemsList(),50);
+  setTimeout(()=>{renderDevItemsList();dvObraChanged()},50);
+}
+function dvObraChanged(){
+  const sel=document.getElementById('dv-obra');if(!sel)return;
+  const area=obraArea(sel.value);
+  const areaSel=document.getElementById('dv-area');
+  if(areaSel&&area)areaSel.value=area;
 }
 function devMatAuto(){
   const v=document.getElementById('dv-mat-inp').value.trim();
@@ -2291,7 +2411,7 @@ function saveDevolucion(){
   if(!obra){toast('Seleccioná una obra','err');return}
   const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
+  DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,area:(document.getElementById('dv-area')||{}).value||'',cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 
@@ -2834,7 +2954,7 @@ function generarRemitoEntrega(s){
 }
 let _solTabArea='Todas';
 function solSetTab(area){_solTabArea=area;go('solicitudes')}
-function solGetArea(s){return obraArea(s.obra)||'Sin área'}
+function solGetArea(s){return s.areaSolicitud||obraArea(s.obra)||'Sin área'}
 function solBuildCard(s,st){
   const urgCls=s.urgencia==='Urgente'?'alta':s.urgencia==='Normal'?'med':'baja';
   const cut=t=>(t||'').length>24?(t||'').slice(0,23)+'…':(t||'');
@@ -3047,6 +3167,10 @@ SCREENS.solicitudes=()=>{
     <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--gray)">
       💡 <b>Tocá una tarjeta</b> para ver el detalle. <b>Circuito:</b> Pendiente → <b>imprimir picking</b> pasa a En preparación → ajustar cantidades e <b>imprimir remito</b> pasa a Listo → <b>confirmar entrega</b> pasa a Entregado. Las solicitudes de obras <b>Dime Mide</b> primero pasan por aprobación.
     </div>
+    ${can('admin')?`<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="exportarMaestros()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📤 Exportar datos para cuadrillas</button>
+      <a href="https://pamar-wms.github.io/wms-pamar/solicitud.html" target="_blank" style="padding:8px 16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;color:var(--steel);text-decoration:none;cursor:pointer">📱 Ver formulario cuadrillas</a>
+    </div>`:''}
   </div>`;
 };
 function aprobarSol(id){
@@ -3179,7 +3303,8 @@ SCREENS.nuevasol=()=>{
   const cuads=DB.getAll('cuadrillas').map(c=>`${c.id} · ${cuaNombreCompleto(c)}`);
   const isWeb=(currentUser.vistaApp==='web');
   const formBody=`
-          <div class="pf"><label>Obra</label><select id="ns-obra">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+          <div class="pf"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+          <div class="pf"><label>Área</label><select id="ns-area"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
           <div class="pf" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()" style="width:18px;height:18px"><label for="ns-dime-chk" style="font-weight:600;cursor:pointer">Solicitud Dime Mide</label></div>
           <div id="ns-dime-fields" style="display:none">
             <div class="pf"><label>Nombre del solicitante</label><select id="ns-solicitante" onchange="nsDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
@@ -3250,6 +3375,17 @@ function nsDimeSolChange(){
   const c=DB.get('cuadrillas',cId);
   if(c&&c.usuarioEdenor)usrInp.value=c.usuarioEdenor;else usrInp.value='';
 }
+function nsObraChanged(){
+  const sel=document.getElementById('ns-obra');if(!sel)return;
+  const obraNombre=sel.value.split(' · ')[1]||sel.value;
+  const area=obraArea(obraNombre);
+  const areaSel=document.getElementById('ns-area');
+  if(areaSel&&area){areaSel.value=area;}
+  /* Si el área es Dime Mide, marcar el checkbox automáticamente */
+  const dimeChk=document.getElementById('ns-dime-chk');
+  if(dimeChk&&area==='Dime Mide'&&!dimeChk.checked){dimeChk.checked=true;nsDimeToggle();}
+  else if(dimeChk&&area!=='Dime Mide'&&dimeChk.checked){dimeChk.checked=false;nsDimeToggle();}
+}
 let selectedUrg='Normal';
 function selUrg(el,val){
   selectedUrg=val;
@@ -3304,7 +3440,9 @@ function sendSolicitud(){
   const dimeChk=document.getElementById('ns-dime-chk');
   const esDime=dimeChk&&dimeChk.checked;
   const cuadText=esDime?'':(document.getElementById('ns-cuad').value.split(' · ')[1]||document.getElementById('ns-cuad').value);
-  const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:esDime?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime};
+  const areaSel=document.getElementById('ns-area');
+  const areaSolicitud=areaSel?areaSel.value:'';
+  const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:esDime?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime};
   if(esDime){
     const solSel=document.getElementById('ns-solicitante');
     const solCId=solSel?parseInt(solSel.value):0;
