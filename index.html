@@ -134,6 +134,7 @@
   .empty{padding:40px;text-align:center;color:var(--gray);font-size:13px}
   .statusbar{background:var(--panel);border-top:1px solid var(--line);padding:5px 14px;font-size:11px;color:var(--gray);display:flex;gap:18px}
   .statusbar b{color:var(--steel)}
+  #sb-ms{color:#c0392b;font-weight:600}
   .search-box{margin-left:auto;position:relative}
   .search-box input{border:1px solid var(--line);border-radius:20px;padding:6px 12px 6px 30px;font-size:12px;width:200px}
   .search-box::before{content:"🔍";position:absolute;left:10px;top:6px;font-size:11px;opacity:.5}
@@ -394,6 +395,9 @@
     <div class="lblogo" style="padding:0;overflow:hidden;background:none;width:auto;height:56px"><img src="data:image/jpeg;base64,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" style="height:56px;border-radius:12px" alt="PAMAR"></div>
     <h2>WMS PAMAR</h2>
     <p>Ingresá tus credenciales para continuar</p>
+    <div id="first-time-msg" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#856404">
+      <b>⚠ Primera vez en esta PC:</b> Primero hacé click en <b>Sincronizar con Microsoft</b> para descargar los datos. Después podrás iniciar sesión con tu usuario.
+    </div>
     <div class="lfield"><label>Usuario</label><input id="lg-user" placeholder="usuario"></div>
     <div class="lfield"><label>Contraseña</label><input id="lg-pass" type="password" placeholder="••••••••"></div>
     <button class="lbtn" onclick="doLogin()">Ingresar</button>
@@ -446,6 +450,7 @@
     <span id="sb-user">Usuario: <b>Guillermo</b> (Control total)</span>
     <span id="sb-stats">Registros: <b>cargando…</b></span>
     <span id="sb-sync" style="cursor:pointer;display:none" onclick="syncSP()" title="Sincronizar con SharePoint">🔄 Sincronizar</span>
+    <span id="sb-ms" style="cursor:pointer;display:none" onclick="msLoginFromApp()" title="Conectar con Microsoft SharePoint">⚠ SharePoint desconectado</span>
     <span style="margin-left:auto">WMS PAMAR v1.0</span>
   </div>
 </div>
@@ -511,21 +516,37 @@ const SP={
       try{
         const resp=await this.msalApp.handleRedirectPromise();
         if(resp&&resp.account){this.account=resp.account;}
-      }catch(e){console.warn('Redirect handle:',e)}
+      }catch(e){
+        console.warn('Redirect handle:',e);
+        var stEl=document.getElementById('ms-status');
+        if(stEl)stEl.textContent='⚠ Error al procesar login de Microsoft: '+(e.message||e);
+        if(stEl)stEl.style.color='#c0392b';
+      }
       this._initialized=true;
       const accts=this.msalApp.getAllAccounts();
       if(accts.length)this.account=accts[0];
       this.siteId=localStorage.getItem('sp_siteId')||null;
       this.listId=localStorage.getItem('sp_listId')||null;
       if(this.siteId&&this.listId){this.ready=true;var sb=document.getElementById('sb-sync');if(sb)sb.style.display='';}
-    }catch(e){console.warn('MSAL init:',e)}
+    }catch(e){
+      console.warn('MSAL init:',e);
+      var stEl=document.getElementById('ms-status');
+      if(stEl){stEl.textContent='⚠ Error al inicializar Microsoft: '+(e.message||e);stEl.style.color='#c0392b';}
+    }
   },
 
   async login(){
     try{
+      var rUri=location.origin+location.pathname;
+      console.log('MSAL login redirect URI:',rUri);
       await this.msalApp.loginRedirect({scopes:['User.Read','Sites.ReadWrite.All'],prompt:'consent'});
       return true; // won't reach here, page redirects
-    }catch(e){console.error('MSAL login:',e);return false}
+    }catch(e){
+      console.error('MSAL login error:',e);
+      var stEl=document.getElementById('ms-status');
+      if(stEl){stEl.textContent='⚠ Error al conectar: '+(e.message||e)+' (URI: '+location.origin+location.pathname+')';stEl.style.color='#c0392b';}
+      return false;
+    }
   },
 
   async getToken(){
@@ -666,6 +687,48 @@ async function syncSP(){
   btn.style.pointerEvents='auto';
 }
 
+/* Microsoft login from inside the app (when sync button wasn't connected on login screen) */
+async function msLoginFromApp(){
+  if(SP.ready){syncSP();return;}
+  const msEl=document.getElementById('sb-ms');
+  if(msEl){msEl.textContent='⏳ Conectando…';msEl.style.pointerEvents='none';}
+  try{
+    if(!SP._initialized){await SP.init();}
+    if(!SP.isLoggedIn()){
+      // Need to redirect to Microsoft - warn user
+      toast('Redirigiendo a Microsoft para autenticar…');
+      await SP.login(); // page will redirect
+      return;
+    }
+    // Already logged in, just need to discover sites
+    if(!SP.siteId){
+      if(msEl)msEl.textContent='⏳ Buscando sitio SharePoint…';
+      var wmsSiteId=null;
+      try{var wmsD=await SP.gGet('/sites/pamarsacifya.sharepoint.com:/sites/WMS');if(wmsD&&wmsD.id)wmsSiteId=wmsD.id;}catch(ew){}
+      if(wmsSiteId){
+        await SP.setupSite(wmsSiteId);
+      }else{
+        var sites=[];try{sites=await SP.discoverSites();}catch(ed){}
+        if(!sites.length){toast('No se encontraron sitios SharePoint. Pedí permisos al administrador.','err');if(msEl){msEl.textContent='⚠ Sin acceso a SharePoint';msEl.style.pointerEvents='auto';}return;}
+        if(sites.length===1){await SP.setupSite(sites[0].id);}else{showSitePicker(sites);if(msEl)msEl.style.pointerEvents='auto';return;}
+      }
+    }else if(!SP.listId){
+      try{await SP.ensureList();}catch(e){toast('Error al acceder a la lista: '+e.message,'err');if(msEl){msEl.textContent='⚠ Error SharePoint';msEl.style.pointerEvents='auto';}return;}
+    }
+    // Now pull data
+    if(msEl)msEl.textContent='⏳ Sincronizando…';
+    const n=await SP.pullAll();
+    seed();migratePermisos();updateStats();
+    toast('SharePoint sincronizado ('+n+' tablas)','ok');
+    // Show sync button, hide ms connect button
+    var sb=document.getElementById('sb-sync');if(sb)sb.style.display='';
+    if(msEl)msEl.style.display='none';
+  }catch(e){
+    toast('⚠ Error SharePoint: '+e.message,'err');
+    if(msEl){msEl.textContent='⚠ SharePoint desconectado';msEl.style.pointerEvents='auto';}
+  }
+}
+
 // ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
 const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJs6eURETO66H_Wf1DGQv8zW-HB2ANyKmjChrWDCo2PLGHPknQ/exec';
 async function exportarMaestros(){
@@ -776,39 +839,59 @@ async function msLogin(){
   const st=document.getElementById('ms-status');
   btn.disabled=true;
 
+  // Step 1: Initialize MSAL
   if(!SP._initialized){
-    btn.textContent='Inicializando…';
-    await SP.init();
+    btn.textContent='Paso 1: Inicializando MSAL…';
+    st.textContent='Cargando librería de autenticación…';st.style.color='var(--gray)';
+    try{
+      await SP.init();
+    }catch(e){
+      st.textContent='⚠ Error al inicializar: '+(e.message||e);st.style.color='#c0392b';
+      btn.disabled=false;btn.textContent='Reintentar';return;
+    }
   }
 
+  // Step 2: Login with Microsoft
   if(!SP.isLoggedIn()){
-    btn.textContent='Conectando…';
+    btn.textContent='Paso 2: Conectando con Microsoft…';
+    st.textContent='Redirigiendo a Microsoft para autenticar. Si no se abre, verificá que no bloquee popups/redirecciones.';st.style.color='var(--gray)';
     const ok=await SP.login();
     if(!ok){
       btn.disabled=false;
       btn.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Sincronizar con Microsoft';
-      st.textContent='⚠ No se pudo conectar';st.style.color='#c0392b';return;
+      st.textContent='⚠ No se pudo conectar con Microsoft. Verificá que tengas cuenta de Office 365 en PAMAR.';st.style.color='#c0392b';return;
     }
+    return; // page will redirect to Microsoft
   }
 
-  st.textContent='✓ '+SP.getName();st.style.color='var(--edenor)';
+  // Step 3: We're logged in
+  st.textContent='✓ Autenticado como '+SP.getName();st.style.color='var(--edenor)';
 
+  // Step 4: Find SharePoint site
   if(!SP.siteId){
-    st.textContent='Buscando sitios SharePoint…';st.style.color='var(--gray)';
+    btn.textContent='Paso 3: Buscando sitio SharePoint…';
+    st.textContent='Buscando sitio WMS en SharePoint…';st.style.color='var(--gray)';
     try{
       // First try direct access to WMS site
       var wmsSiteId=null;
       try{
         var wmsD=await SP.gGet('/sites/pamarsacifya.sharepoint.com:/sites/WMS');
         if(wmsD&&wmsD.id)wmsSiteId=wmsD.id;
-      }catch(ew){console.warn('WMS direct:',ew)}
+      }catch(ew){
+        console.warn('WMS direct:',ew);
+        st.textContent='Sitio WMS directo no encontrado, buscando otros sitios…';st.style.color='var(--gray)';
+      }
       // If we got WMS site directly, use it without picker
       if(wmsSiteId){
+        st.textContent='Sitio WMS encontrado, configurando…';st.style.color='var(--gray)';
         await SP.setupSite(wmsSiteId);
       }else{
         var sites=[];
         try{sites=await SP.discoverSites();}catch(ed){console.warn('discover:',ed)}
-        if(!sites.length){st.textContent='⚠ No se encontraron sitios. Pedí permisos de acceso al sitio WMS en SharePoint.';st.style.color='#c0392b';btn.disabled=false;return}
+        if(!sites.length){
+          st.innerHTML='⚠ No se encontraron sitios SharePoint.<br>El usuario <b>'+SP.getName()+'</b> necesita permisos de acceso al sitio WMS en SharePoint.';
+          st.style.color='#c0392b';btn.disabled=false;btn.textContent='Reintentar';return;
+        }
         if(sites.length===1){
           await SP.setupSite(sites[0].id);
         }else{
@@ -817,25 +900,32 @@ async function msLogin(){
       }
     }catch(e){
       if(e.message&&e.message.includes('403')){
-        st.textContent='⚠ Permiso denegado. Cerrando sesión para re-autorizar…';st.style.color='#c0392b';
-        localStorage.clear();
-        setTimeout(()=>location.reload(),2000);
-        return;
+        st.innerHTML='⚠ Permiso denegado (403). El usuario <b>'+SP.getName()+'</b> no tiene acceso al sitio SharePoint.<br>Pedí al administrador que le dé permisos.';
+        st.style.color='#c0392b';btn.disabled=false;btn.textContent='Reintentar';return;
       }
-      st.textContent='⚠ '+e.message;st.style.color='#c0392b';btn.disabled=false;return;
+      st.textContent='⚠ Error: '+(e.message||e);st.style.color='#c0392b';btn.disabled=false;btn.textContent='Reintentar';return;
     }
   }else if(!SP.listId){
-    try{await SP.ensureList()}catch(e){st.textContent='⚠ '+e.message;btn.disabled=false;return}
+    try{await SP.ensureList()}catch(e){st.textContent='⚠ Error con lista: '+(e.message||e);st.style.color='#c0392b';btn.disabled=false;return}
   }
 
-  st.textContent='Sincronizando datos…';st.style.color='var(--gray)';
-  const n=await SP.pullAll();
-  // Re-run seed and permisos with fresh data
-  seed();migratePermisos();updateStats();
+  // Step 5: Sync data
+  btn.textContent='Paso 4: Sincronizando datos…';
+  st.textContent='Descargando datos del WMS desde SharePoint…';st.style.color='var(--gray)';
+  try{
+    const n=await SP.pullAll();
+    // Re-run seed and permisos with fresh data
+    seed();migratePermisos();updateStats();
 
-  st.innerHTML='✓ Conectado · '+n+' tablas sincronizadas';st.style.color='var(--edenor)';
-  btn.innerHTML='✓ Conectado a SharePoint';btn.style.background='var(--edenor)';
-  toast('SharePoint sincronizado ('+n+' tablas)','ok');
+    st.innerHTML='✓ Conectado · '+n+' tablas sincronizadas · Ya podés iniciar sesión';st.style.color='var(--edenor)';
+    btn.innerHTML='✓ Conectado a SharePoint';btn.style.background='var(--edenor)';
+    toast('SharePoint sincronizado ('+n+' tablas). Ahora ingresá con tu usuario y contraseña.','ok');
+    // Hide first-time message
+    var ftm=document.getElementById('first-time-msg');if(ftm)ftm.style.display='none';
+  }catch(e){
+    st.textContent='⚠ Error al sincronizar: '+(e.message||e);st.style.color='#c0392b';
+    btn.disabled=false;btn.textContent='Reintentar';
+  }
 }
 
 function showSitePicker(sites){
@@ -4682,6 +4772,13 @@ function loginAs(nombre,rol,permisos){
   document.getElementById('sb-user').innerHTML=`Usuario: <b>${nombre}</b> (${rolLabel})`;
   updateStats();
   applyPermisos();
+  // Show SharePoint status in statusbar
+  if(SP.ready){
+    var sbSync=document.getElementById('sb-sync');if(sbSync)sbSync.style.display='';
+    var sbMs=document.getElementById('sb-ms');if(sbMs)sbMs.style.display='none';
+  }else if(['super','gerencial','admin'].includes(rol)){
+    var sbMs=document.getElementById('sb-ms');if(sbMs){sbMs.style.display='';sbMs.textContent='⚠ SharePoint desconectado';}
+  }
   go(rol==='sup'&&can('missol')?'missol':'home');
 }
 function applyPermisos(){
@@ -4704,6 +4801,8 @@ function logout(){
   document.getElementById('login').classList.remove('hide');
   document.getElementById('lg-user').value='';
   document.getElementById('lg-pass').value='';
+  var sbMs=document.getElementById('sb-ms');if(sbMs)sbMs.style.display='none';
+  var sbSync=document.getElementById('sb-sync');if(sbSync)sbSync.style.display='none';
 }
 function updateStats(){
   document.getElementById('sb-stats').innerHTML=`Registros: <b>${DB.count('materiales')} materiales · ${DB.count('obras')} obras · ${DB.count('supervisores')} supervisores</b>`;
@@ -4716,37 +4815,52 @@ seed();
 migratePermisos();
 buildNav();
 
+// Show first-time message if no users besides seed default
+(function(){
+  const us=DB.getAll('usuarios');
+  if(us.length<=1){
+    var ftm=document.getElementById('first-time-msg');if(ftm)ftm.style.display='block';
+  }
+})();
+
 // Initialize MSAL and check if already authenticated (or returning from redirect)
 SP.init().then(()=>{
+  const stEl=document.getElementById('ms-status');
+  const btnEl=document.getElementById('ms-login-btn');
   if(SP.isLoggedIn()){
-    const stEl=document.getElementById('ms-status');
-    const btnEl=document.getElementById('ms-login-btn');
-    stEl.textContent='✓ '+SP.getName();stEl.style.color='var(--edenor)';
+    stEl.textContent='✓ Autenticado como '+SP.getName();stEl.style.color='var(--edenor)';
     btnEl.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Conectado';
     btnEl.disabled=true;
     document.getElementById('ms-reset').style.display='block';
     if(SP.ready){
-      stEl.textContent='Sincronizando…';stEl.style.color='var(--gray)';
+      stEl.textContent='Sincronizando datos…';stEl.style.color='var(--gray)';
       SP.pullAll().then(n=>{
         seed();migratePermisos();
-        stEl.innerHTML='✓ Conectado · '+n+' tablas';stEl.style.color='var(--edenor)';
+        stEl.innerHTML='✓ Conectado · '+n+' tablas · Ya podés iniciar sesión';stEl.style.color='var(--edenor)';
         btnEl.innerHTML='✓ Conectado a SharePoint';btnEl.style.background='var(--edenor)';
+        var ftm=document.getElementById('first-time-msg');if(ftm)ftm.style.display='none';
       }).catch(e=>{
         if(e.message&&e.message.includes('403')){
-          // Permission denied on cached site — reset and let user pick again
           localStorage.removeItem('sp_siteId');localStorage.removeItem('sp_listId');
           SP.siteId=null;SP.listId=null;SP.ready=false;
-          stEl.textContent='Seleccioná un sitio SharePoint';stEl.style.color='var(--gray)';
-          btnEl.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Elegir sitio SharePoint';
+          stEl.innerHTML='⚠ Permiso denegado (403). El usuario <b>'+SP.getName()+'</b> no tiene acceso al sitio SharePoint.';stEl.style.color='#c0392b';
+          btnEl.innerHTML='<svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Reintentar';
           btnEl.disabled=false;
-        }else{stEl.textContent='⚠ Error sync: '+e.message;stEl.style.color='#c0392b'}
+        }else{stEl.textContent='⚠ Error al sincronizar: '+(e.message||e);stEl.style.color='#c0392b';btnEl.disabled=false;btnEl.textContent='Reintentar';}
       });
     } else {
       // Logged in but no site yet — auto-discover
       msLogin();
     }
+  }else{
+    // Not logged in — check if this is a fresh machine with no data
+    stEl.textContent='No conectado a Microsoft';stEl.style.color='var(--gray)';
   }
-}).catch(e=>console.warn('SP init error:',e));
+}).catch(e=>{
+  console.warn('SP init error:',e);
+  var stEl=document.getElementById('ms-status');
+  if(stEl){stEl.textContent='⚠ Error MSAL: '+(e.message||e);stEl.style.color='#c0392b';}
+});
 </script>
 </body>
 </html>
