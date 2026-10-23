@@ -539,7 +539,7 @@ const SP={
     try{
       var rUri=location.origin+location.pathname;
       console.log('MSAL login redirect URI:',rUri);
-      await this.msalApp.loginRedirect({scopes:['User.Read','Sites.ReadWrite.All'],prompt:'consent'});
+      await this.msalApp.loginRedirect({scopes:['User.Read','Sites.ReadWrite.All'],prompt:'select_account'});
       return true; // won't reach here, page redirects
     }catch(e){
       console.error('MSAL login error:',e);
