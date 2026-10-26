@@ -731,23 +731,42 @@ async function msLoginFromApp(){
 
 // ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
 const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJs6eURETO66H_Wf1DGQv8zW-HB2ANyKmjChrWDCo2PLGHPknQ/exec';
+
+// Función interna que hace la exportación real (sin UI)
+async function _doExportMaestros(){
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>`${o.id} · ${o.nombre}`);
+  const cuadrillas=DB.getAll('cuadrillas').map(c=>`${c.id} · ${cuaNombreCompleto(c)}`);
+  const supervisores=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
+  const materiales=DB.getAll('materiales').map(m=>({matricula:m.matricula,descripcion:m.descripcion,unidad:m.unidad||''}));
+  const dimeCuadrillas=DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide').map(c=>(c.apellido+' '+c.nombre).trim());
+  await fetch(GSCRIPT_URL,{
+    method:'POST',mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'sync_maestros',obras,cuadrillas,supervisores,materiales,dimeCuadrillas})
+  });
+}
+
+// Botón manual (con feedback visual)
 async function exportarMaestros(){
   const btn=event.target;
   btn.disabled=true;btn.textContent='⏳ Exportando…';
   try{
-    const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
-    const cuadrillas=DB.getAll('cuadrillas').map(c=>c.nombre);
-    const materiales=DB.getAll('materiales').map(m=>({matricula:m.matricula,descripcion:m.descripcion}));
-    await fetch(GSCRIPT_URL,{
-      method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'sync_maestros',obras,cuadrillas,materiales})
-    });
+    await _doExportMaestros();
     toast('✓ Datos exportados al formulario de cuadrillas');
   }catch(e){
     toast('⚠ Error al exportar: '+e.message,'err');
   }
   btn.disabled=false;btn.textContent='📤 Exportar datos para cuadrillas';
+}
+
+// Auto-export silencioso con debounce (espera 3s después del último cambio)
+let _autoExportTimer=null;
+function autoExportMaestros(){
+  if(_autoExportTimer) clearTimeout(_autoExportTimer);
+  _autoExportTimer=setTimeout(async()=>{
+    try{ await _doExportMaestros(); console.log('Auto-export maestros OK'); }
+    catch(e){ console.log('Auto-export maestros error:',e); }
+  },3000);
 }
 
 // ── AUTO-IMPORTAR SOLICITUDES DESDE GOOGLE SHEETS ──
@@ -785,24 +804,28 @@ async function solImportarNuevas(){
       let items=[];
       try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
 
+      const esDime=sol.esDime==='Si'||sol.esDime===true;
       const nueva={
         id:Date.now()+Math.floor(Math.random()*1000),
         codigo:sol.codigo,
-        estado:'Pendiente',
+        estado:esDime?'Aprobación Dime':'Pendiente',
         urgencia:sol.urgencia||'Normal',
         obra:sol.obra||'',
+        areaSolicitud:sol.areaSolicitud||'',
         cuadrilla:sol.cuadrilla||'',
-        supervisor:sol.cuadrilla||'',
+        supervisor:sol.supervisor||sol.cuadrilla||'',
         pidioUsuario:'Cuadrilla (formulario)',
         fecha:sol.fecha||new Date().toLocaleString('es-AR'),
         items:items.map(it=>({
           matricula:it.matricula||'',
           descripcion:it.descripcion||it.material||'',
           cantidad:it.cantidad||0,
-          unidad:'u'
+          unidad:it.unidad||'u'
         })),
         obs:sol.observaciones||'',
-        esDime:false,
+        esDime:esDime,
+        solicitanteDime:sol.solicitanteDime||'',
+        usuarioEdenor:sol.usuarioEdenor||'',
         origen:'google_sheets'
       };
       existentes.push(nueva);
@@ -1285,8 +1308,7 @@ function go(id,el){
   area.scrollTop=0;
   // post-render hooks
   if(POST_RENDER[id])POST_RENDER[id]();
-  // Auto-importar solicitudes de cuadrillas
-  if(id==='solicitudes'){solStartPolling();}else{solStopPolling();}
+  // Polling de solicitudes ahora es global (se inicia en doLogin)
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1421,6 +1443,7 @@ function saveMaterial(editId){
   var dup=DB.getAll('materiales').find(r=>r.matricula===d.matricula&&r.id!==editId);
   if(dup){toast('⚠ Ya existe un material con matrícula '+d.matricula,'err');return}
   if(editId)DB.update('materiales',editId,d);else DB.add('materiales',d);
+  autoExportMaestros();
   closeModal();toast(editId?'Material actualizado':'Material creado');go('materiales');
 }
 function editMaterial(id){
@@ -1486,6 +1509,7 @@ function confirmImportMat(){
     if(e){DB.update('materiales',e.id,{matricula:r.matricula,descripcion:r.descripcion,unidad:r.unidad,sector:r.sector});upd++}
     else{DB.add('materiales',{...r,stockMin:0,reqBobina:false,reqEdenor:false});nvos++}
   });
+  autoExportMaestros();
   closeModal();toast(`✓ ${nvos} nuevos, ${upd} actualizados`);go('materiales');
 }
 
@@ -1571,6 +1595,7 @@ function saveSupervisor(editId){
   const d={legajo:document.getElementById('s-legajo').value.trim(),nombre:document.getElementById('s-nombre').value.trim(),apellido:document.getElementById('s-apellido').value.trim(),area:document.getElementById('s-area').value,region:document.getElementById('s-region').value};
   if(!d.nombre){toast('El nombre es obligatorio','err');return}
   if(editId)DB.update('supervisores',editId,d);else DB.add('supervisores',d);
+  autoExportMaestros();
   closeModal();toast('Supervisor guardado');go('supervisores');
 }
 function editSupervisor(id){
@@ -1625,6 +1650,7 @@ function saveCuadrilla(editId){
   const d={legajo:document.getElementById('c-legajo').value.trim(),nombre:document.getElementById('c-nombre').value.trim(),apellido:document.getElementById('c-apellido').value.trim(),telefono:document.getElementById('c-telefono').value.trim(),area:document.getElementById('c-area').value,region:document.getElementById('c-region').value,usuarioEdenor:(document.getElementById('c-usredenor')||{value:''}).value.trim()};
   if(!d.nombre){toast('El nombre es obligatorio','err');return}
   if(editId)DB.update('cuadrillas',editId,d);else DB.add('cuadrillas',d);
+  autoExportMaestros();
   closeModal();toast('Cuadrilla guardada');go('cuadrillas');
 }
 function editCuadrilla(id){
@@ -1691,6 +1717,7 @@ function saveObra(editId){
   const d={nombre:document.getElementById('o-nombre').value.trim(),area:document.getElementById('o-area').value,region:document.getElementById('o-region').value,pep:(document.getElementById('o-pep')||{}).value||'',pedido:(document.getElementById('o-pedido')||{}).value||'',grafo:(document.getElementById('o-grafo')||{}).value||'',inspector:(document.getElementById('o-inspector')||{}).value||'',estado:document.getElementById('o-estado').value};
   if(!d.nombre){toast('El nombre es obligatorio','err');return}
   if(editId)DB.update('obras',editId,d);else DB.add('obras',d);
+  autoExportMaestros();
   closeModal();toast('Obra guardada');go('obras');
 }
 function editObra(id){
@@ -3393,7 +3420,7 @@ SCREENS.nuevasol=()=>{
   const cuads=DB.getAll('cuadrillas').map(c=>`${c.id} · ${cuaNombreCompleto(c)}`);
   const isWeb=(currentUser.vistaApp==='web');
   const formBody=`
-          <div class="pf"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+          <div class="pf" id="ns-obra-wrap"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
           <div class="pf"><label>Área</label><select id="ns-area"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
           <div class="pf" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()" style="width:18px;height:18px"><label for="ns-dime-chk" style="font-weight:600;cursor:pointer">Solicitud Dime Mide</label></div>
           <div id="ns-dime-fields" style="display:none">
@@ -3448,6 +3475,7 @@ function nsDimeToggle(){
   const isDime=chk&&chk.checked;
   df.style.display=isDime?'block':'none';
   const cw=document.getElementById('ns-cuad-wrap');if(cw)cw.style.display=isDime?'none':'block';
+  const ow=document.getElementById('ns-obra-wrap');if(ow)ow.style.display=isDime?'none':'block';
   if(isDime){
     const sel=document.getElementById('ns-solicitante');
     if(sel&&sel.options.length<=1){
@@ -4779,6 +4807,8 @@ function loginAs(nombre,rol,permisos){
   }else if(['super','gerencial','admin'].includes(rol)){
     var sbMs=document.getElementById('sb-ms');if(sbMs){sbMs.style.display='';sbMs.textContent='⚠ SharePoint desconectado';}
   }
+  // Iniciar polling global de solicitudes cada 60 seg
+  solStartPolling();
   go(rol==='sup'&&can('missol')?'missol':'home');
 }
 function applyPermisos(){
