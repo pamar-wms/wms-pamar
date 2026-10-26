@@ -394,8 +394,10 @@ function renderNsItemsList(){
 
 // ── ENVIAR ──
 async function sendSolicitud(){
+  const dimeChk0 = document.getElementById('ns-dime-chk');
+  const esDime0 = dimeChk0 && dimeChk0.checked;
   const obraText = document.getElementById('ns-obra').value.trim();
-  if(!obraText){ toast('Seleccioná una obra','err'); return; }
+  if(!esDime0 && !obraText){ toast('Seleccioná una obra','err'); return; }
 
   const items = nsItems.filter(it => it.matricula && it.cantidad > 0);
   if(!items.length){ toast('Agregá al menos un material','err'); return; }
