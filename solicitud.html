@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Solicitud de Material — PAMAR</title>
+<style>
+  :root{
+    --ink:#0f1f17; --steel:#1A3D27; --edenor:#25573A; --edenor-lt:#dce8df;
+    --accent:#c9a227; --line:#c3ccd4; --panel:#f4f6f8; --white:#fff;
+    --gray:#6b7885;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--panel);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+
+  /* ── HEADER ── */
+  .header{background:linear-gradient(135deg,#25573A,#1d4a30);color:#fff;padding:14px 18px}
+  .header .app-t{font-size:15px;font-weight:700}
+  .header .app-s{font-size:11px;opacity:.85;margin-top:2px}
+
+  /* ── FORM ── */
+  .form-wrap{flex:1;padding:14px 16px;max-width:500px;margin:0 auto;width:100%}
+
+  .pf{margin-bottom:11px}
+  .pf>label{display:block;font-size:10.5px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+  .pf input,.pf select,.pf textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;background:#f7f9fb}
+  .pf input:focus,.pf select:focus,.pf textarea:focus{outline:none;border-color:var(--edenor);box-shadow:0 0 0 3px rgba(37,87,58,.15)}
+  .pf select{appearance:auto;-webkit-appearance:auto}
+  .pf textarea{resize:none;height:52px}
+
+  /* ── URGENCIA ── */
+  .urgency{display:flex;gap:6px}
+  .urgency label{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:11.5px;cursor:pointer;background:#fff;font-weight:600;color:var(--gray);transition:all .2s}
+  .urgency input{display:none}
+  .urgency label.sel{border-color:var(--edenor);background:var(--edenor-lt);color:var(--edenor)}
+
+  /* ── MATERIALES CARGA RÁPIDA ── */
+  .mat-grid{display:grid;grid-template-columns:110px 1fr 80px;gap:6px;align-items:end;margin-bottom:8px}
+  .mat-grid label{font-size:10px;color:var(--gray);display:block;margin-bottom:2px}
+  .mat-grid input{width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px;font-family:inherit}
+  .mat-grid input:focus{outline:none;border-color:var(--edenor)}
+  .mat-grid input[readonly]{background:#f0f2f4;color:var(--ink)}
+  .mat-grid input.mat-err{color:#c53727}
+
+  .mat-items-list{margin-top:4px}
+  .mat-items-list .mat-header{font-size:10px;color:var(--gray);font-weight:700;margin-bottom:4px}
+  .mat-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#f7f9fb;border-radius:4px;margin-bottom:3px;font-size:12px}
+  .mat-row code{font-weight:700;min-width:70px}
+  .mat-row .mat-desc{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mat-row .mat-cant{min-width:50px;text-align:right;font-weight:700}
+  .mat-row .mat-del{background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+
+  .mat-hint{color:var(--gray);font-size:11px;text-align:center;padding:10px}
+
+  /* ── ENVIAR ── */
+  .phone-send{background:var(--edenor);color:#fff;border:none;border-radius:10px;width:100%;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
+  .phone-send:hover{background:#1d4a30}
+  .phone-send:active{transform:scale(.98)}
+  .phone-send:disabled{opacity:.5;pointer-events:none}
+
+  /* ── TOAST ── */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
+  .toast.ok{background:var(--edenor)}
+  .toast.err{background:#c53727}
+  .toast.show{opacity:1}
+
+  /* ── SUCCESS ── */
+  .success-screen{display:none;text-align:center;padding:60px 20px}
+  .success-screen .check{font-size:64px;margin-bottom:16px}
+  .success-screen h2{color:var(--edenor);font-size:22px;margin-bottom:8px}
+  .success-screen p{color:var(--gray);font-size:14px;margin-bottom:24px}
+  .success-screen button{padding:14px 32px;background:var(--edenor);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+
+  /* ── LOADING ── */
+  .loading{text-align:center;padding:40px 20px;color:var(--gray);font-size:14px}
+  .loading .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--line);border-top-color:var(--edenor);border-radius:50%;animation:sp .6s linear infinite;margin-bottom:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* ── DIME MIDE ── */
+  .dime-check{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .dime-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--edenor)}
+  .dime-check label{font-weight:600;cursor:pointer;font-size:13px}
+
+  /* ── SEARCHABLE SELECT ── */
+  .search-select{position:relative}
+  .search-select input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;background:#f7f9fb}
+  .search-select input:focus{outline:none;border-color:var(--edenor);box-shadow:0 0 0 3px rgba(37,87,58,.15)}
+  .ss-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--edenor);border-top:none;border-radius:0 0 8px 8px;max-height:180px;overflow-y:auto;z-index:20;display:none;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .ss-list.open{display:block}
+  .ss-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0}
+  .ss-item:active,.ss-item:hover{background:var(--edenor-lt)}
+  .ss-item b{color:var(--edenor)}
+  .ss-empty{padding:10px 12px;font-size:12px;color:var(--gray);text-align:center}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="app-t">🏗️ Solicitar Material</div>
+  <div class="app-s" id="headerUser">PAMAR</div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loadingScreen">
+  <div class="spin"></div>
+  <div>Cargando datos…</div>
+</div>
+
+<!-- FORM -->
+<div class="form-wrap" id="formWrap" style="display:none">
+
+  <div class="pf" id="ns-obra-wrap">
+    <label>Obra</label>
+    <div class="search-select">
+      <input type="text" id="ns-obra" placeholder="Escribí número o nombre de obra…" autocomplete="off" oninput="ssFilter('ns-obra','ns-obra-list',OBRAS)" onfocus="ssFilter('ns-obra','ns-obra-list',OBRAS)">
+      <div class="ss-list" id="ns-obra-list"></div>
+    </div>
+  </div>
+
+  <div class="pf">
+    <label>Área</label>
+    <select id="ns-area">
+      <option value="Obra y Distribución">Obra y Distribución</option>
+      <option value="Mantenimiento">Mantenimiento</option>
+      <option value="Dime Mide">Dime Mide</option>
+    </select>
+  </div>
+
+  <div class="dime-check">
+    <input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()">
+    <label for="ns-dime-chk">Solicitud Dime Mide</label>
+  </div>
+
+  <div id="ns-dime-fields" style="display:none">
+    <div class="pf">
+      <label>Nombre del solicitante</label>
+      <select id="ns-solicitante">
+        <option value="">— Seleccionar —</option>
+      </select>
+    </div>
+    <div class="pf">
+      <label>Usuario Edenor a asignar</label>
+      <input id="ns-usredenor" placeholder="Ej: PM001">
+    </div>
+  </div>
+
+  <div class="pf" id="ns-cuad-wrap">
+    <label>Cuadrilla</label>
+    <div class="search-select">
+      <input type="text" id="ns-cuad" placeholder="Escribí nombre o número…" autocomplete="off" oninput="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)" onfocus="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)">
+      <div class="ss-list" id="ns-cuad-list"></div>
+    </div>
+  </div>
+
+  <div class="pf">
+    <label>Supervisor (para quién se pide)</label>
+    <div class="search-select">
+      <input type="text" id="ns-sup" placeholder="Escribí nombre del supervisor…" autocomplete="off" oninput="ssFilter('ns-sup','ns-sup-list',SUPERVISORES)" onfocus="ssFilter('ns-sup','ns-sup-list',SUPERVISORES)">
+      <div class="ss-list" id="ns-sup-list"></div>
+    </div>
+  </div>
+
+  <div class="pf">
+    <label>Urgencia</label>
+    <div class="urgency" id="ns-urg">
+      <label onclick="selUrg(this,'Baja')">Baja</label>
+      <label class="sel" onclick="selUrg(this,'Normal')">Normal</label>
+      <label onclick="selUrg(this,'Urgente')">Urgente</label>
+    </div>
+  </div>
+
+  <div class="pf">
+    <label>📦 Materiales — carga rápida</label>
+    <div class="mat-grid">
+      <div>
+        <label>Matrícula</label>
+        <input id="ns-mat-inp" placeholder="Matrícula" oninput="nsMatAuto()" onkeydown="if(event.key==='Enter'){event.preventDefault();nsMatEnter()}">
+      </div>
+      <div>
+        <label>Descripción</label>
+        <input id="ns-desc-inp" readonly placeholder="—">
+      </div>
+      <div>
+        <label>Cantidad</label>
+        <input type="number" id="ns-cant-inp" placeholder="Cant." inputmode="numeric" onkeydown="if(event.key==='Enter'){event.preventDefault();nsCantEnter()}">
+      </div>
+    </div>
+    <div id="ns-items">
+      <div class="mat-hint">Escribí matrícula + Enter, cantidad + Enter para agregar</div>
+    </div>
+  </div>
+
+  <div class="pf">
+    <label>Observaciones</label>
+    <textarea id="ns-obs" placeholder="Aclaraciones para el pañolero…"></textarea>
+  </div>
+
+  <button class="phone-send" id="btnSend" onclick="sendSolicitud()">📤 Enviar solicitud al depósito</button>
+</div>
+
+<!-- SUCCESS -->
+<div class="success-screen" id="successScreen">
+  <div class="check">✅</div>
+  <h2>¡Solicitud enviada!</h2>
+  <p>Tu pedido llegó al depósito. Te avisamos cuando esté listo.</p>
+  <p id="successCode" style="font-size:18px;font-weight:700;color:var(--steel);margin-bottom:20px"></p>
+  <button onclick="nuevaSol()">📦 Hacer otro pedido</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJs6eURETO66H_Wf1DGQv8zW-HB2ANyKmjChrWDCo2PLGHPknQ/exec';
+
+// ── MASTER DATA ──
+let OBRAS = [];       // ["id · nombre", ...]
+let CUADRILLAS = [];  // ["id · nombre apellido", ...]
+let MATERIALES = [];  // [{matricula, descripcion, unidad?}, ...]
+let SUPERVISORES = []; // ["nombre", ...]
+let DIME_CUADRILLAS = []; // cuadrillas del área Dime Mide
+
+// ── STATE ──
+let nsItems = [];
+let selectedUrg = 'Normal';
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadMaestros();
+  renderNsItemsList();
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('formWrap').style.display = 'block';
+  nsObraChanged();
+});
+
+async function loadMaestros(){
+  try {
+    const resp = await fetch(SCRIPT_URL);
+    const data = await resp.json();
+    if(data.obras) OBRAS = data.obras;
+    if(data.cuadrillas) CUADRILLAS = data.cuadrillas;
+    if(data.materiales) MATERIALES = data.materiales;
+    if(data.supervisores) SUPERVISORES = data.supervisores;
+    if(data.dimeCuadrillas) DIME_CUADRILLAS = data.dimeCuadrillas;
+    // Cache para offline
+    localStorage.setItem('sol_maestros', JSON.stringify({
+      obras:OBRAS, cuadrillas:CUADRILLAS, materiales:MATERIALES,
+      supervisores:SUPERVISORES, dimeCuadrillas:DIME_CUADRILLAS
+    }));
+  } catch(e){
+    try {
+      const cached = JSON.parse(localStorage.getItem('sol_maestros')||'{}');
+      if(cached.obras) OBRAS = cached.obras;
+      if(cached.cuadrillas) CUADRILLAS = cached.cuadrillas;
+      if(cached.materiales) MATERIALES = cached.materiales;
+      if(cached.supervisores) SUPERVISORES = cached.supervisores || [];
+      if(cached.dimeCuadrillas) DIME_CUADRILLAS = cached.dimeCuadrillas || [];
+    } catch(ce){}
+  }
+}
+
+// ── SEARCHABLE SELECT (buscar mientras escribís) ──
+function ssFilter(inputId, listId, dataArr){
+  const inp = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const q = inp.value.trim().toLowerCase();
+
+  // Mostrar todos si el campo está vacío y tiene foco
+  const items = q.length < 1 ? dataArr.slice(0, 15) : dataArr.filter(x => x.toLowerCase().includes(q)).slice(0, 10);
+
+  if(!items.length){
+    list.innerHTML = '<div class="ss-empty">No se encontró</div>';
+  } else {
+    list.innerHTML = items.map(item => {
+      let display = esc(item);
+      if(q.length >= 1){
+        const idx = item.toLowerCase().indexOf(q);
+        if(idx >= 0){
+          display = esc(item.substring(0,idx)) + '<b>' + esc(item.substring(idx, idx+q.length)) + '</b>' + esc(item.substring(idx+q.length));
+        }
+      }
+      return `<div class="ss-item" data-val="${esc(item)}">${display}</div>`;
+    }).join('');
+  }
+  list.classList.add('open');
+
+  list.querySelectorAll('.ss-item').forEach(el => {
+    el.addEventListener('click', function(){
+      inp.value = this.dataset.val;
+      list.classList.remove('open');
+      if(inputId === 'ns-obra') nsObraChanged();
+    });
+  });
+}
+
+// Cerrar listas al hacer click afuera
+document.addEventListener('click', function(e){
+  document.querySelectorAll('.ss-list.open').forEach(list => {
+    if(!list.parentElement.contains(e.target)) list.classList.remove('open');
+  });
+});
+
+// ── OBRA CHANGED → auto-set area ──
+function nsObraChanged(){
+  // Si la obra tiene un área asociada en los datos, intentamos setearla
+  // Por ahora no tenemos esa info en el standalone, el usuario la elige manual
+}
+
+// ── DIME MIDE TOGGLE ──
+function nsDimeToggle(){
+  const chk = document.getElementById('ns-dime-chk');
+  const df = document.getElementById('ns-dime-fields');
+  const cw = document.getElementById('ns-cuad-wrap');
+  const ow = document.getElementById('ns-obra-wrap');
+  const isDime = chk && chk.checked;
+  df.style.display = isDime ? 'block' : 'none';
+  cw.style.display = isDime ? 'none' : 'block';
+  ow.style.display = isDime ? 'none' : 'block';
+  if(isDime){
+    const sel = document.getElementById('ns-solicitante');
+    if(sel && sel.options.length <= 1 && DIME_CUADRILLAS.length){
+      DIME_CUADRILLAS.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
+        sel.appendChild(o);
+      });
+    }
+  }
+}
+
+// ── URGENCIA ──
+function selUrg(el, val){
+  selectedUrg = val;
+  el.parentElement.querySelectorAll('label').forEach(l => l.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// ── MATERIALES CARGA RÁPIDA ──
+function matLookup(mat){
+  const m = MATERIALES.find(r => r.matricula === mat);
+  return m ? m.descripcion : null;
+}
+
+function nsMatAuto(){
+  const v = document.getElementById('ns-mat-inp').value.trim();
+  const desc = matLookup(v);
+  const di = document.getElementById('ns-desc-inp');
+  di.value = desc || '';
+  di.style.color = desc ? 'var(--ink)' : '#c53727';
+}
+
+function nsMatEnter(){
+  const mi = document.getElementById('ns-mat-inp');
+  if(!mi.value.trim()) return;
+  const desc = matLookup(mi.value.trim());
+  if(!desc){ toast('Matrícula no encontrada','err'); mi.select(); return; }
+  document.getElementById('ns-cant-inp').focus();
+}
+
+function nsCantEnter(){
+  const mi = document.getElementById('ns-mat-inp');
+  const ci = document.getElementById('ns-cant-inp');
+  const mat = mi.value.trim(), cant = parseInt(ci.value) || 0;
+  if(!mat || cant <= 0){ toast('Matrícula y cantidad requeridas','err'); return; }
+  const desc = matLookup(mat);
+  if(!desc){ toast('Matrícula no encontrada','err'); mi.select(); return; }
+  const m = MATERIALES.find(x => x.matricula === mat);
+  nsItems.push({matricula:mat, descripcion:desc, cantidad:cant, unidad:m&&m.unidad==='Metro'?'m':'u'});
+  mi.value = ''; ci.value = '';
+  document.getElementById('ns-desc-inp').value = '';
+  renderNsItemsList();
+  toast('✓ Agregado: ' + mat + ' ×' + cant);
+  // Foco de vuelta a matrícula para seguir cargando
+  setTimeout(function(){ mi.focus(); mi.click(); }, 100);
+}
+
+function renderNsItemsList(){
+  const c = document.getElementById('ns-items');
+  if(!c) return;
+  if(!nsItems.length){
+    c.innerHTML = '<div class="mat-hint">Escribí matrícula + Enter, cantidad + Enter para agregar</div>';
+    return;
+  }
+  c.innerHTML = '<div class="mat-items-list"><div class="mat-header">MATERIALES CARGADOS ('+nsItems.length+')</div>'
+    + nsItems.map((it,i) => `<div class="mat-row">
+      <code>${it.matricula}</code>
+      <span class="mat-desc">${it.descripcion}</span>
+      <b class="mat-cant">${it.cantidad} ${it.unidad}</b>
+      <button class="mat-del" onclick="nsItems.splice(${i},1);renderNsItemsList()">✕</button>
+    </div>`).join('') + '</div>';
+}
+
+// ── ENVIAR ──
+async function sendSolicitud(){
+  const obraText = document.getElementById('ns-obra').value.trim();
+  if(!obraText){ toast('Seleccioná una obra','err'); return; }
+
+  const items = nsItems.filter(it => it.matricula && it.cantidad > 0);
+  if(!items.length){ toast('Agregá al menos un material','err'); return; }
+  const areaSel = document.getElementById('ns-area');
+  const areaSolicitud = areaSel ? areaSel.value : '';
+  const dimeChk = document.getElementById('ns-dime-chk');
+  const esDime = dimeChk && dimeChk.checked;
+  const cuadText = esDime ? '' : document.getElementById('ns-cuad').value;
+  const supText = document.getElementById('ns-sup').value;
+
+  const btn = document.getElementById('btnSend');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando…';
+
+  const solicitud = {
+    obra: obraText,
+    areaSolicitud: areaSolicitud,
+    cuadrilla: cuadText,
+    supervisor: supText,
+    urgencia: selectedUrg,
+    materiales: JSON.stringify(items),
+    observaciones: document.getElementById('ns-obs').value,
+    fecha: new Date().toLocaleString('es-AR'),
+    estado: esDime ? 'Pend. aprobación' : 'Pendiente',
+    esDime: !!esDime
+  };
+
+  if(esDime){
+    const solSel = document.getElementById('ns-solicitante');
+    const usrEdn = document.getElementById('ns-usredenor');
+    if(solSel && solSel.value) solicitud.solicitanteDime = solSel.value;
+    if(usrEdn && usrEdn.value.trim()) solicitud.usuarioEdenor = usrEdn.value.trim();
+  }
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(solicitud)
+    });
+    showSuccess();
+  } catch(e){
+    try {
+      const pending = JSON.parse(localStorage.getItem('sol_pending') || '[]');
+      pending.push(solicitud);
+      localStorage.setItem('sol_pending', JSON.stringify(pending));
+      toast('Sin conexión — guardado. Se enviará cuando haya señal.','ok');
+    } catch(le){
+      toast('Error al enviar. Intentá de nuevo.','err');
+    }
+    btn.disabled = false;
+    btn.textContent = '📤 Enviar solicitud al depósito';
+  }
+}
+
+function showSuccess(){
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('successScreen').style.display = 'block';
+  document.getElementById('successCode').textContent = 'Código: SOL-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900)+100);
+}
+
+function nuevaSol(){
+  nsItems = [];
+  selectedUrg = 'Normal';
+  document.getElementById('formWrap').style.display = 'block';
+  document.getElementById('successScreen').style.display = 'none';
+  document.getElementById('ns-obra').value = '';
+  document.getElementById('ns-cuad').value = '';
+  document.getElementById('ns-sup').value = '';
+  document.getElementById('ns-obs').value = '';
+  document.getElementById('ns-mat-inp').value = '';
+  document.getElementById('ns-desc-inp').value = '';
+  document.getElementById('ns-cant-inp').value = '';
+  document.getElementById('ns-dime-chk').checked = false;
+  nsDimeToggle();
+  document.querySelectorAll('.urgency label').forEach(l => l.classList.remove('sel'));
+  document.querySelectorAll('.urgency label')[1].classList.add('sel');
+  renderNsItemsList();
+  document.getElementById('btnSend').disabled = false;
+  document.getElementById('btnSend').textContent = '📤 Enviar solicitud al depósito';
+}
+
+// ── UTILS ──
+function toast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Retry pending when back online
+window.addEventListener('online', async () => {
+  const pending = JSON.parse(localStorage.getItem('sol_pending') || '[]');
+  if(!pending.length) return;
+  for(const sol of pending){
+    try {
+      await fetch(SCRIPT_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(sol)});
+    } catch(e){ return; }
+  }
+  localStorage.removeItem('sol_pending');
+  toast('Solicitudes pendientes enviadas ✓');
+});
+</script>
+</body>
+</html>
