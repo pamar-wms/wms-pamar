@@ -808,7 +808,7 @@ async function solImportarNuevas(){
       const nueva={
         id:Date.now()+Math.floor(Math.random()*1000),
         codigo:sol.codigo,
-        estado:esDime?'Aprobación Dime':'Pendiente',
+        estado:esDime?EST_APROB:'Pendiente',
         urgencia:sol.urgencia||'Normal',
         obra:sol.obra||'',
         areaSolicitud:sol.areaSolicitud||'',
