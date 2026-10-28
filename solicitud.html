@@ -112,16 +112,11 @@
 
   <div class="pf">
     <label>Área</label>
-    <select id="ns-area">
+    <select id="ns-area" onchange="nsAreaChanged()">
       <option value="Obra y Distribución">Obra y Distribución</option>
       <option value="Mantenimiento">Mantenimiento</option>
       <option value="Dime Mide">Dime Mide</option>
     </select>
-  </div>
-
-  <div class="dime-check">
-    <input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()">
-    <label for="ns-dime-chk">Solicitud Dime Mide</label>
   </div>
 
   <div class="pf" id="ns-obra-wrap">
@@ -307,16 +302,16 @@ function nsObraChanged(){
   // Por ahora no tenemos esa info en el standalone, el usuario la elige manual
 }
 
-// ── DIME MIDE TOGGLE ──
-function nsDimeToggle(){
-  const chk = document.getElementById('ns-dime-chk');
+// ── ÁREA CHANGED (auto-detect Dime Mide) ──
+function nsAreaChanged(){
+  const areaSel = document.getElementById('ns-area');
+  const isDime = areaSel && areaSel.value === 'Dime Mide';
   const df = document.getElementById('ns-dime-fields');
   const cw = document.getElementById('ns-cuad-wrap');
   const ow = document.getElementById('ns-obra-wrap');
-  const isDime = chk && chk.checked;
-  df.style.display = isDime ? 'block' : 'none';
-  cw.style.display = isDime ? 'none' : 'block';
-  ow.style.display = isDime ? 'none' : 'block';
+  if(df) df.style.display = isDime ? 'block' : 'none';
+  if(cw) cw.style.display = isDime ? 'none' : 'block';
+  if(ow) ow.style.display = isDime ? 'none' : 'block';
   if(isDime){
     const sel = document.getElementById('ns-solicitante');
     if(sel && sel.options.length <= 1 && DIME_CUADRILLAS.length){
@@ -394,17 +389,14 @@ function renderNsItemsList(){
 
 // ── ENVIAR ──
 async function sendSolicitud(){
-  const dimeChk0 = document.getElementById('ns-dime-chk');
-  const esDime0 = dimeChk0 && dimeChk0.checked;
+  const areaSel = document.getElementById('ns-area');
+  const areaSolicitud = areaSel ? areaSel.value : '';
+  const esDime = areaSolicitud === 'Dime Mide';
   const obraText = document.getElementById('ns-obra').value.trim();
-  if(!esDime0 && !obraText){ toast('Seleccioná una obra','err'); return; }
+  if(!esDime && !obraText){ toast('Seleccioná una obra','err'); return; }
 
   const items = nsItems.filter(it => it.matricula && it.cantidad > 0);
   if(!items.length){ toast('Agregá al menos un material','err'); return; }
-  const areaSel = document.getElementById('ns-area');
-  const areaSolicitud = areaSel ? areaSel.value : '';
-  const dimeChk = document.getElementById('ns-dime-chk');
-  const esDime = dimeChk && dimeChk.checked;
   const cuadText = esDime ? '' : document.getElementById('ns-cuad').value;
   const supText = document.getElementById('ns-sup').value;
 
@@ -471,8 +463,8 @@ function nuevaSol(){
   document.getElementById('ns-mat-inp').value = '';
   document.getElementById('ns-desc-inp').value = '';
   document.getElementById('ns-cant-inp').value = '';
-  document.getElementById('ns-dime-chk').checked = false;
-  nsDimeToggle();
+  document.getElementById('ns-area').value = 'Obra y Distribución';
+  nsAreaChanged();
   document.querySelectorAll('.urgency label').forEach(l => l.classList.remove('sel'));
   document.querySelectorAll('.urgency label')[1].classList.add('sel');
   renderNsItemsList();
