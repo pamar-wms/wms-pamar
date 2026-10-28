@@ -326,7 +326,7 @@ function nsAreaChanged(){
   if(isSpecial){
     const sel = document.getElementById('ns-solicitante');
     sel.innerHTML = '<option value="">— Seleccionar —</option>';
-    const srcList = isDime ? DIME_CUADRILLAS : MANT_CUADRILLAS;
+    const srcList = isDime ? DIME_CUADRILLAS : CUADRILLAS;
     if(srcList && srcList.length){
       srcList.forEach(c => {
         const o = document.createElement('option');
@@ -408,8 +408,8 @@ async function sendSolicitud(){
   const esDime = areaSolicitud === 'Dime Mide';
   const isMant = areaSolicitud === 'Mantenimiento';
   const isSpecial = esDime || isMant;
-  const obraText = isDime ? '' : document.getElementById('ns-obra').value.trim();
-  if(!isDime && !obraText){ toast('Seleccioná una obra','err'); return; }
+  const obraText = esDime ? '' : document.getElementById('ns-obra').value.trim();
+  if(!esDime && !obraText){ toast('Seleccioná una obra','err'); return; }
 
   const items = nsItems.filter(it => it.matricula && it.cantidad > 0);
   if(!items.length){ toast('Agregá al menos un material','err'); return; }
