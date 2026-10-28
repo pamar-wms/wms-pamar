@@ -792,10 +792,11 @@ async function solImportarNuevas(){
 
     const existentes=DB.getAll('solicitudes');
     const codigos=new Set(existentes.map(s=>s.codigo));
+    const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
     let nuevas=0;
 
     for(const sol of data.solicitudes){
-      if(codigos.has(sol.codigo)) continue; // ya existe, saltar
+      if(codigos.has(sol.codigo)||deleted.has(sol.codigo)) continue; // ya existe o fue eliminada
       // Parsear materiales
       let items=[];
       try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
@@ -2812,7 +2813,15 @@ function solItemsDet(s){
 }
 function canDeleteSol(){return ['super','gerencial','admin'].includes(currentUser.rol)}
 function canEditSol(){return ['super','gerencial','admin','jefedep'].includes(currentUser.rol)}
-function delSolicitud(id){if(!confirm('¿Eliminar esta solicitud?'))return;DB.del('solicitudes',id);toast('Solicitud eliminada');go('solicitudes')}
+function delSolicitud(id){
+  if(!confirm('¿Eliminar esta solicitud?'))return;
+  const s=DB.get('solicitudes',id);
+  if(s&&s.codigo){
+    const deleted=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');
+    if(!deleted.includes(s.codigo)){deleted.push(s.codigo);localStorage.setItem('wms_sol_deleted',JSON.stringify(deleted));}
+  }
+  DB.del('solicitudes',id);toast('Solicitud eliminada');go('solicitudes');
+}
 function editarSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
   const mats=DB.getAll('materiales');
