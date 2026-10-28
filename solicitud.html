@@ -110,14 +110,6 @@
 <!-- FORM -->
 <div class="form-wrap" id="formWrap" style="display:none">
 
-  <div class="pf" id="ns-obra-wrap">
-    <label>Obra</label>
-    <div class="search-select">
-      <input type="text" id="ns-obra" placeholder="Escribí número o nombre de obra…" autocomplete="off" oninput="ssFilter('ns-obra','ns-obra-list',OBRAS)" onfocus="ssFilter('ns-obra','ns-obra-list',OBRAS)">
-      <div class="ss-list" id="ns-obra-list"></div>
-    </div>
-  </div>
-
   <div class="pf">
     <label>Área</label>
     <select id="ns-area">
@@ -125,6 +117,14 @@
       <option value="Mantenimiento">Mantenimiento</option>
       <option value="Dime Mide">Dime Mide</option>
     </select>
+  </div>
+
+  <div class="pf" id="ns-obra-wrap">
+    <label>Obra</label>
+    <div class="search-select">
+      <input type="text" id="ns-obra" placeholder="Escribí número o nombre de obra…" autocomplete="off" oninput="ssFilter('ns-obra','ns-obra-list',OBRAS)" onfocus="ssFilter('ns-obra','ns-obra-list',OBRAS)">
+      <div class="ss-list" id="ns-obra-list"></div>
+    </div>
   </div>
 
   <div class="dime-check">
