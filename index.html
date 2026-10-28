@@ -3564,7 +3564,8 @@ function nsAreaChanged(){
   if(isSpecial){
     const sel=document.getElementById('ns-solicitante');
     sel.innerHTML='<option value="">— Seleccionar —</option>';
-    const areaCuads=DB.getAll('cuadrillas').filter(c=>c.area===area).sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
+    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
+    areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
     areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
     document.getElementById('ns-usredenor').value='';
   }
