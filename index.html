@@ -668,6 +668,53 @@ const SP={
     try{await this.msalApp.logoutPopup()}catch(e){}
     this.account=null;this.ready=false;
     localStorage.removeItem('sp_siteId');localStorage.removeItem('sp_listId');
+  },
+
+  // ── POWER AUTOMATE: lista WMS_Notificaciones ──
+  _notifListId:null,
+  async ensureNotifList(){
+    if(this._notifListId)return this._notifListId;
+    const cached=localStorage.getItem('sp_notifListId');
+    if(cached){this._notifListId=cached;return cached;}
+    try{
+      const ls=await this.gGet('/sites/'+this.siteId+'/lists');
+      const found=(ls.value||[]).find(l=>l.displayName==='WMS_Notificaciones');
+      if(found){this._notifListId=found.id;localStorage.setItem('sp_notifListId',found.id);return found.id;}
+    }catch(e){}
+    // Crear lista con columnas para Power Automate
+    try{
+      const nl=await this.gPost('/sites/'+this.siteId+'/lists',{
+        displayName:'WMS_Notificaciones',
+        list:{template:'genericList'},
+        columns:[
+          {name:'Tipo',text:{maxLength:50}},
+          {name:'Mensaje',text:{allowMultipleLines:true,maxLength:0}},
+          {name:'Codigo',text:{maxLength:50}},
+          {name:'Area',text:{maxLength:50}},
+          {name:'Urgencia',text:{maxLength:20}},
+          {name:'Usuario',text:{maxLength:100}}
+        ]
+      });
+      this._notifListId=nl.id;localStorage.setItem('sp_notifListId',nl.id);return nl.id;
+    }catch(e){console.error('Error creando WMS_Notificaciones:',e);return null;}
+  },
+  async pushNotif(tipo,mensaje,extra){
+    if(!this.ready)return;
+    try{
+      const listId=await this.ensureNotifList();
+      if(!listId)return;
+      await this.gPost('/sites/'+this.siteId+'/lists/'+listId+'/items',{
+        fields:{
+          Title:tipo,
+          Tipo:tipo,
+          Mensaje:mensaje,
+          Codigo:extra.codigo||'',
+          Area:extra.area||'',
+          Urgencia:extra.urgencia||'',
+          Usuario:currentUser?currentUser.nombre:''
+        }
+      });
+    }catch(e){console.error('SP pushNotif:',e)}
   }
 };
 
@@ -2373,6 +2420,7 @@ function saveDespacho(){
   });
   const desp={fecha:document.getElementById('d-fecha').value,fechaHora:nowLocal(),obra:obraNombre,area:document.getElementById('d-area').value,region:document.getElementById('d-region').value,cuadrilla:document.getElementById('d-cuad').value,supervisor:document.getElementById('d-sup').value,remito:remito,items:items};
   DB.add('despachos',desp);
+  checkStockBajo(items);
   closeModal();toast('Despacho registrado — '+remito);go('despachos');
 }
 function delDespacho(id){
@@ -2717,14 +2765,21 @@ function notifSol(s,evento){
   const dueños=[...usersForPerson(s.supervisor),...usersForPerson(s.pidioUsuario)];
   const deposito=usersWith('despachos');
   const ref=`<b>${s.codigo}</b> · ${s.obra}`;
+  const refPlain=`${s.codigo} · ${s.obra||s.areaSolicitud||''}`;
   switch(evento){
     case 'nueva':
-      if(s.estado===EST_APROB){notify(usersWith('aprobardime'),'🛂',`Nueva solicitud Dime Mide para aprobar: ${ref} (${s.supervisor})`,s.id)}
-      else notify(deposito,'📥',`Nueva solicitud ${s.urgencia==='Urgente'?'<b style="color:#c53727">URGENTE</b> ':''}${ref} — ${s.supervisor}`,s.id);
+      if(s.estado===EST_APROB){
+        notify(usersWith('aprobardime'),'🛂',`Nueva solicitud Dime Mide para aprobar: ${ref} (${s.supervisor})`,s.id);
+        SP.pushNotif('Aprobación Dime',`Nueva solicitud Dime Mide para aprobar: ${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||'Dime Mide',urgencia:s.urgencia});
+      }else{
+        notify(deposito,'📥',`Nueva solicitud ${s.urgencia==='Urgente'?'<b style="color:#c53727">URGENTE</b> ':''}${ref} — ${s.supervisor}`,s.id);
+        SP.pushNotif('Nueva Solicitud',`Nueva solicitud ${s.urgencia==='Urgente'?'URGENTE ':'' }${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||'',urgencia:s.urgencia});
+      }
       break;
     case 'aprobada':
       notify(dueños,'✔️',`Tu solicitud ${ref} fue aprobada por ${s.aprobadoPor}${s.aprobModificada?' <b>con cantidades modificadas</b>':''}`,s.id);
       notify(deposito,'📥',`Nueva solicitud aprobada por Dime Mide: ${ref} — ${s.supervisor}`,s.id);
+      SP.pushNotif('Solicitud Aprobada',`Solicitud ${refPlain} aprobada por ${s.aprobadoPor||''}`,{codigo:s.codigo,area:s.areaSolicitud||'Dime Mide',urgencia:s.urgencia});
       break;
     case 'rechazada':
       notify(dueños,'✕',`Tu solicitud ${ref} fue rechazada por ${s.rechazadoPor}: ${s.motivoRechazo||'sin motivo'}`,s.id);break;
@@ -2735,6 +2790,29 @@ function notifSol(s,evento){
     case 'entregado':
       notify(dueños,'🚚',`Se entregó el material de ${ref} · Remito ${s.remito||'—'}`,s.id);break;
   }
+}
+// ── ALERTA STOCK BAJO → Power Automate ──
+function checkStockBajo(itemsDespachados){
+  if(!SP.ready)return;
+  const mats=DB.getAll('materiales');
+  const ingresos=DB.getAll('ingresos');
+  const despachos=DB.getAll('despachos');
+  const devoluciones=DB.getAll('devoluciones');
+  const traspContra=DB.getAll('traspcontra');
+  const matriculasDesp=new Set((itemsDespachados||[]).map(it=>it.matricula));
+
+  mats.filter(m=>matriculasDesp.has(m.matricula)&&(+m.stockMin||0)>0).forEach(m=>{
+    let ing=0,des=0,dev=0,tc=0;
+    ingresos.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)ing+=+it.cantidad||0}));
+    despachos.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)des+=+it.cantidad||0}));
+    devoluciones.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)dev+=+it.cantidad||0}));
+    traspContra.forEach(r=>{if(r.matricula===m.matricula)tc+=+r.cantidad||0});
+    const stock=ing-des+dev-tc;
+    if(stock<=m.stockMin){
+      const estado=stock<=0?'SIN STOCK':'BAJO MÍNIMO';
+      SP.pushNotif('Stock Bajo',`⚠️ ${estado}: ${m.matricula} — ${m.descripcion}. Stock actual: ${stock}, Mínimo: ${m.stockMin}`,{codigo:m.matricula,area:'Stock',urgencia:estado});
+    }
+  });
 }
 function myNotifs(){return DB.getAll('notificaciones').filter(n=>n.para===currentUser.id).sort((a,b)=>b.id-a.id)}
 let notifLastMax=0;
@@ -3066,6 +3144,7 @@ function generarRemitoEntrega(s){
   const o=DB.getAll('obras').find(x=>x.nombre===s.obra)||{};
   const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
   const desp=DB.add('despachos',{fecha:today(),fechaHora:nowLocal(),obra:s.obra,area:o.area||'',region:o.region||'',cuadrilla:s.cuadrilla||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo});
+  checkStockBajo(items);
   return {remito,desp};
 }
 let _solTabArea='Todas';
@@ -3423,8 +3502,8 @@ SCREENS.nuevasol=()=>{
           <div class="pf"><label>Área</label><select id="ns-area" onchange="nsAreaChanged()"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
           <div class="pf" id="ns-obra-wrap"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
           <div id="ns-dime-fields" style="display:none">
-            <div class="pf"><label>Nombre del solicitante</label><select id="ns-solicitante" onchange="nsDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
-            <div class="pf"><label>Usuario Edenor a asignar</label><input id="ns-usredenor" placeholder="Ej: PM001"></div>
+            <div class="pf"><label id="ns-sol-label">Cuadrilla</label><select id="ns-solicitante" onchange="nsDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
+            <div class="pf"><label id="ns-usr-label">Usuario Edenor a asignar</label><input id="ns-usredenor" placeholder="Ej: PM001"></div>
           </div>
           <div class="pf" id="ns-cuad-wrap"><label>Cuadrilla</label><select id="ns-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
           <div class="pf"><label>Supervisor (para quién se pide)</label><select id="ns-sup">${supOpts()}</select></div>
@@ -3469,18 +3548,25 @@ SCREENS.nuevasol=()=>{
 };
 function nsAreaChanged(){
   const areaSel=document.getElementById('ns-area');
-  const isDime=areaSel&&areaSel.value==='Dime Mide';
+  const area=areaSel?areaSel.value:'';
+  const isDime=area==='Dime Mide';
+  const isMant=area==='Mantenimiento';
+  const isSpecial=isDime||isMant;
   const df=document.getElementById('ns-dime-fields');
   if(!df)return;
-  df.style.display=isDime?'block':'none';
-  const cw=document.getElementById('ns-cuad-wrap');if(cw)cw.style.display=isDime?'none':'block';
+  df.style.display=isSpecial?'block':'none';
+  const cw=document.getElementById('ns-cuad-wrap');if(cw)cw.style.display=isSpecial?'none':'block';
   const ow=document.getElementById('ns-obra-wrap');if(ow)ow.style.display=isDime?'none':'block';
-  if(isDime){
+  const solLabel=document.getElementById('ns-sol-label');
+  const usrLabel=document.getElementById('ns-usr-label');
+  if(solLabel)solLabel.textContent='Cuadrilla';
+  if(usrLabel)usrLabel.textContent='Usuario Edenor a asignar';
+  if(isSpecial){
     const sel=document.getElementById('ns-solicitante');
-    if(sel&&sel.options.length<=1){
-      const dimeCuads=DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide').sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
-      dimeCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
-    }
+    sel.innerHTML='<option value="">— Seleccionar —</option>';
+    const areaCuads=DB.getAll('cuadrillas').filter(c=>c.area===area).sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
+    areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
+    document.getElementById('ns-usredenor').value='';
   }
 }
 function nsDimeSolChange(){
@@ -3552,16 +3638,19 @@ function sendSolicitud(){
   const areaSel=document.getElementById('ns-area');
   const areaSolicitud=areaSel?areaSel.value:'';
   const esDime=areaSolicitud==='Dime Mide';
-  const obraText=esDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
-  const cuadText=esDime?'':(document.getElementById('ns-cuad').value.split(' · ')[1]||document.getElementById('ns-cuad').value);
+  const isMant=areaSolicitud==='Mantenimiento';
+  const isSpecial=esDime||isMant;
+  const obraText=isDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
+  const cuadText=isSpecial?'':(document.getElementById('ns-cuad').value.split(' · ')[1]||document.getElementById('ns-cuad').value);
   const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:esDime?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime};
-  if(esDime){
+  if(isSpecial){
     const solSel=document.getElementById('ns-solicitante');
     const solCId=solSel?parseInt(solSel.value):0;
     const solCua=solCId?DB.get('cuadrillas',solCId):null;
     const solNom=solCua?(solCua.apellido+' '+solCua.nombre).trim():'';
     const usrEdn=(document.getElementById('ns-usredenor')||{}).value||'';
-    if(solNom)solData.solicitanteDime=solNom;
+    if(esDime&&solNom)solData.solicitanteDime=solNom;
+    if(isMant&&solNom)solData.cuadrilla=solNom;
     if(usrEdn)solData.usuarioEdenor=usrEdn.trim();
   }
   DB.add('solicitudes',solData);
