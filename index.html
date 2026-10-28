@@ -793,13 +793,9 @@ async function solImportarNuevas(){
     const existentes=DB.getAll('solicitudes');
     const codigos=new Set(existentes.map(s=>s.codigo));
     let nuevas=0;
-    const rowsImportadas=[];
 
     for(const sol of data.solicitudes){
-      if(codigos.has(sol.codigo)) {
-        rowsImportadas.push(sol.row); // ya existe, marcar como importada
-        continue;
-      }
+      if(codigos.has(sol.codigo)) continue; // ya existe, saltar
       // Parsear materiales
       let items=[];
       try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
@@ -829,7 +825,6 @@ async function solImportarNuevas(){
         origen:'google_sheets'
       };
       existentes.push(nueva);
-      rowsImportadas.push(sol.row);
       nuevas++;
     }
 
@@ -840,16 +835,7 @@ async function solImportarNuevas(){
       if(document.querySelector('.sol-tabs')) go('solicitudes');
     }
 
-    // Marcar como importadas en Google Sheets
-    if(rowsImportadas.length){
-      try{
-        await fetch(GSCRIPT_URL,{
-          method:'POST',mode:'no-cors',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'marcar_importadas',rows:rowsImportadas})
-        });
-      }catch(e){}
-    }
+    // No marcamos como importadas — así todos los usuarios reciben las mismas solicitudes
   }catch(e){
     console.log('Poll solicitudes error:',e);
   }
