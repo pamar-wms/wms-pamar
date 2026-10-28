@@ -119,17 +119,17 @@
     </select>
   </div>
 
+  <div class="dime-check">
+    <input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()">
+    <label for="ns-dime-chk">Solicitud Dime Mide</label>
+  </div>
+
   <div class="pf" id="ns-obra-wrap">
     <label>Obra</label>
     <div class="search-select">
       <input type="text" id="ns-obra" placeholder="Escribí número o nombre de obra…" autocomplete="off" oninput="ssFilter('ns-obra','ns-obra-list',OBRAS)" onfocus="ssFilter('ns-obra','ns-obra-list',OBRAS)">
       <div class="ss-list" id="ns-obra-list"></div>
     </div>
-  </div>
-
-  <div class="dime-check">
-    <input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()">
-    <label for="ns-dime-chk">Solicitud Dime Mide</label>
   </div>
 
   <div id="ns-dime-fields" style="display:none">
