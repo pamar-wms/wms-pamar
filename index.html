@@ -2552,8 +2552,8 @@ function addDevolucion(){
   openModal(`<h3>↩️ Nueva devolución</h3>
     <div class="fgrid">
       <div class="field"><label>Fecha</label><input type="date" id="dv-fecha" value="${today()}"></div>
-      <div class="field"><label>Obra origen</label><select id="dv-obra" onchange="dvObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
-      <div class="field"><label>Área</label><select id="dv-area"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
+      <div class="field" id="dv-obra-wrap"><label>Obra origen</label><select id="dv-obra" onchange="dvObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Área</label><select id="dv-area" onchange="dvAreaChanged()"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
       <div class="field"><label>Cuadrilla</label><select id="dv-cuad"><option value="">— Seleccionar —</option>${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Supervisor</label><select id="dv-sup"><option value="">— Seleccionar —</option>${sups.map(s=>`<option>${s}</option>`).join('')}</select></div>
       <div class="field wide"><label>Observaciones</label><input id="dv-obs" placeholder="Opcional"></div>
@@ -2567,13 +2567,18 @@ function addDevolucion(){
     </div>
     <div id="dev-items-list" style="margin-top:6px"></div>
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveDevolucion()">💾 Registrar devolución</button></div>`);
-  setTimeout(()=>{renderDevItemsList();dvObraChanged()},50);
+  setTimeout(()=>{renderDevItemsList();dvObraChanged();dvAreaChanged()},50);
 }
 function dvObraChanged(){
   const sel=document.getElementById('dv-obra');if(!sel)return;
   const area=obraArea(sel.value);
   const areaSel=document.getElementById('dv-area');
-  if(areaSel&&area)areaSel.value=area;
+  if(areaSel&&area){areaSel.value=area;dvAreaChanged();}
+}
+function dvAreaChanged(){
+  const area=(document.getElementById('dv-area')||{}).value||'';
+  const isDime=area==='Dime Mide';
+  const ow=document.getElementById('dv-obra-wrap');if(ow)ow.style.display=isDime?'none':'block';
 }
 function devMatAuto(){
   const v=document.getElementById('dv-mat-inp').value.trim();
@@ -2615,11 +2620,13 @@ function renderDevItemsList(){
   </div>`).join('');
 }
 function saveDevolucion(){
-  const obra=document.getElementById('dv-obra').value;
-  if(!obra){toast('Seleccioná una obra','err');return}
+  const area=(document.getElementById('dv-area')||{}).value||'';
+  const isDime=area==='Dime Mide';
+  const obra=isDime?'':(document.getElementById('dv-obra').value);
+  if(!isDime&&!obra){toast('Seleccioná una obra','err');return}
   const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,area:(document.getElementById('dv-area')||{}).value||'',cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
+  DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 
