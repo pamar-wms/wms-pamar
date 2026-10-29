@@ -1308,7 +1308,8 @@ const NAV_ITEMS=[
     {id:'stockfull',icon:'📊',label:'Stock completo'},
     {id:'movobra',icon:'📋',label:'Movimientos por obra'},
     {id:'medconsulta',icon:'🔍',label:'Consulta medidores'},
-    {id:'consultalibre',icon:'🧠',label:'Consulta personalizada'}
+    {id:'consultalibre',icon:'🧠',label:'Consulta personalizada'},
+    {id:'extraccion',icon:'📦',label:'Extracción de movimientos'}
   ]}
 ];
 
@@ -2272,7 +2273,7 @@ function importIngresoMasivo(){
     </div>
     <div class="fgrid" style="margin-bottom:10px">
       <div class="field"><label>Fecha</label><input type="date" id="im-fecha" value="${today()}"></div>
-      <div class="field"><label>Proveedor</label><select id="im-prov">${provs.map(p=>\`<option>\${p}</option>\`).join('')}</select></div>
+      <div class="field"><label>Proveedor</label><select id="im-prov">${provs.map(p=>'<option>'+p+'</option>').join('')}</select></div>
       <div class="field"><label>Remito de origen</label><input id="im-remito" placeholder="Nro de remito"></div>
     </div>
     <div class="field wide"><label>Pegá los datos acá (Matrícula + Cantidad)</label><textarea id="im-txt" rows="10" placeholder="2537&#9;850&#10;1558&#9;3&#10;3638&#9;120" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:11px;resize:vertical" oninput="previewImportIngreso()"></textarea></div>
