@@ -1187,18 +1187,9 @@ function migratePermisos(){
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v14','1');
   }
-  /* v15: cuadrillas Dime Mide + usuarioEdenor field */
+  /* v15: vistaApp + esDime flag (cuadrillas dmNames removidas, v17 las reemplaza) */
   if(!localStorage.getItem('wms_mig_v15')){
     const cuads=DB.getAll('cuadrillas');
-    const dmNames=['Alfonso Brenda Estefania','Avalos Fabian Ezequiel','Avalos Jonatas Nicolas','Benetti Leandro Matias','Bohos Sebastian Manuel','Caldentey Lucas Hector','Casazola Juan Pablo','Chao Martin Emilio','Chavez Santiago Jesús','Cobelli Carlos Andres','Contreras Arnaldo Nicolas','Dadin Damian','Echaniz Nahuel','Fernandez Nicolas Maximiliano','Galeano Leandro Matias','Gimenez Gustavo Ezequiel','Gomez Lucas Hernan','Gomez Maximiliano','Gutierrez Ignacio Gabriel','Gutierrez Juan Carlos','Insaurralde Rosana Sabrina','Lopez Gonzalo','Lopez Julio','Luna Diego Miguel','Mangussi Axel Ezequiel','Merlos Hector Horacio','Miranda Alberto Ezequiel','Nores Elias Maximiliano','Obregon Juan Jose','Ojeda Pablo','Pesce Marina Soledad','Repisarda Gustavo Ezequiel','Rodriguez Nestor Omar','Rolon Javier Carlos','Romano Ivan Emanuel','Romero Sergio Gustavo','Scigliano Gomez Franco','Serrano Federico Miguel','Sotomayor Tiziano Uriel','Olivera Marcos','Veliz Daniel Alberto','Ventura Gabriel Elian','Villasvoa Hugo Orlando','Rodriguez Néstor','Martinez Lautaro'];
-    let maxId=cuads.reduce((m,c)=>Math.max(m,c.id),0);
-    dmNames.forEach(n=>{
-      const parts=n.split(' ');
-      const apellido=parts[0];
-      const nombre=parts.slice(1).join(' ');
-      const exists=cuads.find(c=>c.area==='Dime Mide'&&c.apellido===apellido&&c.nombre===nombre);
-      if(!exists){maxId++;cuads.push({id:maxId,legajo:'DM'+String(maxId).padStart(3,'0'),nombre:nombre,apellido:apellido,area:'Dime Mide',region:'R1',usuarioEdenor:''})}
-    });
     cuads.forEach(c=>{if(c.usuarioEdenor===undefined)c.usuarioEdenor=''});
     DB.save('cuadrillas',cuads);
     /* add vistaApp to users */
