@@ -130,13 +130,17 @@
   <div id="ns-dime-fields" style="display:none">
     <div class="pf">
       <label id="ns-sol-label">Cuadrilla</label>
-      <select id="ns-solicitante">
-        <option value="">— Seleccionar —</option>
-      </select>
+      <div class="search-select">
+        <input type="text" id="ns-solicitante" placeholder="Escribí apellido o nombre…" autocomplete="off" oninput="ssFilter('ns-solicitante','ns-sol-list',_solCuads)" onfocus="ssFilter('ns-solicitante','ns-sol-list',_solCuads)">
+        <div class="ss-list" id="ns-sol-list"></div>
+      </div>
     </div>
     <div class="pf">
       <label id="ns-usr-label">Usuario Edenor a asignar</label>
-      <input id="ns-usredenor" placeholder="Ej: PM001">
+      <div class="search-select">
+        <input type="text" id="ns-usredenor" placeholder="Escribí usuario…" autocomplete="off" oninput="ssFilter('ns-usredenor','ns-usr-list',_solUsrs)" onfocus="ssFilter('ns-usredenor','ns-usr-list',_solUsrs)">
+        <div class="ss-list" id="ns-usr-list"></div>
+      </div>
     </div>
   </div>
 
@@ -217,10 +221,13 @@ let MATERIALES = [];  // [{matricula, descripcion, unidad?}, ...]
 let SUPERVISORES = []; // ["nombre", ...]
 let DIME_CUADRILLAS = []; // cuadrillas del área Dime Mide
 let MANT_CUADRILLAS = []; // cuadrillas del área Mantenimiento
+let USR_EDENOR = ['ddadin','jugutierrez','maolivera','lmgaleano','fserrano','eromano','jcasazola','segromero','megomez','sbohos','balfonso','alemiranda','rinsaurralde','gugimenez','grepisarda','pojeda','nimfernandez','sachavez','julilopez','iggutierrez','laumartinez','mpesce','juobregon','enores'];
 
 // ── STATE ──
 let nsItems = [];
 let selectedUrg = 'Normal';
+let _solCuads = [];
+let _solUsrs = [];
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -241,10 +248,12 @@ async function loadMaestros(){
     if(data.supervisores) SUPERVISORES = data.supervisores;
     if(data.dimeCuadrillas) DIME_CUADRILLAS = data.dimeCuadrillas;
     if(data.mantCuadrillas) MANT_CUADRILLAS = data.mantCuadrillas;
+    if(data.usuariosEdenor) USR_EDENOR = data.usuariosEdenor;
     // Cache para offline
     localStorage.setItem('sol_maestros', JSON.stringify({
       obras:OBRAS, cuadrillas:CUADRILLAS, materiales:MATERIALES,
-      supervisores:SUPERVISORES, dimeCuadrillas:DIME_CUADRILLAS, mantCuadrillas:MANT_CUADRILLAS
+      supervisores:SUPERVISORES, dimeCuadrillas:DIME_CUADRILLAS, mantCuadrillas:MANT_CUADRILLAS,
+      usuariosEdenor:USR_EDENOR
     }));
   } catch(e){
     try {
@@ -255,6 +264,7 @@ async function loadMaestros(){
       if(cached.supervisores) SUPERVISORES = cached.supervisores || [];
       if(cached.dimeCuadrillas) DIME_CUADRILLAS = cached.dimeCuadrillas || [];
       if(cached.mantCuadrillas) MANT_CUADRILLAS = cached.mantCuadrillas || [];
+      if(cached.usuariosEdenor) USR_EDENOR = cached.usuariosEdenor || [];
     } catch(ce){}
   }
 }
@@ -324,17 +334,10 @@ function nsAreaChanged(){
   if(solLabel) solLabel.textContent = 'Cuadrilla';
   if(usrLabel) usrLabel.textContent = 'Usuario Edenor a asignar';
   if(isSpecial){
-    const sel = document.getElementById('ns-solicitante');
-    sel.innerHTML = '<option value="">— Seleccionar —</option>';
     const srcList = isDime ? DIME_CUADRILLAS : CUADRILLAS;
-    if(srcList && srcList.length){
-      srcList.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c;
-        o.textContent = c;
-        sel.appendChild(o);
-      });
-    }
+    _solCuads = (srcList||[]).slice();
+    _solUsrs = (USR_EDENOR||[]).slice();
+    document.getElementById('ns-solicitante').value = '';
     document.getElementById('ns-usredenor').value = '';
   }
 }
