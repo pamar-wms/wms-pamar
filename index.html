@@ -5183,6 +5183,7 @@ function qlCompute(){
 }
 function qlCell(c,v){if(c.n)return fmtNum(Math.round((+v||0)*100)/100);if(c.t==='date')return fmtDate((v||'').slice(0,10));return v??''}
 function runConsulta(){
+  try{
   const res=qlCompute();
   if(res.err){toast(res.err,'err');return}
   qlLast=res;
@@ -5190,11 +5191,14 @@ function runConsulta(){
   const tot={};cols.filter(c=>c.n).forEach(c=>tot[c.k]=rows.reduce((s,r)=>s+(+r[c.k]||0),0));
   const body=rows.map(r=>`<tr>${cols.map(c=>`<td style="${c.n?'text-align:right':''}">${qlCell(c,r[c.k])}</td>`).join('')}</tr>`).join('');
   const foot=`<tr style="font-weight:700;background:var(--edenor-lt)">${cols.map((c,i)=>`<td style="${c.n?'text-align:right':''}">${i===0?`TOTAL (${rows.length}${total>rows.length?' de '+total:''})`:c.n?fmtNum(Math.round(tot[c.k]*100)/100):''}</td>`).join('')}</tr>`;
-  document.getElementById('ql-result').innerHTML=`<div style="font-size:12px;color:var(--gray);margin-bottom:6px">${total} resultado${total===1?'':'s'} · ${QL_SRC[res.st.fuente].label}${res.st.group?' · agrupado por '+cols[0].l:''}</div>
+  const el=document.getElementById('ql-result');
+  el.innerHTML=`<div style="font-size:12px;color:var(--gray);margin-bottom:6px">${total} resultado${total===1?'':'s'} · ${QL_SRC[res.st.fuente].label}${res.st.group?' · agrupado por '+cols[0].l:''}</div>
     <div class="tablewrap" style="overflow-x:auto"><table id="ql-table">
     <thead><tr>${cols.map(c=>`<th style="${c.n?'text-align:right':''}">${c.l}</th>`).join('')}</tr></thead>
     <tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Sin resultados con esos filtros</td></tr>`}${rows.length?foot:''}</tbody>
   </table></div>`;
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
+  }catch(e){toast('Error al ejecutar consulta: '+e.message,'err');console.error('runConsulta error:',e)}
 }
 function qlExport(){
   if(!qlLast)runConsulta();
