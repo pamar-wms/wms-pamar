@@ -848,10 +848,11 @@ async function solImportarNuevas(){
       try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
 
       const esDime=sol.esDime==='Si'||sol.esDime===true;
+      const esMant=sol.esMant==='Si'||sol.esMant===true||(sol.areaSolicitud==='Mantenimiento');
       const nueva={
         id:Date.now()+Math.floor(Math.random()*1000),
         codigo:sol.codigo,
-        estado:esDime?EST_APROB:'Pendiente',
+        estado:(esDime||(esMant&&!esDime))?EST_APROB:'Pendiente',
         urgencia:sol.urgencia||'Normal',
         obra:sol.obra||'',
         areaSolicitud:sol.areaSolicitud||'',
@@ -867,6 +868,7 @@ async function solImportarNuevas(){
         })),
         obs:sol.observaciones||'',
         esDime:esDime,
+        esMant:esMant,
         solicitanteDime:sol.solicitanteDime||'',
         usuarioEdenor:sol.usuarioEdenor||'',
         origen:'google_sheets'
@@ -1110,7 +1112,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1126,7 +1128,7 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
   const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
@@ -1135,7 +1137,7 @@ function migratePermisos(){
   let changed=false;
   users.forEach(u=>{
     if(!u.permisos){
-      u.permisos=u.rol==='super'||u.rol==='admin'||u.rol==='gerencial'?[...permAll]:u.rol==='jefedep'?[...permJefeDep]:u.rol==='sup'?[...permSup]:u.rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:u.rol==='administrativo'?[...permAdmin]:[...permOp];
+      u.permisos=u.rol==='super'||u.rol==='admin'||u.rol==='gerencial'?[...permAll]:u.rol==='jefedep'?[...permJefeDep]:u.rol==='sup'?[...permSup]:u.rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:u.rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:u.rol==='administrativo'?[...permAdmin]:[...permOp];
       changed=true;
     }
     // Migrate old 'admin' rol to 'super' for Guillermo
@@ -1376,6 +1378,13 @@ function migratePermisos(){
     DB.save('cuadrillas',newCuads);
     localStorage.setItem('wms_mig_v18','1');
   }
+  /* v19: permiso aprobación Mantenimiento para admins */
+  if(!localStorage.getItem('wms_mig_v19')){
+    const us=DB.getAll('usuarios');
+    us.forEach(u=>{if(['super','gerencial','admin'].includes(u.rol)&&u.permisos&&!u.permisos.includes('aprobarmant'))u.permisos.push('aprobarmant')});
+    DB.save('usuarios',us);
+    localStorage.setItem('wms_mig_v19','1');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1406,7 +1415,8 @@ const PERM_MODULES=[
     {id:'solicitudes',label:'Bandeja de solicitudes',icon:'📥'},
     {id:'nuevasol',label:'Nueva solicitud',icon:'📱'},
     {id:'missol',label:'Mis solicitudes (seguimiento)',icon:'📍'},
-    {id:'aprobardime',label:'Aprobar solicitudes Dime Mide',icon:'✔️'}
+    {id:'aprobardime',label:'Aprobar solicitudes Dime Mide',icon:'✔️'},
+    {id:'aprobarmant',label:'Aprobar solicitudes Mantenimiento',icon:'🔧'}
   ]},
   {group:'Consultas',items:[
     {id:'stockfull',label:'Stock completo',icon:'📊'},
@@ -1584,6 +1594,7 @@ SCREENS.home=()=>{
     :currentUser.rol==='sup'?'Acceso supervisor · Solicitar material y ver estado de solicitudes'
     :currentUser.rol==='administrativo'?'Consultas y reportes del depósito · PAMAR'
     :currentUser.rol==='dime'?'Aprobador Dime Mide · Revisá y aprobá los materiales que piden las cuadrillas'
+    :currentUser.rol==='mant'?'Aprobador Mantenimiento · Revisá y aprobá los materiales que piden las cuadrillas'
     :'Acceso operativo · Cargá ingresos, despachos, devoluciones y traspasos';
   return `<div class="screen on" style="display:block">
     <div class="hero"><h2>Sistema de Gestión de Depósito</h2><span>${heroText}</span></div>
@@ -1592,7 +1603,8 @@ SCREENS.home=()=>{
       <div class="stat"><div class="sv">${oCount}</div><div class="sl">Obras activas</div></div>
       <div class="stat"><div class="sv">${DB.count('despachos')}</div><div class="sl">Despachos realizados</div></div>
       <div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado==='Pendiente').length}</div><div class="sl">Solicitudes pendientes</div></div>
-      ${can('aprobardime')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB).length}</div><div class="sl">Esperan aprobación Dime</div></div>`:''}
+      ${can('aprobardime')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Dime Mide').length}</div><div class="sl">Esperan aprobación Dime</div></div>`:''}
+      ${can('aprobarmant')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Mantenimiento').length}</div><div class="sl">Esperan aprobación Mant.</div></div>`:''}
     </div>
     <div class="cards">
       <div class="card admin-only" onclick="go('materiales')"><div class="cic">📦</div><h3>Maestros</h3><p>Materiales, cuadrillas, supervisores, obras, sectores, áreas y regiones.</p></div>
@@ -2120,7 +2132,7 @@ function editProveedor(id){
 // ─── USUARIOS ───────────────────────────
 SCREENS.usuarios=()=>{
   const rows=DB.getAll('usuarios');
-  const rolLabel=r=>({super:'<span class="pill ok">Super Usuario</span>',gerencial:'<span class="pill" style="background:#ef9a9a;color:#3a0000">Gerencial</span>',admin:'<span class="pill ok">Admin</span>',jefedep:'<span class="pill" style="background:#e8a838;color:#2a1a00">Jefe Depósito</span>',op:'<span class="pill r2">Pañolero</span>',sup:'<span class="pill r3">Supervisor</span>',dime:'<span class="pill r1">Aprob. Dime</span>',administrativo:'<span class="pill" style="background:#b39ddb;color:#1a0040">Administrativo</span>'})[r]||`<span class="pill">${r}</span>`;
+  const rolLabel=r=>({super:'<span class="pill ok">Super Usuario</span>',gerencial:'<span class="pill" style="background:#ef9a9a;color:#3a0000">Gerencial</span>',admin:'<span class="pill ok">Admin</span>',jefedep:'<span class="pill" style="background:#e8a838;color:#2a1a00">Jefe Depósito</span>',op:'<span class="pill r2">Pañolero</span>',sup:'<span class="pill r3">Supervisor</span>',dime:'<span class="pill r1">Aprob. Dime</span>',mant:'<span class="pill" style="background:#90caf9;color:#0d47a1">Aprob. Mant.</span>',administrativo:'<span class="pill" style="background:#b39ddb;color:#1a0040">Administrativo</span>'})[r]||`<span class="pill">${r}</span>`;
   const actLabel=a=>a?'<span class="pill ok">Activo</span>':'<span class="pill fin">Inactivo</span>';
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.id}</td>
@@ -2132,7 +2144,7 @@ SCREENS.usuarios=()=>{
     <div class="shead"><div class="sicon">👤</div><div><h1>Gestión de Usuarios</h1><p>Crear y administrar cuentas de acceso al sistema</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addUsuario()">＋ Nuevo usuario</button></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--gray);margin-bottom:14px">
-      💡 Cada usuario necesita una cuenta Microsoft 365 para la futura integración con SharePoint. Las cuadrillas de <b>Dime Mide</b> harán sus solicitudes por <b>Microsoft Forms</b> (integración futura). Para que alguien apruebe esas solicitudes, marcale el permiso <b>"Aprobar solicitudes Dime Mide"</b> (o elegí el rol "Aprobador Dime Mide").
+      💡 Cada usuario necesita una cuenta Microsoft 365 para la futura integración con SharePoint. Las cuadrillas de <b>Dime Mide</b> y <b>Mantenimiento</b> harán sus solicitudes por <b>Microsoft Forms</b> (integración futura). Para que alguien apruebe esas solicitudes, marcale el permiso <b>"Aprobar solicitudes Dime Mide"</b> o <b>"Aprobar solicitudes Mantenimiento"</b> (o elegí el rol correspondiente).
     </div>
     <div class="tablewrap"><table>
       <thead><tr><th>ID</th><th>Nombre</th><th>Email 365</th><th>Usuario</th><th>Rol</th><th>Vista</th><th>Estado</th><th>Acciones</th></tr></thead>
@@ -2143,7 +2155,7 @@ SCREENS.usuarios=()=>{
 function permCheckboxes(selected){
   const sel=selected||[];
   let h='<div class="field wide"><label>Permisos — Acceso a módulos</label>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="toggleAllPerms(true)">✅ Todos</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="toggleAllPerms(false)">❌ Ninguno</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'jefedep\')">🏭 Jefe Dep.</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'op\')">🔧 Pañolero</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'sup\')">📋 Supervisor</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'administrativo\')">📊 Administrativo</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'dime\')">🛂 Aprob. Dime</button></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="toggleAllPerms(true)">✅ Todos</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="toggleAllPerms(false)">❌ Ninguno</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'jefedep\')">🏭 Jefe Dep.</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'op\')">🔧 Pañolero</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'sup\')">📋 Supervisor</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'administrativo\')">📊 Administrativo</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'dime\')">🛂 Aprob. Dime</button><button type="button" class="btn" style="font-size:10px;padding:4px 10px" onclick="presetPerms(\'mant\')">🔧 Aprob. Mant.</button></div>';
   PERM_MODULES.forEach(g=>{
     h+=`<div style="margin-bottom:6px"><div style="font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">${g.group}</div>`;
     h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px">';
@@ -2163,10 +2175,11 @@ function presetPerms(preset){
   const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
+  const mantP=['solicitudes','aprobarmant','stockfull','movobra'];
   const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
-  const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='administrativo'?adminP:supP;
+  const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='mant'?mantP:preset==='administrativo'?adminP:supP;
   document.querySelectorAll('.perm-chk').forEach(c=>{c.checked=allow.includes(c.value);c.parentElement.style.background=c.checked?'var(--edenor-lt)':'#f7f9fb'});
 }
 function getSelectedPerms(){
@@ -2180,7 +2193,7 @@ function addUsuario(){
       <div class="field"><label>Email Microsoft 365</label><input id="u-email" type="email" placeholder="nombre@empresa.com"></div>
       <div class="field"><label>Usuario (login)</label><input id="u-usuario" placeholder="Sin espacios"></div>
       <div class="field"><label>Contraseña</label><input id="u-clave" type="text" placeholder="Mínimo 6 caracteres"></div>
-      <div class="field"><label>Rol base</label><select id="u-rol" onchange="presetPerms(this.value)"><option value="super">Super Usuario</option><option value="gerencial">Gerencial</option><option value="jefedep">Jefe de Depósito</option><option value="op">Pañolero</option><option value="sup">Supervisor</option><option value="administrativo">Administrativo</option><option value="dime">Aprobador Dime Mide</option></select></div>
+      <div class="field"><label>Rol base</label><select id="u-rol" onchange="presetPerms(this.value)"><option value="super">Super Usuario</option><option value="gerencial">Gerencial</option><option value="jefedep">Jefe de Depósito</option><option value="op">Pañolero</option><option value="sup">Supervisor</option><option value="administrativo">Administrativo</option><option value="dime">Aprobador Dime Mide</option><option value="mant">Aprobador Mantenimiento</option></select></div>
       <div class="field"><label>Vista Nueva Solicitud</label><select id="u-vistaapp"><option value="app">📱 App (móvil)</option><option value="web">🖥️ Web (escritorio)</option></select></div>
     </div>
     ${permCheckboxes(allPerms)}
@@ -2219,7 +2232,7 @@ function editUsuario(id){
       <div class="field"><label>Email 365</label><input id="u-email" type="email" value="${r.email||''}"></div>
       <div class="field"><label>Usuario</label><input id="u-usuario" value="${r.usuario}"></div>
       <div class="field"><label>Contraseña</label><input id="u-clave" value="••••••" onfocus="if(this.value==='••••••')this.value=''"></div>
-      <div class="field"><label>Rol base</label><select id="u-rol" onchange="presetPerms(this.value)">${[{v:'super',l:'Super Usuario'},{v:'gerencial',l:'Gerencial'},{v:'jefedep',l:'Jefe de Depósito'},{v:'op',l:'Pañolero'},{v:'sup',l:'Supervisor'},{v:'administrativo',l:'Administrativo'},{v:'dime',l:'Aprobador Dime Mide'}].map(x=>`<option value="${x.v}"${x.v===r.rol?' selected':''}>${x.l}</option>`).join('')}</select></div>
+      <div class="field"><label>Rol base</label><select id="u-rol" onchange="presetPerms(this.value)">${[{v:'super',l:'Super Usuario'},{v:'gerencial',l:'Gerencial'},{v:'jefedep',l:'Jefe de Depósito'},{v:'op',l:'Pañolero'},{v:'sup',l:'Supervisor'},{v:'administrativo',l:'Administrativo'},{v:'dime',l:'Aprobador Dime Mide'},{v:'mant',l:'Aprobador Mantenimiento'}].map(x=>`<option value="${x.v}"${x.v===r.rol?' selected':''}>${x.l}</option>`).join('')}</select></div>
       <div class="field"><label>Vista Nueva Solicitud</label><select id="u-vistaapp"><option value="app"${(r.vistaApp||'app')==='app'?' selected':''}>📱 App (móvil)</option><option value="web"${r.vistaApp==='web'?' selected':''}>🖥️ Web (escritorio)</option></select></div>
     </div>
     ${permCheckboxes(r.permisos||[])}
@@ -3066,17 +3079,21 @@ function notifSol(s,evento){
   switch(evento){
     case 'nueva':
       if(s.estado===EST_APROB){
-        notify(usersWith('aprobardime'),'🛂',`Nueva solicitud Dime Mide para aprobar: ${ref} (${s.supervisor})`,s.id);
-        SP.pushNotif('Aprobación Dime',`Nueva solicitud Dime Mide para aprobar: ${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||'Dime Mide',urgencia:s.urgencia});
+        const _isMant=solGetArea(s)==='Mantenimiento';
+        const _apPerm=_isMant?'aprobarmant':'aprobardime';
+        const _apLabel=_isMant?'Mantenimiento':'Dime Mide';
+        notify(usersWith(_apPerm),'🛂',`Nueva solicitud ${_apLabel} para aprobar: ${ref} (${s.supervisor})`,s.id);
+        SP.pushNotif(`Aprobación ${_apLabel}`,`Nueva solicitud ${_apLabel} para aprobar: ${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||_apLabel,urgencia:s.urgencia});
       }else{
         notify(deposito,'📥',`Nueva solicitud ${s.urgencia==='Urgente'?'<b style="color:#c53727">URGENTE</b> ':''}${ref} — ${s.supervisor}`,s.id);
         SP.pushNotif('Nueva Solicitud',`Nueva solicitud ${s.urgencia==='Urgente'?'URGENTE ':'' }${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||'',urgencia:s.urgencia});
       }
       break;
     case 'aprobada':
+      const _apLbl2=solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide';
       notify(dueños,'✔️',`Tu solicitud ${ref} fue aprobada por ${s.aprobadoPor}${s.aprobModificada?' <b>con cantidades modificadas</b>':''}`,s.id);
-      notify(deposito,'📥',`Nueva solicitud aprobada por Dime Mide: ${ref} — ${s.supervisor}`,s.id);
-      SP.pushNotif('Solicitud Aprobada',`Solicitud ${refPlain} aprobada por ${s.aprobadoPor||''}`,{codigo:s.codigo,area:s.areaSolicitud||'Dime Mide',urgencia:s.urgencia});
+      notify(deposito,'📥',`Nueva solicitud aprobada por ${_apLbl2}: ${ref} — ${s.supervisor}`,s.id);
+      SP.pushNotif('Solicitud Aprobada',`Solicitud ${refPlain} aprobada por ${s.aprobadoPor||''}`,{codigo:s.codigo,area:s.areaSolicitud||_apLbl2,urgencia:s.urgencia});
       break;
     case 'rechazada':
       notify(dueños,'✕',`Tu solicitud ${ref} fue rechazada por ${s.rechazadoPor}: ${s.motivoRechazo||'sin motivo'}`,s.id);break;
@@ -3244,7 +3261,7 @@ function solActionBtns(s,inModal){
   const st=s.estado,stop='event.stopPropagation();',cm=inModal?'closeModal();':'';
   const delBtn=canDeleteSol()?` <button onclick="${stop}${cm}delSolicitud(${s.id})" title="Eliminar" style="background:#c53727;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🗑️</button>`:'';
   const editBtn=canEditSol()&&[EST_APROB,'Pendiente','En preparación'].includes(st)?` <button onclick="${stop}${cm}editarSolicitud(${s.id})" title="Editar solicitud" style="background:#e8a838;color:#2a1a00;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button>`:'';
-  if(st===EST_APROB){const apb=can('aprobardime')?`<button class="pr" onclick="${stop}${cm}aprobarSol(${s.id})">✔ Aprobar</button><button onclick="${stop}${cm}rechazarSol(${s.id})">✕ Rechazar</button>`:'';return apb+editBtn+delBtn}
+  if(st===EST_APROB){const apb=canAprobar(s)?`<button class="pr" onclick="${stop}${cm}aprobarSol(${s.id})">✔ Aprobar</button><button onclick="${stop}${cm}rechazarSol(${s.id})">✕ Rechazar</button>`:'';return apb+editBtn+delBtn}
   if(['Pendiente','En preparación','Listo'].includes(st)&&!can('despachos'))return editBtn+delBtn;
   if(st==='Pendiente')return `<button class="pr" onclick="${stop}imprimirSolicitud(${s.id})">🖨️ Imprimir picking</button>`+editBtn+delBtn;
   if(st==='En preparación')return (inModal?`<button class="pr" onclick="${stop}marcarListoSol(${s.id})">✔ Marcar listo</button>`:`<button class="pr" onclick="${stop}verSolicitud(${s.id})">📦 Preparar</button>`)+editBtn+delBtn;
@@ -3286,7 +3303,7 @@ function verSolicitud(id){
       <div><span>Fecha y hora</span><b>${fmtFechaHora(s.fecha)}</b></div>
       ${s.solicitanteDime?`<div><span>Solicitante Dime Mide</span><b>${s.solicitanteDime}</b></div>`:''}
       ${s.usuarioEdenor?`<div><span>Usuario Edenor</span><b>${s.usuarioEdenor}</b></div>`:''}
-      ${s.aprobadoPor?`<div><span>Aprobó (Dime Mide)</span><b>${s.aprobadoPor}</b></div>`:''}
+      ${s.aprobadoPor?`<div><span>Aprobó (${solGetArea(s)==='Mantenimiento'?'Mant.':'Dime Mide'})</span><b>${s.aprobadoPor}</b></div>`:''}
       ${s.remito?`<div><span>Remito</span><b>${s.remito}</b></div>`:''}
     </div>
     ${s.obs||s.obsAprob?`<div style="font-size:12px;background:#fff8e6;border:1px solid #f1dfb0;border-radius:6px;padding:8px 10px;margin-bottom:10px">💬 ${[s.obs,s.obsAprob&&('Aprobador: '+s.obsAprob)].filter(Boolean).join('<br>')}</div>`:''}
@@ -3323,7 +3340,7 @@ function imprimirSolicitud(id){
       <div><span>Obra</span><b>${s.obra||'— ('+(s.areaSolicitud||'Sin área')+')'}</b></div><div><span>Área / Región</span><b>${s.areaSolicitud||o.area||'—'} · ${o.region||'—'}</b></div><div><span>Cuadrilla</span><b>${s.cuadrilla||s.solicitanteDime||'—'}</b></div>
       <div><span>Supervisor</span><b>${s.supervisor}</b></div><div><span>Pidió (usuario)</span><b>${pidio}</b></div><div><span>Fecha y hora del pedido</span><b>${fmtFechaHora(s.fecha)}</b></div>
       ${s.solicitanteDime?`<div><span>Solicitante Dime Mide</span><b>${s.solicitanteDime}</b></div>`:''}${s.usuarioEdenor?`<div><span>Usuario Edenor</span><b>${s.usuarioEdenor}</b></div>`:''}
-      ${s.aprobadoPor?`<div><span>Aprobó Dime Mide</span><b>${s.aprobadoPor}</b></div>`:''}
+      ${s.aprobadoPor?`<div><span>Aprobó ${solGetArea(s)==='Mantenimiento'?'Mant.':'Dime Mide'}</span><b>${s.aprobadoPor}</b></div>`:''}
     </div>
     ${s.obs?`<p><b>Observaciones:</b> ${s.obs}</p>`:''}
     <table><thead><tr><th>Sector</th><th>Matrícula</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th>UM</th><th style="text-align:center">✓</th></tr></thead>
@@ -3452,7 +3469,7 @@ function solBuildCard(s,st){
   const cut=t=>(t||'').length>24?(t||'').slice(0,23)+'…':(t||'');
   const itemsText=(s.items||[]).map(it=>{const orig=it.cantEntregada!=null?it.cantidad:it.cantPedida;const fin=it.cantEntregada??it.cantidad;return `${cut(it.descripcion)} (${orig!=null&&orig!==fin?`<s style="color:#b3261e">${orig}</s> → `:''}${fin}${it.unidad||''})`}).concat((s.itemsQuitados||[]).map(it=>`<s style="color:#b3261e">${cut(it.descripcion)} (${it.cantPedida}${it.unidad||''})</s>`)).join(' · ');
   const btns=solActionBtns(s,false);
-  const actions=btns?`<div class="sc-actions">${btns}</div>`:(st===EST_APROB?`<div class="sc-wait">Esperando aprobación de Dime Mide</div>`:'');
+  const actions=btns?`<div class="sc-actions">${btns}</div>`:(st===EST_APROB?`<div class="sc-wait">Esperando aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}</div>`:'');
   const pidio=s.pidioUsuario||s.supervisor;
   return `<div class="solcard" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
@@ -3559,7 +3576,7 @@ SCREENS.solicitudes=()=>{
     const states=[EST_APROB,'Pendiente','En preparación','Listo','Entregado'];
     const cls=['aprob','pend','prep','listo','entr'];
     const icons=['🛂','⏳','🔧','✅','🚚'];
-    const labels=['Aprobación Dime Mide','Pendientes','En preparación','Listos para retirar','Entregados hoy'];
+    const labels=['Pend. aprobación','Pendientes','En preparación','Listos para retirar','Entregados hoy'];
     let cols='';
     states.forEach((st,i)=>{
       if(!showAprob&&st===EST_APROB)return;
@@ -3620,7 +3637,7 @@ SCREENS.solicitudes=()=>{
   if(_solTabArea==='Todas'){
     /* Main view — sections by area */
     const areaGroups=[
-      {area:'Mantenimiento',icon:'🔧',label:'Mantenimiento',color:'#2e75b6',aprob:false},
+      {area:'Mantenimiento',icon:'🔧',label:'Mantenimiento',color:'#2e75b6',aprob:true},
       {area:'Obra y Distribución',icon:'🏗️',label:'Obra y Distribución',color:'#c47a1f',aprob:false},
       {area:'Dime Mide',icon:'📐',label:'Dime Mide',color:'#7a4fa3',aprob:true}
     ];
@@ -3636,7 +3653,7 @@ SCREENS.solicitudes=()=>{
     /* Rechazadas across all */
     const rechazadas=allSols.filter(s=>s.estado==='Rechazada');
     if(rechazadas.length){body+=`<div style="margin:12px 0 16px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px">
-      <div style="font-weight:700;margin-bottom:6px">✕ Rechazadas por Dime Mide (${rechazadas.length})</div>
+      <div style="font-weight:700;margin-bottom:6px">✕ Rechazadas (${rechazadas.length})</div>
       ${rechazadas.map(s=>`<div style="font-size:12px;padding:4px 0;border-top:1px solid #eef2f5"><b>${s.codigo}</b> · ${s.obra} · ${s.supervisor} — <span style="color:#b3261e">${s.motivoRechazo||'Sin motivo'}</span> <span style="color:var(--gray)">(${s.rechazadoPor||''})</span></div>`).join('')}
     </div>`}
   }else if(_solTabArea==='Medidores'){
@@ -3644,11 +3661,11 @@ SCREENS.solicitudes=()=>{
   }else{
     /* Single area tab */
     const sols=allSols.filter(s=>solGetArea(s)===_solTabArea);
-    const showAprob=_solTabArea==='Dime Mide';
+    const showAprob=_solTabArea==='Dime Mide'||_solTabArea==='Mantenimiento';
     body=solBuildKanban(sols,showAprob);
     const rechazadas=sols.filter(s=>s.estado==='Rechazada');
     if(rechazadas.length){body+=`<div style="margin-bottom:16px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px">
-      <div style="font-weight:700;margin-bottom:6px">✕ Rechazadas por Dime Mide (${rechazadas.length})</div>
+      <div style="font-weight:700;margin-bottom:6px">✕ Rechazadas (${rechazadas.length})</div>
       ${rechazadas.map(s=>`<div style="font-size:12px;padding:4px 0;border-top:1px solid #eef2f5"><b>${s.codigo}</b> · ${s.obra} · ${s.supervisor} — <span style="color:#b3261e">${s.motivoRechazo||'Sin motivo'}</span> <span style="color:var(--gray)">(${s.rechazadoPor||''})</span></div>`).join('')}
     </div>`}
   }
@@ -3657,7 +3674,7 @@ SCREENS.solicitudes=()=>{
     <div class="sol-tabs">${tabs}</div>
     ${body}
     <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--gray)">
-      💡 <b>Tocá una tarjeta</b> para ver el detalle. <b>Circuito:</b> Pendiente → <b>imprimir picking</b> pasa a En preparación → ajustar cantidades e <b>imprimir remito</b> pasa a Listo → <b>confirmar entrega</b> pasa a Entregado. Las solicitudes de obras <b>Dime Mide</b> primero pasan por aprobación.
+      💡 <b>Tocá una tarjeta</b> para ver el detalle. <b>Circuito:</b> Pendiente → <b>imprimir picking</b> pasa a En preparación → ajustar cantidades e <b>imprimir remito</b> pasa a Listo → <b>confirmar entrega</b> pasa a Entregado. Las solicitudes de <b>Dime Mide</b> y <b>Mantenimiento</b> primero pasan por aprobación.
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="solImportarNuevas().then(()=>go('solicitudes'))" style="padding:8px 16px;background:var(--edenor);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">🔄 Importar solicitudes</button>
@@ -3666,8 +3683,9 @@ SCREENS.solicitudes=()=>{
     </div>
   </div>`;
 };
+function canAprobar(s){const a=solGetArea(s);return(a==='Mantenimiento'&&can('aprobarmant'))||(a!=='Mantenimiento'&&can('aprobardime'))}
 function aprobarSol(id){
-  if(!can('aprobardime')){toast('No tenés permiso para aprobar','err');return}
+  const _s=DB.get('solicitudes',id);if(_s&&!canAprobar(_s)){toast('No tenés permiso para aprobar','err');return}
   const s=DB.get('solicitudes',id);if(!s)return;
   const rows=(s.items||[]).map((it,i)=>`<tr>
     <td><code>${it.matricula}</code></td><td style="white-space:normal">${it.descripcion}</td>
@@ -3722,7 +3740,7 @@ function confirmAprobar(id){
   toast(mod?'Aprobada con cantidades modificadas':'Solicitud aprobada · pasa al depósito');go('solicitudes');
 }
 function rechazarSol(id){
-  if(!can('aprobardime')){toast('No tenés permiso para rechazar','err');return}
+  const _rs2=DB.get('solicitudes',id);if(_rs2&&!canAprobar(_rs2)){toast('No tenés permiso para rechazar','err');return}
   const motivo=prompt('Motivo del rechazo:');
   if(motivo===null)return;
   const _rs=DB.update('solicitudes',id,{estado:'Rechazada',rechazadoPor:currentUser.nombre,motivoRechazo:motivo.trim(),fechaRechazo:new Date().toISOString()});
@@ -3731,7 +3749,7 @@ function rechazarSol(id){
 }
 function moveSol(id,newState){
   const s=DB.getAll('solicitudes').find(x=>x.id===id);
-  if(s&&s.estado===EST_APROB){toast('Falta la aprobación de Dime Mide','err');return}
+  if(s&&s.estado===EST_APROB){toast(`Falta la aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}`,'err');return}
   DB.update('solicitudes',id,{estado:newState});
   toast('Solicitud movida a: '+newState);
   go('solicitudes');
@@ -3741,9 +3759,10 @@ function moveSol(id,newState){
 let misFiltro='curso';
 function esMia(s){return s.pidioUsuario===currentUser.nombre||s.supervisor===currentUser.nombre||usersForPerson(s.supervisor).includes(currentUser.id)}
 function solEtapas(s){
-  const dime=s.esDime||s.aprobadoPor||s.estado===EST_APROB||(s.estado==='Rechazada');
+  const dime=s.esDime||s.esMant||s.aprobadoPor||s.estado===EST_APROB||(s.estado==='Rechazada');
+  const _etLabel=solGetArea(s)==='Mantenimiento'?'Mant.':'Dime';
   const E=[{k:'env',l:'Enviada',ic:'📤',f:s.fecha}];
-  if(dime)E.push({k:'apr',l:s.estado==='Rechazada'?'Rechazada':'Aprobada Dime',ic:s.estado==='Rechazada'?'✕':'🛂',f:s.fechaAprob||s.fechaRechazo});
+  if(dime)E.push({k:'apr',l:s.estado==='Rechazada'?'Rechazada':`Aprobada ${_etLabel}`,ic:s.estado==='Rechazada'?'✕':'🛂',f:s.fechaAprob||s.fechaRechazo});
   E.push({k:'pen',l:'En depósito',ic:'⏳'},{k:'prep',l:'Preparando',ic:'🔧',f:s.fechaPrep},{k:'listo',l:'Lista p/ retirar',ic:'✅',f:s.fechaRemito},{k:'ent',l:'Entregada',ic:'🚚',f:s.fechaEntrega});
   const orden={[EST_APROB]:'env','Rechazada':'apr','Pendiente':'pen','En preparación':'prep','Listo':'listo','Entregado':'ent'};
   const cur=s.estado==='Entregado'?E.length:E.findIndex(e=>e.k===orden[s.estado]);
@@ -3947,7 +3966,7 @@ function sendSolicitud(){
   const isSpecial=esDime||isMant;
   const obraText=esDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
   const cuadText=isSpecial?'':document.getElementById('ns-cuad').value;
-  const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:esDime?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime};
+  const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:(esDime||isMant)?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime,esMant:!!isMant};
   if(isSpecial){
     const solSel=document.getElementById('ns-solicitante');
     const solCId=solSel?parseInt(solSel.value):0;
@@ -3960,7 +3979,7 @@ function sendSolicitud(){
   }
   DB.add('solicitudes',solData);
   notifSol(DB.getAll('solicitudes').slice(-1)[0],'nueva');
-  toast(esDime?'Solicitud enviada · espera aprobación de Dime Mide':'Solicitud enviada al depósito');
+  toast((esDime||isMant)?`Solicitud enviada · espera aprobación de ${esDime?'Dime Mide':'Mantenimiento'}`:'Solicitud enviada al depósito');
   go(can('missol')&&currentUser.rol==='sup'?'missol':can('solicitudes')?'solicitudes':can('missol')?'missol':'home');
 }
 
@@ -5254,23 +5273,23 @@ function loginAs(nombre,rol,permisos){
     const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
     const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra'];
     const supP=['nuevasol','missol'];
-    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
+    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
-  document.body.classList.remove('rol-op','rol-admin','rol-sup','rol-super','rol-gerencial','rol-jefedep','rol-administrativo');
+  document.body.classList.remove('rol-op','rol-admin','rol-sup','rol-super','rol-gerencial','rol-jefedep','rol-administrativo','rol-mant');
   document.body.classList.add('rol-'+rol);
   document.getElementById('ub-name').textContent=nombre;
   document.getElementById('ub-av').textContent=nombre.charAt(0).toUpperCase();
   const rolEl=document.getElementById('ub-rol');
-  const rolNames={super:'Super Usuario',gerencial:'Gerencial',admin:'Admin',jefedep:'Jefe Depósito',op:'Pañolero',sup:'Supervisor',dime:'Aprob. Dime',administrativo:'Administrativo'};
+  const rolNames={super:'Super Usuario',gerencial:'Gerencial',admin:'Admin',jefedep:'Jefe Depósito',op:'Pañolero',sup:'Supervisor',dime:'Aprob. Dime',mant:'Aprob. Mant.',administrativo:'Administrativo'};
   rolEl.textContent=rolNames[rol]||rol;
-  const rolClasses={op:'op',sup:'sup',dime:'sup',jefedep:'jefedep',administrativo:'administrativo',gerencial:'gerencial'};
+  const rolClasses={op:'op',sup:'sup',dime:'sup',mant:'sup',jefedep:'jefedep',administrativo:'administrativo',gerencial:'gerencial'};
   rolEl.className='role'+(rolClasses[rol]?' '+rolClasses[rol]:'');
-  const rolLabels={super:'Control total',gerencial:'Acceso gerencial',admin:'Control total',jefedep:'Jefe de depósito',op:'Acceso operativo',sup:'Acceso supervisor',dime:'Aprobador Dime Mide',administrativo:'Acceso administrativo'};
+  const rolLabels={super:'Control total',gerencial:'Acceso gerencial',admin:'Control total',jefedep:'Jefe de depósito',op:'Acceso operativo',sup:'Acceso supervisor',dime:'Aprobador Dime Mide',mant:'Aprobador Mantenimiento',administrativo:'Acceso administrativo'};
   const rolLabel=rolLabels[rol]||'Acceso básico';
   document.getElementById('sb-user').innerHTML=`Usuario: <b>${nombre}</b> (${rolLabel})`;
   updateStats();
