@@ -1028,51 +1028,150 @@ function seed(){
   DB.save('regiones',[]);
   DB.save('supervisores',[]);
   DB.save('cuadrillas',[
-    {id:1,legajo:'DM001',nombre:'Brenda Estefania',apellido:'Alfonso',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:2,legajo:'DM002',nombre:'Fabian Ezequiel',apellido:'Avalos',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:3,legajo:'DM003',nombre:'Jonatas Nicolas',apellido:'Avalos',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:4,legajo:'DM004',nombre:'Leandro Matias',apellido:'Benetti',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:5,legajo:'DM005',nombre:'Sebastian Manuel',apellido:'Bohos',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:6,legajo:'DM006',nombre:'Lucas Hector',apellido:'Caldentey',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:7,legajo:'DM007',nombre:'Juan Pablo',apellido:'Casazola',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:8,legajo:'DM008',nombre:'Martin Emilio',apellido:'Chao',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:9,legajo:'DM009',nombre:'Santiago Jesús',apellido:'Chavez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:10,legajo:'DM010',nombre:'Carlos Andres',apellido:'Cobelli',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:11,legajo:'DM011',nombre:'Arnaldo Nicolas',apellido:'Contreras',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:12,legajo:'DM012',nombre:'Damian',apellido:'Dadin',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:13,legajo:'DM013',nombre:'Nahuel',apellido:'Echaniz',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:14,legajo:'DM014',nombre:'Nicolas Maximiliano',apellido:'Fernandez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:15,legajo:'DM015',nombre:'Leandro Matias',apellido:'Galeano',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:16,legajo:'DM016',nombre:'Gustavo Ezequiel',apellido:'Gimenez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:17,legajo:'DM017',nombre:'Lucas Hernan',apellido:'Gomez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:18,legajo:'DM018',nombre:'Maximiliano',apellido:'Gomez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:19,legajo:'DM019',nombre:'Ignacio Gabriel',apellido:'Gutierrez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:20,legajo:'DM020',nombre:'Juan Carlos',apellido:'Gutierrez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:21,legajo:'DM021',nombre:'Rosana Sabrina',apellido:'Insaurralde',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:22,legajo:'DM022',nombre:'Gonzalo',apellido:'Lopez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:23,legajo:'DM023',nombre:'Julio',apellido:'Lopez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:24,legajo:'DM024',nombre:'Diego Miguel',apellido:'Luna',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:25,legajo:'DM025',nombre:'Axel Ezequiel',apellido:'Mangussi',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:26,legajo:'DM026',nombre:'Hector Horacio',apellido:'Merlos',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:27,legajo:'DM027',nombre:'Alberto Ezequiel',apellido:'Miranda',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:28,legajo:'DM028',nombre:'Elias Maximiliano',apellido:'Nores',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:29,legajo:'DM029',nombre:'Juan Jose',apellido:'Obregon',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:30,legajo:'DM030',nombre:'Pablo',apellido:'Ojeda',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:31,legajo:'DM031',nombre:'Marina Soledad',apellido:'Pesce',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:32,legajo:'DM032',nombre:'Gustavo Ezequiel',apellido:'Repisarda',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:33,legajo:'DM033',nombre:'Nestor Omar',apellido:'Rodriguez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:34,legajo:'DM034',nombre:'Javier Carlos',apellido:'Rolon',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:35,legajo:'DM035',nombre:'Ivan Emanuel',apellido:'Romano',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:36,legajo:'DM036',nombre:'Sergio Gustavo',apellido:'Romero',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:37,legajo:'DM037',nombre:'Franco',apellido:'Scigliano Gomez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:38,legajo:'DM038',nombre:'Federico Miguel',apellido:'Serrano',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:39,legajo:'DM039',nombre:'Tiziano Uriel',apellido:'Sotomayor',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:40,legajo:'DM040',nombre:'Marcos',apellido:'Olivera',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:41,legajo:'DM041',nombre:'Daniel Alberto',apellido:'Veliz',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:42,legajo:'DM042',nombre:'Gabriel Elian',apellido:'Ventura',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:43,legajo:'DM043',nombre:'Hugo Orlando',apellido:'Villasvoa',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:44,legajo:'DM044',nombre:'Néstor',apellido:'Rodriguez',area:'Dime Mide',region:'R1',usuarioEdenor:''},
-    {id:45,legajo:'DM045',nombre:'Lautaro',apellido:'Martinez',area:'Dime Mide',region:'R1',usuarioEdenor:''}
+    {id:1,legajo:'18000',nombre:'Juan Carlos',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'jugutierrez'},
+    {id:2,legajo:'18001',nombre:'Damian Joan',apellido:'DADIN',area:'Dime Mide',region:'R1',usuarioEdenor:'ddadin'},
+    {id:3,legajo:'18008',nombre:'Juan Pablo',apellido:'CASAZOLA',area:'Dime Mide',region:'R1',usuarioEdenor:'jcasazola'},
+    {id:4,legajo:'18010',nombre:'Javier Carlos',apellido:'ROLON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:5,legajo:'18013',nombre:'Leandro Matias',apellido:'GALEANO',area:'Dime Mide',region:'R1',usuarioEdenor:'lmgaleano'},
+    {id:6,legajo:'18014',nombre:'Sergio Gustavo',apellido:'ROMERO',area:'Dime Mide',region:'R1',usuarioEdenor:'segromero'},
+    {id:7,legajo:'18017',nombre:'Elias Maximiliano Jesus',apellido:'NORES',area:'Dime Mide',region:'R1',usuarioEdenor:'enores'},
+    {id:8,legajo:'18020',nombre:'Federico Miguel',apellido:'SERRANO',area:'Dime Mide',region:'R1',usuarioEdenor:'fserrano'},
+    {id:9,legajo:'18021',nombre:'Lucas Hector',apellido:'CALDENTEY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:10,legajo:'18023',nombre:'Ivan Emanuel',apellido:'ROMANO',area:'Dime Mide',region:'R1',usuarioEdenor:'eromano'},
+    {id:11,legajo:'18029',nombre:'Lucas Hernan',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:12,legajo:'18030',nombre:'Gonzalo Matias',apellido:'DADI',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:13,legajo:'18035',nombre:'Rosana Sabrina',apellido:'INSAURRALDE',area:'Dime Mide',region:'R1',usuarioEdenor:'rinsaurralde'},
+    {id:14,legajo:'18036',nombre:'Brenda Estefania',apellido:'ALFONSO',area:'Dime Mide',region:'R1',usuarioEdenor:'balfonso'},
+    {id:15,legajo:'18039',nombre:'Nahuel Daniel',apellido:'SOTOMAYOR',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:16,legajo:'18040',nombre:'Pablo Leonardo',apellido:'OJEDA',area:'Dime Mide',region:'R1',usuarioEdenor:'pojeda'},
+    {id:17,legajo:'18041',nombre:'Agustin',apellido:'ARRIETA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:18,legajo:'18042',nombre:'Leandro Angel',apellido:'ORELLANA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:19,legajo:'18043',nombre:'Maximiliano Ezequiel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'megomez'},
+    {id:20,legajo:'18050',nombre:'Cesar Nelson',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:21,legajo:'18051',nombre:'Juan Jose',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:'juobregon'},
+    {id:22,legajo:'18053',nombre:'Sebastian Manuel',apellido:'BOHOS',area:'Dime Mide',region:'R1',usuarioEdenor:'sbohos'},
+    {id:23,legajo:'18054',nombre:'Gustavo Ezequiel',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'gugimenez'},
+    {id:24,legajo:'18055',nombre:'Alberto Ezequiel',apellido:'MIRANDA',area:'Dime Mide',region:'R1',usuarioEdenor:'alemiranda'},
+    {id:25,legajo:'18056',nombre:'Angel Tomas',apellido:'DE NICOLA PIKEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:26,legajo:'18058',nombre:'Marina Soledad',apellido:'PESCE',area:'Dime Mide',region:'R1',usuarioEdenor:'mpesce'},
+    {id:27,legajo:'18059',nombre:'Daniel Alberto',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:28,legajo:'18060',nombre:'Gustavo Ezequiel',apellido:'REPISARDA',area:'Dime Mide',region:'R1',usuarioEdenor:'grepisarda'},
+    {id:29,legajo:'18062',nombre:'Santiago Jesus',apellido:'CHAVEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'sachavez'},
+    {id:30,legajo:'18064',nombre:'Nicolas Maximiliano',apellido:'FERNANDEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'nimfernandez'},
+    {id:31,legajo:'18066',nombre:'Julio',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'julilopez'},
+    {id:32,legajo:'18067',nombre:'Ignacio Gabriel',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'iggutierrez'},
+    {id:33,legajo:'18068',nombre:'Arnaldo Nicola',apellido:'CONTRERAS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:34,legajo:'18071',nombre:'Dylan Leandro',apellido:'ORREGO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:35,legajo:'18072',nombre:'Santiague',apellido:'ARISTIDE',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:36,legajo:'18073',nombre:'Maximo',apellido:'MARTIN',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:37,legajo:'18074',nombre:'Mauro',apellido:'GEREZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:38,legajo:'18075',nombre:'Elias Alejandro',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:39,legajo:'18079',nombre:'Bautista',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:40,legajo:'18082',nombre:'Juan',apellido:'GODOY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:41,legajo:'18083',nombre:'Joaquin Gabriel',apellido:'HOYOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:42,legajo:'18084',nombre:'Pablo',apellido:'VILLANUEVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:43,legajo:'18086',nombre:'Aldo',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:44,legajo:'18089',nombre:'Juan Ignacio',apellido:'VILLAREAL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:45,legajo:'18092',nombre:'Diego',apellido:'CASTRO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:46,legajo:'18093',nombre:'Claudio',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:47,legajo:'18094',nombre:'Ariel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:48,legajo:'18095',nombre:'Diego',apellido:'VIDELA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:49,legajo:'18096',nombre:'Gonzalo',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:50,legajo:'18097',nombre:'Lautaro',apellido:'MARTINEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'laumartinez'},
+    {id:51,legajo:'18099',nombre:'Alexis',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:52,legajo:'18100',nombre:'Federico',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:53,legajo:'18101',nombre:'Alexis',apellido:'MEDINA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:54,legajo:'18102',nombre:'Santiago',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:55,legajo:'18103',nombre:'Leandro',apellido:'OSWALD',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:56,legajo:'18104',nombre:'Diego',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:57,legajo:'18105',nombre:'Federico',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:58,legajo:'18106',nombre:'Elias',apellido:'RODRIGUEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:59,legajo:'18107',nombre:'Nelson',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:60,legajo:'18108',nombre:'Cristian',apellido:'MACIEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:61,legajo:'18109',nombre:'Pablo',apellido:'GONZALEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:62,legajo:'18110',nombre:'Matias Ezequiel',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:63,legajo:'18111',nombre:'Misael Mauro',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:64,legajo:'18112',nombre:'Ian Agustin',apellido:'PEREIRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:65,legajo:'18113',nombre:'Maximo Federico',apellido:'ROJAS FERREYRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:66,legajo:'18114',nombre:'Fernando Gabriel',apellido:'TULA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:67,legajo:'18115',nombre:'Lucas Ezequiel',apellido:'BONILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:68,legajo:'18116',nombre:'Leandro Isaias',apellido:'AVENDAÑO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:69,legajo:'18117',nombre:'Pablo Daniel',apellido:'AMARILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:70,legajo:'18118',nombre:'Jorge Martin',apellido:'REINOSO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+    {id:71,legajo:'18119',nombre:'Facundo Nicolas',apellido:'BOIKO',area:'Dime Mide',region:'R1',usuarioEdenor:''}
+  ]);
+  DB.save('personal',[
+    {id:1,legajo:'18000',nombre:'Juan Carlos',apellido:'GUTIERREZ'},
+    {id:2,legajo:'18001',nombre:'Damian Joan',apellido:'DADIN'},
+    {id:3,legajo:'18008',nombre:'Juan Pablo',apellido:'CASAZOLA'},
+    {id:4,legajo:'18010',nombre:'Javier Carlos',apellido:'ROLON'},
+    {id:5,legajo:'18013',nombre:'Leandro Matias',apellido:'GALEANO'},
+    {id:6,legajo:'18014',nombre:'Sergio Gustavo',apellido:'ROMERO'},
+    {id:7,legajo:'18017',nombre:'Elias Maximiliano Jesus',apellido:'NORES'},
+    {id:8,legajo:'18020',nombre:'Federico Miguel',apellido:'SERRANO'},
+    {id:9,legajo:'18021',nombre:'Lucas Hector',apellido:'CALDENTEY'},
+    {id:10,legajo:'18023',nombre:'Ivan Emanuel',apellido:'ROMANO'},
+    {id:11,legajo:'18029',nombre:'Lucas Hernan',apellido:'GOMEZ'},
+    {id:12,legajo:'18030',nombre:'Gonzalo Matias',apellido:'DADI'},
+    {id:13,legajo:'18035',nombre:'Rosana Sabrina',apellido:'INSAURRALDE'},
+    {id:14,legajo:'18036',nombre:'Brenda Estefania',apellido:'ALFONSO'},
+    {id:15,legajo:'18039',nombre:'Nahuel Daniel',apellido:'SOTOMAYOR'},
+    {id:16,legajo:'18040',nombre:'Pablo Leonardo',apellido:'OJEDA'},
+    {id:17,legajo:'18041',nombre:'Agustin',apellido:'Arrieta'},
+    {id:18,legajo:'18042',nombre:'Leandro Angel',apellido:'ORELLANA'},
+    {id:19,legajo:'18043',nombre:'Maximiliano Ezequiel',apellido:'GOMEZ'},
+    {id:20,legajo:'18050',nombre:'Cesar Nelson',apellido:'NUÑEZ'},
+    {id:21,legajo:'18051',nombre:'Juan Jose',apellido:'OBREGON'},
+    {id:22,legajo:'18053',nombre:'Sebastian Manuel',apellido:'BOHOS'},
+    {id:23,legajo:'18054',nombre:'Gustavo Ezequiel',apellido:'GIMENEZ'},
+    {id:24,legajo:'18055',nombre:'Alberto Ezequiel',apellido:'MIRANDA'},
+    {id:25,legajo:'18056',nombre:'Angel Tomas',apellido:'DE NICOLA PIKEL'},
+    {id:26,legajo:'18058',nombre:'Marina Soledad',apellido:'PESCE'},
+    {id:27,legajo:'18059',nombre:'Daniel Alberto',apellido:'VELIZ'},
+    {id:28,legajo:'18060',nombre:'Gustavo Ezequiel',apellido:'REPISARDA'},
+    {id:29,legajo:'18062',nombre:'Santiago Jesús',apellido:'CHAVEZ'},
+    {id:30,legajo:'18064',nombre:'Nicolas Maximiliano',apellido:'FERNANDEZ'},
+    {id:31,legajo:'18066',nombre:'Julio',apellido:'Lopez'},
+    {id:32,legajo:'18067',nombre:'Ignacio Gabriel',apellido:'Gutierrez'},
+    {id:33,legajo:'18068',nombre:'Arnaldo Nicola',apellido:'Contreras'},
+    {id:34,legajo:'18071',nombre:'Dylan Leandro',apellido:'Orrego'},
+    {id:35,legajo:'18072',nombre:'Santiague',apellido:'Aristide'},
+    {id:36,legajo:'18073',nombre:'Maximo',apellido:'Martin'},
+    {id:37,legajo:'18074',nombre:'Mauro',apellido:'Gerez'},
+    {id:38,legajo:'18075',nombre:'Elias Alejandro',apellido:'Nuñez'},
+    {id:39,legajo:'18079',nombre:'Bautista',apellido:'Obregon'},
+    {id:40,legajo:'18082',nombre:'Juan',apellido:'Godoy'},
+    {id:41,legajo:'18083',nombre:'Joaquin Gabriel',apellido:'Hoyos'},
+    {id:42,legajo:'18084',nombre:'Pablo',apellido:'Villanueva'},
+    {id:43,legajo:'18086',nombre:'Aldo',apellido:'Sanchez'},
+    {id:44,legajo:'18089',nombre:'Juan Ignacio',apellido:'Villareal'},
+    {id:45,legajo:'18092',nombre:'Diego',apellido:'Castro'},
+    {id:46,legajo:'18093',nombre:'Claudio',apellido:'Leiva'},
+    {id:47,legajo:'18094',nombre:'Ariel',apellido:'Gomez'},
+    {id:48,legajo:'18095',nombre:'Diego',apellido:'Videla'},
+    {id:49,legajo:'18096',nombre:'Gonzalo',apellido:'Veliz'},
+    {id:50,legajo:'18097',nombre:'Lautaro',apellido:'Martinez'},
+    {id:51,legajo:'18099',nombre:'Alexis',apellido:'Gimenez'},
+    {id:52,legajo:'18100',nombre:'Federico',apellido:'Leiva'},
+    {id:53,legajo:'18101',nombre:'Alexis',apellido:'Medina'},
+    {id:54,legajo:'18102',nombre:'Santiago',apellido:'Cantos'},
+    {id:55,legajo:'18103',nombre:'Leandro',apellido:'Oswald'},
+    {id:56,legajo:'18104',nombre:'Diego',apellido:'Sanchez'},
+    {id:57,legajo:'18105',nombre:'Federico',apellido:'Silva'},
+    {id:58,legajo:'18106',nombre:'Elias',apellido:'Rodriguez'},
+    {id:59,legajo:'18107',nombre:'Nelson',apellido:'Silva'},
+    {id:60,legajo:'18108',nombre:'Cristian',apellido:'Maciel'},
+    {id:61,legajo:'18109',nombre:'Pablo',apellido:'Gonzalez'},
+    {id:62,legajo:'18110',nombre:'Matias Ezequiel',apellido:'CANTOS'},
+    {id:63,legajo:'18111',nombre:'Misael Mauro',apellido:'LOPEZ'},
+    {id:64,legajo:'18112',nombre:'Ian Agustín',apellido:'PEREIRA'},
+    {id:65,legajo:'18113',nombre:'Máximo Federico',apellido:'ROJAS FERREYRA'},
+    {id:66,legajo:'18114',nombre:'Fernando Gabriel',apellido:'TULA'},
+    {id:67,legajo:'18115',nombre:'Lucas Ezequiel',apellido:'BONILLA'},
+    {id:68,legajo:'18116',nombre:'Leandro Isaias',apellido:'AVENDAÑO'},
+    {id:69,legajo:'18117',nombre:'Pablo Daniel',apellido:'AMARILLA'},
+    {id:70,legajo:'18118',nombre:'Jorge Martín',apellido:'REINOSO'},
+    {id:71,legajo:'18119',nombre:'Facundo Nicolás',apellido:'BOIKO'}
   ]);
   DB.save('obras',[]);
   DB.save('sectores',[]);
@@ -1084,7 +1183,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','personal','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1100,7 +1199,7 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','personal','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
   const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
@@ -1200,6 +1299,172 @@ function migratePermisos(){
     DB.save('usuarios',usm);
     localStorage.setItem('wms_mig_med','1');
   }
+  /* v17: actualizar cuadrillas con listado completo Personal.xlsx + usuarios Edenor */
+  if(!localStorage.getItem('wms_mig_v17')){
+    const newCuads=[
+      {id:1,legajo:'18000',nombre:'Juan Carlos',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'jugutierrez'},
+      {id:2,legajo:'18001',nombre:'Damian Joan',apellido:'DADIN',area:'Dime Mide',region:'R1',usuarioEdenor:'ddadin'},
+      {id:3,legajo:'18008',nombre:'Juan Pablo',apellido:'CASAZOLA',area:'Dime Mide',region:'R1',usuarioEdenor:'jcasazola'},
+      {id:4,legajo:'18010',nombre:'Javier Carlos',apellido:'ROLON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:5,legajo:'18013',nombre:'Leandro Matias',apellido:'GALEANO',area:'Dime Mide',region:'R1',usuarioEdenor:'lmgaleano'},
+      {id:6,legajo:'18014',nombre:'Sergio Gustavo',apellido:'ROMERO',area:'Dime Mide',region:'R1',usuarioEdenor:'segromero'},
+      {id:7,legajo:'18017',nombre:'Elias Maximiliano Jesus',apellido:'NORES',area:'Dime Mide',region:'R1',usuarioEdenor:'enores'},
+      {id:8,legajo:'18020',nombre:'Federico Miguel',apellido:'SERRANO',area:'Dime Mide',region:'R1',usuarioEdenor:'fserrano'},
+      {id:9,legajo:'18021',nombre:'Lucas Hector',apellido:'CALDENTEY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:10,legajo:'18023',nombre:'Ivan Emanuel',apellido:'ROMANO',area:'Dime Mide',region:'R1',usuarioEdenor:'eromano'},
+      {id:11,legajo:'18029',nombre:'Lucas Hernan',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:12,legajo:'18030',nombre:'Gonzalo Matias',apellido:'DADI',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:13,legajo:'18035',nombre:'Rosana Sabrina',apellido:'INSAURRALDE',area:'Dime Mide',region:'R1',usuarioEdenor:'rinsaurralde'},
+      {id:14,legajo:'18036',nombre:'Brenda Estefania',apellido:'ALFONSO',area:'Dime Mide',region:'R1',usuarioEdenor:'balfonso'},
+      {id:15,legajo:'18039',nombre:'Nahuel Daniel',apellido:'SOTOMAYOR',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:16,legajo:'18040',nombre:'Pablo Leonardo',apellido:'OJEDA',area:'Dime Mide',region:'R1',usuarioEdenor:'pojeda'},
+      {id:17,legajo:'18041',nombre:'Agustin',apellido:'ARRIETA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:18,legajo:'18042',nombre:'Leandro Angel',apellido:'ORELLANA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:19,legajo:'18043',nombre:'Maximiliano Ezequiel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'megomez'},
+      {id:20,legajo:'18050',nombre:'Cesar Nelson',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:21,legajo:'18051',nombre:'Juan Jose',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:'juobregon'},
+      {id:22,legajo:'18053',nombre:'Sebastian Manuel',apellido:'BOHOS',area:'Dime Mide',region:'R1',usuarioEdenor:'sbohos'},
+      {id:23,legajo:'18054',nombre:'Gustavo Ezequiel',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'gugimenez'},
+      {id:24,legajo:'18055',nombre:'Alberto Ezequiel',apellido:'MIRANDA',area:'Dime Mide',region:'R1',usuarioEdenor:'alemiranda'},
+      {id:25,legajo:'18056',nombre:'Angel Tomas',apellido:'DE NICOLA PIKEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:26,legajo:'18058',nombre:'Marina Soledad',apellido:'PESCE',area:'Dime Mide',region:'R1',usuarioEdenor:'mpesce'},
+      {id:27,legajo:'18059',nombre:'Daniel Alberto',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:28,legajo:'18060',nombre:'Gustavo Ezequiel',apellido:'REPISARDA',area:'Dime Mide',region:'R1',usuarioEdenor:'grepisarda'},
+      {id:29,legajo:'18062',nombre:'Santiago Jesus',apellido:'CHAVEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'sachavez'},
+      {id:30,legajo:'18064',nombre:'Nicolas Maximiliano',apellido:'FERNANDEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'nimfernandez'},
+      {id:31,legajo:'18066',nombre:'Julio',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'julilopez'},
+      {id:32,legajo:'18067',nombre:'Ignacio Gabriel',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'iggutierrez'},
+      {id:33,legajo:'18068',nombre:'Arnaldo Nicola',apellido:'CONTRERAS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:34,legajo:'18071',nombre:'Dylan Leandro',apellido:'ORREGO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:35,legajo:'18072',nombre:'Santiague',apellido:'ARISTIDE',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:36,legajo:'18073',nombre:'Maximo',apellido:'MARTIN',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:37,legajo:'18074',nombre:'Mauro',apellido:'GEREZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:38,legajo:'18075',nombre:'Elias Alejandro',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:39,legajo:'18079',nombre:'Bautista',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:40,legajo:'18082',nombre:'Juan',apellido:'GODOY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:41,legajo:'18083',nombre:'Joaquin Gabriel',apellido:'HOYOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:42,legajo:'18084',nombre:'Pablo',apellido:'VILLANUEVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:43,legajo:'18086',nombre:'Aldo',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:44,legajo:'18089',nombre:'Juan Ignacio',apellido:'VILLAREAL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:45,legajo:'18092',nombre:'Diego',apellido:'CASTRO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:46,legajo:'18093',nombre:'Claudio',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:47,legajo:'18094',nombre:'Ariel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:48,legajo:'18095',nombre:'Diego',apellido:'VIDELA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:49,legajo:'18096',nombre:'Gonzalo',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:50,legajo:'18097',nombre:'Lautaro',apellido:'MARTINEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'laumartinez'},
+      {id:51,legajo:'18099',nombre:'Alexis',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:52,legajo:'18100',nombre:'Federico',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:53,legajo:'18101',nombre:'Alexis',apellido:'MEDINA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:54,legajo:'18102',nombre:'Santiago',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:55,legajo:'18103',nombre:'Leandro',apellido:'OSWALD',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:56,legajo:'18104',nombre:'Diego',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:57,legajo:'18105',nombre:'Federico',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:58,legajo:'18106',nombre:'Elias',apellido:'RODRIGUEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:59,legajo:'18107',nombre:'Nelson',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:60,legajo:'18108',nombre:'Cristian',apellido:'MACIEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:61,legajo:'18109',nombre:'Pablo',apellido:'GONZALEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:62,legajo:'18110',nombre:'Matias Ezequiel',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:63,legajo:'18111',nombre:'Misael Mauro',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:64,legajo:'18112',nombre:'Ian Agustin',apellido:'PEREIRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:65,legajo:'18113',nombre:'Maximo Federico',apellido:'ROJAS FERREYRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:66,legajo:'18114',nombre:'Fernando Gabriel',apellido:'TULA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:67,legajo:'18115',nombre:'Lucas Ezequiel',apellido:'BONILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:68,legajo:'18116',nombre:'Leandro Isaias',apellido:'AVENDAÑO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:69,legajo:'18117',nombre:'Pablo Daniel',apellido:'AMARILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:70,legajo:'18118',nombre:'Jorge Martin',apellido:'REINOSO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:71,legajo:'18119',nombre:'Facundo Nicolas',apellido:'BOIKO',area:'Dime Mide',region:'R1',usuarioEdenor:''}
+    ];
+    DB.save('cuadrillas',newCuads);
+    localStorage.setItem('wms_mig_v17','1');
+  }
+
+  /* ── v18: tabla Personal (legajo + apellido + nombre) ── */
+  if(!localStorage.getItem('wms_mig_v18')){
+    if(!DB.getAll('personal').length){
+      DB.save('personal',[
+        {id:1,legajo:'18000',nombre:'Juan Carlos',apellido:'GUTIERREZ'},
+        {id:2,legajo:'18001',nombre:'Damian Joan',apellido:'DADIN'},
+        {id:3,legajo:'18008',nombre:'Juan Pablo',apellido:'CASAZOLA'},
+        {id:4,legajo:'18010',nombre:'Javier Carlos',apellido:'ROLON'},
+        {id:5,legajo:'18013',nombre:'Leandro Matias',apellido:'GALEANO'},
+        {id:6,legajo:'18014',nombre:'Sergio Gustavo',apellido:'ROMERO'},
+        {id:7,legajo:'18017',nombre:'Elias Maximiliano Jesus',apellido:'NORES'},
+        {id:8,legajo:'18020',nombre:'Federico Miguel',apellido:'SERRANO'},
+        {id:9,legajo:'18021',nombre:'Lucas Hector',apellido:'CALDENTEY'},
+        {id:10,legajo:'18023',nombre:'Ivan Emanuel',apellido:'ROMANO'},
+        {id:11,legajo:'18029',nombre:'Lucas Hernan',apellido:'GOMEZ'},
+        {id:12,legajo:'18030',nombre:'Gonzalo Matias',apellido:'DADI'},
+        {id:13,legajo:'18035',nombre:'Rosana Sabrina',apellido:'INSAURRALDE'},
+        {id:14,legajo:'18036',nombre:'Brenda Estefania',apellido:'ALFONSO'},
+        {id:15,legajo:'18039',nombre:'Nahuel Daniel',apellido:'SOTOMAYOR'},
+        {id:16,legajo:'18040',nombre:'Pablo Leonardo',apellido:'OJEDA'},
+        {id:17,legajo:'18041',nombre:'Agustin',apellido:'Arrieta'},
+        {id:18,legajo:'18042',nombre:'Leandro Angel',apellido:'ORELLANA'},
+        {id:19,legajo:'18043',nombre:'Maximiliano Ezequiel',apellido:'GOMEZ'},
+        {id:20,legajo:'18050',nombre:'Cesar Nelson',apellido:'NUÑEZ'},
+        {id:21,legajo:'18051',nombre:'Juan Jose',apellido:'OBREGON'},
+        {id:22,legajo:'18053',nombre:'Sebastian Manuel',apellido:'BOHOS'},
+        {id:23,legajo:'18054',nombre:'Gustavo Ezequiel',apellido:'GIMENEZ'},
+        {id:24,legajo:'18055',nombre:'Alberto Ezequiel',apellido:'MIRANDA'},
+        {id:25,legajo:'18056',nombre:'Angel Tomas',apellido:'DE NICOLA PIKEL'},
+        {id:26,legajo:'18058',nombre:'Marina Soledad',apellido:'PESCE'},
+        {id:27,legajo:'18059',nombre:'Daniel Alberto',apellido:'VELIZ'},
+        {id:28,legajo:'18060',nombre:'Gustavo Ezequiel',apellido:'REPISARDA'},
+        {id:29,legajo:'18062',nombre:'Santiago Jesús',apellido:'CHAVEZ'},
+        {id:30,legajo:'18064',nombre:'Nicolas Maximiliano',apellido:'FERNANDEZ'},
+        {id:31,legajo:'18066',nombre:'Julio',apellido:'Lopez'},
+        {id:32,legajo:'18067',nombre:'Ignacio Gabriel',apellido:'Gutierrez'},
+        {id:33,legajo:'18068',nombre:'Arnaldo Nicola',apellido:'Contreras'},
+        {id:34,legajo:'18071',nombre:'Dylan Leandro',apellido:'Orrego'},
+        {id:35,legajo:'18072',nombre:'Santiague',apellido:'Aristide'},
+        {id:36,legajo:'18073',nombre:'Maximo',apellido:'Martin'},
+        {id:37,legajo:'18074',nombre:'Mauro',apellido:'Gerez'},
+        {id:38,legajo:'18075',nombre:'Elias Alejandro',apellido:'Nuñez'},
+        {id:39,legajo:'18079',nombre:'Bautista',apellido:'Obregon'},
+        {id:40,legajo:'18082',nombre:'Juan',apellido:'Godoy'},
+        {id:41,legajo:'18083',nombre:'Joaquin Gabriel',apellido:'Hoyos'},
+        {id:42,legajo:'18084',nombre:'Pablo',apellido:'Villanueva'},
+        {id:43,legajo:'18086',nombre:'Aldo',apellido:'Sanchez'},
+        {id:44,legajo:'18089',nombre:'Juan Ignacio',apellido:'Villareal'},
+        {id:45,legajo:'18092',nombre:'Diego',apellido:'Castro'},
+        {id:46,legajo:'18093',nombre:'Claudio',apellido:'Leiva'},
+        {id:47,legajo:'18094',nombre:'Ariel',apellido:'Gomez'},
+        {id:48,legajo:'18095',nombre:'Diego',apellido:'Videla'},
+        {id:49,legajo:'18096',nombre:'Gonzalo',apellido:'Veliz'},
+        {id:50,legajo:'18097',nombre:'Lautaro',apellido:'Martinez'},
+        {id:51,legajo:'18099',nombre:'Alexis',apellido:'Gimenez'},
+        {id:52,legajo:'18100',nombre:'Federico',apellido:'Leiva'},
+        {id:53,legajo:'18101',nombre:'Alexis',apellido:'Medina'},
+        {id:54,legajo:'18102',nombre:'Santiago',apellido:'Cantos'},
+        {id:55,legajo:'18103',nombre:'Leandro',apellido:'Oswald'},
+        {id:56,legajo:'18104',nombre:'Diego',apellido:'Sanchez'},
+        {id:57,legajo:'18105',nombre:'Federico',apellido:'Silva'},
+        {id:58,legajo:'18106',nombre:'Elias',apellido:'Rodriguez'},
+        {id:59,legajo:'18107',nombre:'Nelson',apellido:'Silva'},
+        {id:60,legajo:'18108',nombre:'Cristian',apellido:'Maciel'},
+        {id:61,legajo:'18109',nombre:'Pablo',apellido:'Gonzalez'},
+        {id:62,legajo:'18110',nombre:'Matias Ezequiel',apellido:'CANTOS'},
+        {id:63,legajo:'18111',nombre:'Misael Mauro',apellido:'LOPEZ'},
+        {id:64,legajo:'18112',nombre:'Ian Agustín',apellido:'PEREIRA'},
+        {id:65,legajo:'18113',nombre:'Máximo Federico',apellido:'ROJAS FERREYRA'},
+        {id:66,legajo:'18114',nombre:'Fernando Gabriel',apellido:'TULA'},
+        {id:67,legajo:'18115',nombre:'Lucas Ezequiel',apellido:'BONILLA'},
+        {id:68,legajo:'18116',nombre:'Leandro Isaias',apellido:'AVENDAÑO'},
+        {id:69,legajo:'18117',nombre:'Pablo Daniel',apellido:'AMARILLA'},
+        {id:70,legajo:'18118',nombre:'Jorge Martín',apellido:'REINOSO'},
+        {id:71,legajo:'18119',nombre:'Facundo Nicolás',apellido:'BOIKO'}
+      ]);
+    }
+    // Agregar permiso 'personal' a super/gerencial/admin/jefedep
+    const users=DB.getAll('usuarios');
+    users.forEach(u=>{
+      if(['super','gerencial','admin','jefedep'].includes(u.rol)&&!u.permisos.includes('personal')){
+        u.permisos.push('personal');
+        DB.update('usuarios',u.id,u);
+      }
+    });
+    localStorage.setItem('wms_mig_v18','1');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1216,7 +1481,8 @@ const PERM_MODULES=[
     {id:'sectores',label:'Sectores',icon:'🗂️'},
     {id:'proveedores',label:'Proveedores',icon:'🏢'},
     {id:'areas',label:'Áreas',icon:'🏷️'},
-    {id:'regiones',label:'Regiones',icon:'🌐'}
+    {id:'regiones',label:'Regiones',icon:'🌐'},
+    {id:'personal',label:'Personal',icon:'🪪'}
   ]},
   {group:'Operaciones',items:[
     {id:'reservas',label:'Reservas por obra',icon:'📋'},
@@ -1280,7 +1546,8 @@ const NAV_ITEMS=[
     {id:'sectores',icon:'🗂️',label:'Sectores'},
     {id:'proveedores',icon:'🏢',label:'Proveedores / Contratistas'},
     {id:'areas',icon:'🏷️',label:'Áreas'},
-    {id:'regiones',icon:'🌐',label:'Regiones'}
+    {id:'regiones',icon:'🌐',label:'Regiones'},
+    {id:'personal',icon:'🪪',label:'Personal'}
   ]},
   {group:'Operaciones',items:[
     {id:'reservas',icon:'📋',label:'Reservas por obra'},
@@ -1705,6 +1972,55 @@ function editCuadrilla(id){
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveCuadrilla(${id})">💾 Guardar</button></div>`);
 }
 
+// ─── PERSONAL ────────────────────────────
+SCREENS.personal=()=>{
+  const rows=DB.getAll('personal');
+  const q=(document.getElementById('pers-busq')||{}).value||'';
+  const filtered=q?rows.filter(r=>{const t=(r.legajo+' '+r.apellido+' '+r.nombre).toLowerCase();return t.includes(q.toLowerCase())}):rows;
+  let tbody=filtered.map(r=>`<tr>
+    <td class="idcell">${r.legajo||'—'}</td><td>${r.apellido||'—'}</td><td>${r.nombre||'—'}</td>
+    ${canEditMaestro()?`<td class="act-btns"><button onclick="editPersonal(${r.id})">✏️</button><button onclick="delRecord('personal',${r.id},'personal')">🗑️</button></td>`:''}
+  </tr>`).join('');
+  return `<div class="screen on" style="display:block">
+    <div class="shead"><div class="sicon">🪪</div><div><h1>Personal</h1><p>Legajo, apellido y nombre del personal de PAMAR</p></div></div>
+    <div class="toolbar">
+      <input id="pers-busq" type="text" placeholder="🔍 Buscar por legajo, apellido o nombre…" value="${q}" oninput="go('personal')" style="padding:7px 12px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;width:320px">
+      <span style="color:var(--gray);font-size:12px;margin-left:8px">${filtered.length} de ${rows.length} registros</span>
+      <div style="flex:1"></div>
+      ${canEditMaestro()?'<button class="btn primary" onclick="addPersonal()">＋ Nuevo</button>':''}
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Legajo</th><th>Apellido</th><th>Nombre</th>${canEditMaestro()?'<th class="th-acc">Acciones</th>':''}</tr></thead>
+      <tbody>${tbody||'<tr><td colspan="'+(canEditMaestro()?4:3)+'" class="empty">Sin registros</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+};
+function addPersonal(){
+  openModal(`<h3>🆕 Nuevo personal</h3>
+    <div class="fgrid">
+      <div class="field"><label>Legajo</label><input id="p-legajo"></div>
+      <div class="field"><label>Apellido</label><input id="p-apellido"></div>
+      <div class="field"><label>Nombre</label><input id="p-nombre"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="savePersonal()">💾 Guardar</button></div>`);
+}
+function savePersonal(editId){
+  const d={legajo:document.getElementById('p-legajo').value.trim(),apellido:document.getElementById('p-apellido').value.trim(),nombre:document.getElementById('p-nombre').value.trim()};
+  if(!d.apellido){toast('El apellido es obligatorio','err');return}
+  if(editId)DB.update('personal',editId,d);else DB.add('personal',d);
+  closeModal();toast('Personal guardado');go('personal');
+}
+function editPersonal(id){
+  const r=DB.get('personal',id);if(!r)return;
+  openModal(`<h3>✏️ Editar personal</h3>
+    <div class="fgrid">
+      <div class="field"><label>Legajo</label><input id="p-legajo" value="${r.legajo||''}"></div>
+      <div class="field"><label>Apellido</label><input id="p-apellido" value="${r.apellido||''}"></div>
+      <div class="field"><label>Nombre</label><input id="p-nombre" value="${r.nombre||''}"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="savePersonal(${id})">💾 Guardar</button></div>`);
+}
+
 // ─── OBRAS ───────────────────────────────
 SCREENS.obras=()=>{
   const rows=DB.getAll('obras');
@@ -1987,7 +2303,7 @@ function presetPerms(preset){
   const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
-  const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','personal','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
   const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='administrativo'?adminP:supP;
@@ -2323,15 +2639,15 @@ SCREENS.despachos=()=>{
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.remito}</td>
     <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.area}</td><td>${pillRegion(r.region)}</td>
-    <td>${r.cuadrilla}</td><td>${r.supervisor}</td>
+    <td>${r.cuadrilla}</td><td>${r.usuarioEdenor||'—'}</td><td>${r.supervisor}</td>
     <td class="act-btns"><button onclick="viewRemito(${r.id})" title="Ver remito">🧾</button>${isAdminLevel()?`<button onclick="delDespacho(${r.id})" title="Eliminar despacho" style="color:#c53727">🗑️</button>`:''}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🚚</div><div><h1>Despachos a Obra</h1><p>Al confirmar se descuenta stock y se genera el remito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDespacho()">＋ Nuevo despacho</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Remito</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Región</th><th>Cuadrilla</th><th>Supervisor</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="8" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>Remito</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Región</th><th>Cuadrilla</th><th>Usr. Edenor</th><th>Supervisor</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -2342,13 +2658,16 @@ function addDespacho(){
   const sups=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
   openModal(`<h3>🚚 Nuevo despacho</h3>
     <div class="fgrid">
+      <div class="field"><label>Área</label><select id="d-area-sel" onchange="despAreaChanged()"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
       <div class="field"><label>Fecha</label><input type="date" id="d-fecha" value="${today()}"></div>
-      <div class="field" style="position:relative"><label>Obra</label><input id="d-obra" autocomplete="off" placeholder="Escribí el nombre de la obra..." oninput="despObraSearch(this)" onkeydown="despObraKey(event)"><div id="d-obra-list" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:99;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div></div>
-      <div class="field"><label>Área</label><input id="d-area" readonly style="background:#f0f2f4"></div>
-      <div class="field"><label>Región</label><input id="d-region" readonly style="background:#f0f2f4"></div>
-      <div class="field"><label>PEP</label><input id="d-pep" readonly style="background:#f0f2f4"></div>
-      <div class="field"><label>Grafo</label><input id="d-grafo" readonly style="background:#f0f2f4"></div>
-      <div class="field"><label>Cuadrilla</label><select id="d-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="field" id="d-obra-field" style="position:relative"><label>Obra</label><input id="d-obra" autocomplete="off" placeholder="Escribí el nombre de la obra..." oninput="despObraSearch(this)" onkeydown="despObraKey(event)"><div id="d-obra-list" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:99;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div></div>
+      <div class="field" id="d-obraarea-field"><label>Área de obra</label><input id="d-area" readonly style="background:#f0f2f4"></div>
+      <div class="field" id="d-region-field"><label>Región</label><input id="d-region" readonly style="background:#f0f2f4"></div>
+      <div class="field" id="d-pep-field"><label>PEP</label><input id="d-pep" readonly style="background:#f0f2f4"></div>
+      <div class="field" id="d-grafo-field"><label>Grafo</label><input id="d-grafo" readonly style="background:#f0f2f4"></div>
+      <div class="field" id="d-cuad-wrap"><label>Cuadrilla</label><select id="d-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="field" id="d-dimecuad-field" style="display:none"><label>Cuadrilla</label><select id="d-solicitante" onchange="despDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
+      <div class="field" id="d-usredenor-field" style="display:none"><label>Usuario Edenor</label><input id="d-usredenor" placeholder="Se autocompleta" style="background:#f0f2f4" readonly></div>
       <div class="field"><label>Supervisor</label><select id="d-sup">${sups.map(s=>`<option>${s}</option>`).join('')}</select></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
@@ -2363,6 +2682,44 @@ function addDespacho(){
     </div>
     <div id="desp-items-list" style="margin-top:6px"></div>
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveDespacho()">🧾 Despachar</button></div>`);
+}
+/* Área dinámica en despachos */
+function despAreaChanged(){
+  const area=document.getElementById('d-area-sel').value;
+  const isDime=area==='Dime Mide';
+  const isMant=area==='Mantenimiento';
+  const isSpecial=isDime||isMant;
+  /* Obra fields: ocultar para Dime Mide */
+  ['d-obra-field','d-obraarea-field','d-region-field','d-pep-field','d-grafo-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isDime?'none':''});
+  /* Cuadrilla normal: ocultar para special */
+  const cw=document.getElementById('d-cuad-wrap');if(cw)cw.style.display=isSpecial?'none':'';
+  /* Cuadrilla special + usuario edenor: mostrar para special */
+  const dcf=document.getElementById('d-dimecuad-field');if(dcf)dcf.style.display=isSpecial?'':'none';
+  const duf=document.getElementById('d-usredenor-field');if(duf)duf.style.display=isSpecial?'':'none';
+  if(isSpecial){
+    const sel=document.getElementById('d-solicitante');
+    sel.innerHTML='<option value="">— Seleccionar —</option>';
+    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
+    areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
+    areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
+    document.getElementById('d-usredenor').value='';
+  }
+  if(isDime){
+    document.getElementById('d-obra').value='';
+    document.getElementById('d-area').value='Dime Mide';
+    document.getElementById('d-region').value='';
+    document.getElementById('d-pep').value='';
+    document.getElementById('d-grafo').value='';
+  }
+}
+function despDimeSolChange(){
+  const sel=document.getElementById('d-solicitante');
+  const usrInp=document.getElementById('d-usredenor');
+  if(!sel||!usrInp)return;
+  const cId=parseInt(sel.value);
+  if(!cId){usrInp.value='';return}
+  const c=DB.get('cuadrillas',cId);
+  if(c&&c.usuarioEdenor)usrInp.value=c.usuarioEdenor;else usrInp.value='';
 }
 /* Obra autocomplete */
 function despObraSearch(inp){
@@ -2461,8 +2818,22 @@ function despItemMat(i,val){
   renderDespItemsList();
 }
 function saveDespacho(){
-  const obraNombre=document.getElementById('d-obra').value.trim();
-  if(!obraNombre){toast('Seleccioná una obra','err');return}
+  const areaSel=document.getElementById('d-area-sel');
+  const area=areaSel?areaSel.value:'Obra y Distribución';
+  const isDime=area==='Dime Mide';
+  const isMant=area==='Mantenimiento';
+  const isSpecial=isDime||isMant;
+  const obraNombre=isDime?'':(document.getElementById('d-obra').value.trim());
+  if(!isDime&&!obraNombre){toast('Seleccioná una obra','err');return}
+  /* Cuadrilla según modo */
+  let cuadNombre='';
+  if(isSpecial){
+    const sel=document.getElementById('d-solicitante');
+    if(!sel||!sel.value){toast('Seleccioná una cuadrilla','err');return}
+    cuadNombre=sel.options[sel.selectedIndex].textContent;
+  } else {
+    cuadNombre=document.getElementById('d-cuad').value;
+  }
   const validItems=despItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const cfg=DB.getAll('config');
@@ -2474,7 +2845,8 @@ function saveDespacho(){
     const m=mat.find(x=>x.matricula===it.matricula);
     const item={matricula:it.matricula,descripcion:it.descripcion||m?.descripcion||it.matricula,cantidad:it.cantidad,unidad:m?m.unidad:'Unidad'};if(it.nBobina)item.nBobina=it.nBobina;if(it.nEdenor)item.nEdenor=it.nEdenor;return item;
   });
-  const desp={fecha:document.getElementById('d-fecha').value,fechaHora:nowLocal(),obra:obraNombre,area:document.getElementById('d-area').value,region:document.getElementById('d-region').value,cuadrilla:document.getElementById('d-cuad').value,supervisor:document.getElementById('d-sup').value,remito:remito,items:items};
+  const desp={fecha:document.getElementById('d-fecha').value,fechaHora:nowLocal(),obra:obraNombre,area:isDime?'Dime Mide':(isMant?'Mantenimiento':document.getElementById('d-area').value),region:document.getElementById('d-region').value,cuadrilla:cuadNombre,supervisor:document.getElementById('d-sup').value,remito:remito,items:items};
+  if(isSpecial){const usr=(document.getElementById('d-usredenor')||{}).value||'';if(usr)desp.usuarioEdenor=usr}
   DB.add('despachos',desp);
   checkStockBajo(items);
   closeModal();toast('Despacho registrado — '+remito);go('despachos');
@@ -2507,6 +2879,7 @@ function viewRemito(id,back){
         ${obra&&obra.pedido?`<div><div class="k">Pedido</div><div class="v">${obra.pedido}</div></div>`:''}
         ${obra&&obra.grafo?`<div><div class="k">Grafo</div><div class="v">${obra.grafo}</div></div>`:''}
         <div><div class="k">Cuadrilla</div><div class="v">${r.cuadrilla}</div></div>
+        ${r.usuarioEdenor?`<div><div class="k">Usuario Edenor</div><div class="v">${r.usuarioEdenor}</div></div>`:''}
         <div><div class="k">Supervisor</div><div class="v">${r.supervisor}</div></div>
       </div>
       <div class="rem-items"><table>
@@ -3044,8 +3417,8 @@ function verSolicitud(id){
   const act=solActionBtns(s,true);
   openModal(`<h3>📄 ${s.codigo} <span class="sc-urg ${s.urgencia==='Urgente'?'alta':s.urgencia==='Normal'?'med':'baja'}" style="font-size:11px;padding:2px 8px;border-radius:8px">${s.urgencia}</span><span style="margin-left:auto;font-size:11px;color:var(--gray);font-weight:600">${s.estado}</span></h3>
     <div class="sol-info">
-      <div><span>Obra</span><b>${s.obra}</b></div>
-      <div><span>Área / Región</span><b>${o.area||'—'} · ${o.region||'—'}</b></div>
+      <div><span>Obra</span><b>${s.obra||'— ('+( s.areaSolicitud||'Sin área')+')'}</b></div>
+      <div><span>Área / Región</span><b>${s.areaSolicitud||o.area||'—'} · ${o.region||'—'}</b></div>
       <div><span>Cuadrilla</span><b>${s.cuadrilla||'—'}</b></div>
       <div><span>Supervisor</span><b>${s.supervisor}</b></div>
       <div><span>Pidió (usuario)</span><b>${pidio}${pidio!==s.supervisor?' <em style="color:#b07a00;font-weight:600">· en nombre del supervisor</em>':''}</b></div>
@@ -3086,7 +3459,7 @@ function imprimirSolicitud(id){
   </style></head><body>
     <div class="hd"><div><h1>Listado de picking · ${s.codigo}</h1><div class="sub">WMS PAMAR — Ingeniería y Construcciones</div></div><div><span class="urg">${s.urgencia}</span><div style="margin-top:6px;font-size:10px;color:#666">Impreso: ${fmtFechaHora(nowLocal())}</div></div></div>
     <div class="info">
-      <div><span>Obra</span><b>${s.obra}</b></div><div><span>Área / Región</span><b>${o.area||'—'} · ${o.region||'—'}</b></div><div><span>Cuadrilla</span><b>${s.cuadrilla||'—'}</b></div>
+      <div><span>Obra</span><b>${s.obra||'— ('+(s.areaSolicitud||'Sin área')+')'}</b></div><div><span>Área / Región</span><b>${s.areaSolicitud||o.area||'—'} · ${o.region||'—'}</b></div><div><span>Cuadrilla</span><b>${s.cuadrilla||s.solicitanteDime||'—'}</b></div>
       <div><span>Supervisor</span><b>${s.supervisor}</b></div><div><span>Pidió (usuario)</span><b>${pidio}</b></div><div><span>Fecha y hora del pedido</span><b>${fmtFechaHora(s.fecha)}</b></div>
       ${s.solicitanteDime?`<div><span>Solicitante Dime Mide</span><b>${s.solicitanteDime}</b></div>`:''}${s.usuarioEdenor?`<div><span>Usuario Edenor</span><b>${s.usuarioEdenor}</b></div>`:''}
       ${s.aprobadoPor?`<div><span>Aprobó Dime Mide</span><b>${s.aprobadoPor}</b></div>`:''}
@@ -3222,7 +3595,7 @@ function solBuildCard(s,st){
   const pidio=s.pidioUsuario||s.supervisor;
   return `<div class="solcard" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
-    <div class="sc-obra">${s.obra}</div>
+    <div class="sc-obra">${s.obra||s.areaSolicitud||'—'}</div>
     <div class="sc-who">
       <div>🧑‍💼 <span>Supervisor:</span> <b>${s.supervisor}</b></div>
       <div>👤 <span>Pidió:</span> <b>${pidio}</b>${pidio!==s.supervisor?' <em class="sc-otro">en su nombre</em>':''}</div>
@@ -3704,7 +4077,7 @@ function sendSolicitud(){
   const esDime=areaSolicitud==='Dime Mide';
   const isMant=areaSolicitud==='Mantenimiento';
   const isSpecial=esDime||isMant;
-  const obraText=isDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
+  const obraText=esDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
   const cuadText=isSpecial?'':(document.getElementById('ns-cuad').value.split(' · ')[1]||document.getElementById('ns-cuad').value);
   const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:esDime?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime};
   if(isSpecial){
