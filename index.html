@@ -1297,6 +1297,87 @@ function migratePermisos(){
   }
 }
 
+/* v18: forzar actualización cuadrillas a lista completa de 71 */
+{
+  if(!localStorage.getItem('wms_mig_v18')){
+    const newCuads=[
+      {id:1,legajo:'18000',nombre:'Juan Carlos',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'jugutierrez'},
+      {id:2,legajo:'18001',nombre:'Damian Joan',apellido:'DADIN',area:'Dime Mide',region:'R1',usuarioEdenor:'ddadin'},
+      {id:3,legajo:'18008',nombre:'Juan Pablo',apellido:'CASAZOLA',area:'Dime Mide',region:'R1',usuarioEdenor:'jcasazola'},
+      {id:4,legajo:'18010',nombre:'Javier Carlos',apellido:'ROLON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:5,legajo:'18013',nombre:'Leandro Matias',apellido:'GALEANO',area:'Dime Mide',region:'R1',usuarioEdenor:'lmgaleano'},
+      {id:6,legajo:'18014',nombre:'Sergio Gustavo',apellido:'ROMERO',area:'Dime Mide',region:'R1',usuarioEdenor:'segromero'},
+      {id:7,legajo:'18017',nombre:'Elias Maximiliano Jesus',apellido:'NORES',area:'Dime Mide',region:'R1',usuarioEdenor:'enores'},
+      {id:8,legajo:'18020',nombre:'Federico Miguel',apellido:'SERRANO',area:'Dime Mide',region:'R1',usuarioEdenor:'fserrano'},
+      {id:9,legajo:'18021',nombre:'Lucas Hector',apellido:'CALDENTEY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:10,legajo:'18023',nombre:'Ivan Emanuel',apellido:'ROMANO',area:'Dime Mide',region:'R1',usuarioEdenor:'eromano'},
+      {id:11,legajo:'18029',nombre:'Lucas Hernan',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:12,legajo:'18030',nombre:'Gonzalo Matias',apellido:'DADI',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:13,legajo:'18035',nombre:'Rosana Sabrina',apellido:'INSAURRALDE',area:'Dime Mide',region:'R1',usuarioEdenor:'rinsaurralde'},
+      {id:14,legajo:'18036',nombre:'Brenda Estefania',apellido:'ALFONSO',area:'Dime Mide',region:'R1',usuarioEdenor:'balfonso'},
+      {id:15,legajo:'18039',nombre:'Nahuel Daniel',apellido:'SOTOMAYOR',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:16,legajo:'18040',nombre:'Pablo Leonardo',apellido:'OJEDA',area:'Dime Mide',region:'R1',usuarioEdenor:'pojeda'},
+      {id:17,legajo:'18041',nombre:'Agustin',apellido:'ARRIETA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:18,legajo:'18042',nombre:'Leandro Angel',apellido:'ORELLANA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:19,legajo:'18043',nombre:'Maximiliano Ezequiel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'megomez'},
+      {id:20,legajo:'18050',nombre:'Cesar Nelson',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:21,legajo:'18051',nombre:'Juan Jose',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:'juobregon'},
+      {id:22,legajo:'18053',nombre:'Sebastian Manuel',apellido:'BOHOS',area:'Dime Mide',region:'R1',usuarioEdenor:'sbohos'},
+      {id:23,legajo:'18054',nombre:'Gustavo Ezequiel',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'gugimenez'},
+      {id:24,legajo:'18055',nombre:'Alberto Ezequiel',apellido:'MIRANDA',area:'Dime Mide',region:'R1',usuarioEdenor:'alemiranda'},
+      {id:25,legajo:'18056',nombre:'Angel Tomas',apellido:'DE NICOLA PIKEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:26,legajo:'18058',nombre:'Marina Soledad',apellido:'PESCE',area:'Dime Mide',region:'R1',usuarioEdenor:'mpesce'},
+      {id:27,legajo:'18059',nombre:'Daniel Alberto',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:28,legajo:'18060',nombre:'Gustavo Ezequiel',apellido:'REPISARDA',area:'Dime Mide',region:'R1',usuarioEdenor:'grepisarda'},
+      {id:29,legajo:'18062',nombre:'Santiago Jesus',apellido:'CHAVEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'sachavez'},
+      {id:30,legajo:'18064',nombre:'Nicolas Maximiliano',apellido:'FERNANDEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'nimfernandez'},
+      {id:31,legajo:'18066',nombre:'Julio',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'julilopez'},
+      {id:32,legajo:'18067',nombre:'Ignacio Gabriel',apellido:'GUTIERREZ',area:'Dime Mide',region:'R1',usuarioEdenor:'iggutierrez'},
+      {id:33,legajo:'18068',nombre:'Arnaldo Nicola',apellido:'CONTRERAS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:34,legajo:'18071',nombre:'Dylan Leandro',apellido:'ORREGO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:35,legajo:'18072',nombre:'Santiague',apellido:'ARISTIDE',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:36,legajo:'18073',nombre:'Maximo',apellido:'MARTIN',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:37,legajo:'18074',nombre:'Mauro',apellido:'GEREZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:38,legajo:'18075',nombre:'Elias Alejandro',apellido:'NUÑEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:39,legajo:'18079',nombre:'Bautista',apellido:'OBREGON',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:40,legajo:'18082',nombre:'Juan',apellido:'GODOY',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:41,legajo:'18083',nombre:'Joaquin Gabriel',apellido:'HOYOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:42,legajo:'18084',nombre:'Pablo',apellido:'VILLANUEVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:43,legajo:'18086',nombre:'Aldo',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:44,legajo:'18089',nombre:'Juan Ignacio',apellido:'VILLAREAL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:45,legajo:'18092',nombre:'Diego',apellido:'CASTRO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:46,legajo:'18093',nombre:'Claudio',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:47,legajo:'18094',nombre:'Ariel',apellido:'GOMEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:48,legajo:'18095',nombre:'Diego',apellido:'VIDELA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:49,legajo:'18096',nombre:'Gonzalo',apellido:'VELIZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:50,legajo:'18097',nombre:'Lautaro',apellido:'MARTINEZ',area:'Dime Mide',region:'R1',usuarioEdenor:'laumartinez'},
+      {id:51,legajo:'18099',nombre:'Alexis',apellido:'GIMENEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:52,legajo:'18100',nombre:'Federico',apellido:'LEIVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:53,legajo:'18101',nombre:'Alexis',apellido:'MEDINA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:54,legajo:'18102',nombre:'Santiago',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:55,legajo:'18103',nombre:'Leandro',apellido:'OSWALD',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:56,legajo:'18104',nombre:'Diego',apellido:'SANCHEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:57,legajo:'18105',nombre:'Federico',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:58,legajo:'18106',nombre:'Elias',apellido:'RODRIGUEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:59,legajo:'18107',nombre:'Nelson',apellido:'SILVA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:60,legajo:'18108',nombre:'Cristian',apellido:'MACIEL',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:61,legajo:'18109',nombre:'Pablo',apellido:'GONZALEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:62,legajo:'18110',nombre:'Matias Ezequiel',apellido:'CANTOS',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:63,legajo:'18111',nombre:'Misael Mauro',apellido:'LOPEZ',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:64,legajo:'18112',nombre:'Ian Agustin',apellido:'PEREIRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:65,legajo:'18113',nombre:'Maximo Federico',apellido:'ROJAS FERREYRA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:66,legajo:'18114',nombre:'Fernando Gabriel',apellido:'TULA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:67,legajo:'18115',nombre:'Lucas Ezequiel',apellido:'BONILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:68,legajo:'18116',nombre:'Leandro Isaias',apellido:'AVENDAÑO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:69,legajo:'18117',nombre:'Pablo Daniel',apellido:'AMARILLA',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:70,legajo:'18118',nombre:'Jorge Martin',apellido:'REINOSO',area:'Dime Mide',region:'R1',usuarioEdenor:''},
+      {id:71,legajo:'18119',nombre:'Facundo Nicolas',apellido:'BOIKO',area:'Dime Mide',region:'R1',usuarioEdenor:''}
+    ];
+    DB.save('cuadrillas',newCuads);
+    localStorage.setItem('wms_mig_v18','1');
+  }
+}
+
 /* ══════════════════════════════════════════════════════════
    HELPERS
    ══════════════════════════════════════════════════════════ */
