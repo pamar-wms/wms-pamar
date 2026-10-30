@@ -1173,6 +1173,7 @@ function seed(){
     {id:70,legajo:'18118',nombre:'Jorge Martín',apellido:'REINOSO'},
     {id:71,legajo:'18119',nombre:'Facundo Nicolás',apellido:'BOIKO'}
   ]);
+  DB.save('usuariosEdenor',['ddadin','jugutierrez','maolivera','lmgaleano','fserrano','eromano','jcasazola','segromero','megomez','sbohos','balfonso','alemiranda','rinsaurralde','gugimenez','grepisarda','pojeda','nimfernandez','sachavez','julilopez','iggutierrez','laumartinez','mpesce','juobregon','enores']);
   DB.save('obras',[]);
   DB.save('sectores',[]);
   DB.save('proveedores',[]);
@@ -1463,6 +1464,9 @@ function migratePermisos(){
         DB.update('usuarios',u.id,u);
       }
     });
+    if(!DB.getAll('usuariosEdenor')||!DB.getAll('usuariosEdenor').length){
+      DB.save('usuariosEdenor',['ddadin','jugutierrez','maolivera','lmgaleano','fserrano','eromano','jcasazola','segromero','megomez','sbohos','balfonso','alemiranda','rinsaurralde','gugimenez','grepisarda','pojeda','nimfernandez','sachavez','julilopez','iggutierrez','laumartinez','mpesce','juobregon','enores']);
+    }
     localStorage.setItem('wms_mig_v18','1');
   }
 }
@@ -2666,8 +2670,8 @@ function addDespacho(){
       <div class="field" id="d-pep-field"><label>PEP</label><input id="d-pep" readonly style="background:#f0f2f4"></div>
       <div class="field" id="d-grafo-field"><label>Grafo</label><input id="d-grafo" readonly style="background:#f0f2f4"></div>
       <div class="field" id="d-cuad-wrap"><label>Cuadrilla</label><select id="d-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
-      <div class="field" id="d-dimecuad-field" style="display:none"><label>Cuadrilla</label><select id="d-solicitante" onchange="despDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
-      <div class="field" id="d-usredenor-field" style="display:none"><label>Usuario Edenor</label><input id="d-usredenor" placeholder="Se autocompleta" style="background:#f0f2f4" readonly></div>
+      <div class="field" id="d-dimecuad-field" style="display:none"><label>Cuadrilla</label><select id="d-solicitante"><option value="">— Seleccionar —</option></select></div>
+      <div class="field" id="d-usredenor-field" style="display:none;position:relative"><label>Usuario Edenor</label><input id="d-usredenor" autocomplete="off" placeholder="Buscar usuario..." oninput="despUsrSearch(this)" onfocus="despUsrSearch(this)" onblur="setTimeout(()=>{const l=document.getElementById('d-usr-list');if(l)l.style.display='none'},180)"><div id="d-usr-list" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:99;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div></div>
       <div class="field"><label>Supervisor</label><select id="d-sup">${sups.map(s=>`<option>${s}</option>`).join('')}</select></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
@@ -2699,9 +2703,9 @@ function despAreaChanged(){
   if(isSpecial){
     const sel=document.getElementById('d-solicitante');
     sel.innerHTML='<option value="">— Seleccionar —</option>';
-    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
-    areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
-    areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
+    const pers=DB.getAll('personal');
+    pers.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
+    pers.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.apellido+' '+p.nombre+(p.legajo?' ('+p.legajo+')':'');sel.appendChild(o)});
     document.getElementById('d-usredenor').value='';
   }
   if(isDime){
@@ -2712,14 +2716,14 @@ function despAreaChanged(){
     document.getElementById('d-grafo').value='';
   }
 }
-function despDimeSolChange(){
-  const sel=document.getElementById('d-solicitante');
-  const usrInp=document.getElementById('d-usredenor');
-  if(!sel||!usrInp)return;
-  const cId=parseInt(sel.value);
-  if(!cId){usrInp.value='';return}
-  const c=DB.get('cuadrillas',cId);
-  if(c&&c.usuarioEdenor)usrInp.value=c.usuarioEdenor;else usrInp.value='';
+function despUsrSearch(inp){
+  const q=inp.value.toLowerCase().trim();
+  const list=document.getElementById('d-usr-list');if(!list)return;
+  const usrs=getUsuariosEdenor();
+  const filtered=q?usrs.filter(u=>u.toLowerCase().includes(q)):usrs;
+  if(!filtered.length){list.style.display='none';return}
+  list.innerHTML=filtered.map(u=>`<div style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f0f2f4" onmousedown="document.getElementById('d-usredenor').value='${u}';document.getElementById('d-usr-list').style.display='none'">${u}</div>`).join('');
+  list.style.display='block';
 }
 /* Obra autocomplete */
 function despObraSearch(inp){
@@ -3938,8 +3942,8 @@ SCREENS.nuevasol=()=>{
           <div class="pf"><label>Área</label><select id="ns-area" onchange="nsAreaChanged()"><option value="Obra y Distribución">Obra y Distribución</option><option value="Mantenimiento">Mantenimiento</option><option value="Dime Mide">Dime Mide</option></select></div>
           <div class="pf" id="ns-obra-wrap"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
           <div id="ns-dime-fields" style="display:none">
-            <div class="pf"><label id="ns-sol-label">Cuadrilla</label><select id="ns-solicitante" onchange="nsDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
-            <div class="pf"><label id="ns-usr-label">Usuario Edenor a asignar</label><input id="ns-usredenor" placeholder="Ej: PM001"></div>
+            <div class="pf"><label id="ns-sol-label">Cuadrilla</label><select id="ns-solicitante"><option value="">— Seleccionar —</option></select></div>
+            <div class="pf" style="position:relative"><label id="ns-usr-label">Usuario Edenor a asignar</label><input id="ns-usredenor" autocomplete="off" placeholder="Buscar usuario..." oninput="nsUsrSearch(this)" onfocus="nsUsrSearch(this)" onblur="setTimeout(()=>{const l=document.getElementById('ns-usr-list');if(l)l.style.display='none'},180)"><div id="ns-usr-list" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:99;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div></div>
           </div>
           <div class="pf" id="ns-cuad-wrap"><label>Cuadrilla</label><select id="ns-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
           <div class="pf"><label>Supervisor (para quién se pide)</label><select id="ns-sup">${supOpts()}</select></div>
@@ -4000,20 +4004,24 @@ function nsAreaChanged(){
   if(isSpecial){
     const sel=document.getElementById('ns-solicitante');
     sel.innerHTML='<option value="">— Seleccionar —</option>';
-    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
-    areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
-    areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
+    const pers=DB.getAll('personal');
+    pers.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
+    pers.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.apellido+' '+p.nombre+(p.legajo?' ('+p.legajo+')':'');sel.appendChild(o)});
     document.getElementById('ns-usredenor').value='';
   }
 }
-function nsDimeSolChange(){
-  const sel=document.getElementById('ns-solicitante');
-  const usrInp=document.getElementById('ns-usredenor');
-  if(!sel||!usrInp)return;
-  const cId=parseInt(sel.value);
-  if(!cId){usrInp.value='';return}
-  const c=DB.get('cuadrillas',cId);
-  if(c&&c.usuarioEdenor)usrInp.value=c.usuarioEdenor;else usrInp.value='';
+/* Búsqueda rápida de Usuario Edenor en solicitudes */
+function nsUsrSearch(inp){
+  const q=inp.value.toLowerCase().trim();
+  const list=document.getElementById('ns-usr-list');if(!list)return;
+  const usrs=getUsuariosEdenor();
+  const filtered=q?usrs.filter(u=>u.toLowerCase().includes(q)):usrs;
+  if(!filtered.length){list.style.display='none';return}
+  list.innerHTML=filtered.map(u=>`<div style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f0f2f4" onmousedown="document.getElementById('ns-usredenor').value='${u}';document.getElementById('ns-usr-list').style.display='none'">${u}</div>`).join('');
+  list.style.display='block';
+}
+function getUsuariosEdenor(){
+  return DB.getAll('usuariosEdenor')||[];
 }
 function nsObraChanged(){
   const sel=document.getElementById('ns-obra');if(!sel)return;
@@ -4083,7 +4091,7 @@ function sendSolicitud(){
   if(isSpecial){
     const solSel=document.getElementById('ns-solicitante');
     const solCId=solSel?parseInt(solSel.value):0;
-    const solCua=solCId?DB.get('cuadrillas',solCId):null;
+    const solCua=solCId?DB.get('personal',solCId):null;
     const solNom=solCua?(solCua.apellido+' '+solCua.nombre).trim():'';
     const usrEdn=(document.getElementById('ns-usredenor')||{}).value||'';
     if(esDime&&solNom)solData.solicitanteDime=solNom;
