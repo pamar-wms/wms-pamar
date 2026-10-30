@@ -785,10 +785,11 @@ async function _doExportMaestros(){
   const supervisores=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
   const materiales=DB.getAll('materiales').map(m=>({matricula:m.matricula,descripcion:m.descripcion,unidad:m.unidad||''}));
   const dimeCuadrillas=DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide').map(c=>(c.apellido+' '+c.nombre).trim());
+  const mantCuadrillas=DB.getAll('cuadrillas').filter(c=>c.area==='Mantenimiento').map(c=>(c.apellido+' '+c.nombre).trim());
   await fetch(GSCRIPT_URL,{
     method:'POST',mode:'no-cors',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'sync_maestros',obras,cuadrillas,supervisores,materiales,dimeCuadrillas})
+    body:JSON.stringify({action:'sync_maestros',obras,cuadrillas,supervisores,materiales,dimeCuadrillas,mantCuadrillas})
   });
 }
 
@@ -2572,7 +2573,7 @@ function despAreaChanged(){
   if(isSpecial){
     const sel=document.getElementById('d-solicitante');
     sel.innerHTML='<option value="">— Seleccionar —</option>';
-    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
+    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):isMant?DB.getAll('cuadrillas').filter(c=>c.area==='Mantenimiento'):DB.getAll('cuadrillas');
     areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
     areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
     document.getElementById('d-usredenor').value='';
@@ -2584,6 +2585,9 @@ function despAreaChanged(){
     document.getElementById('d-region').value='';
     document.getElementById('d-pep').value='';
     document.getElementById('d-grafo').value='';
+  }
+  if(isMant){
+    document.getElementById('d-area').value='Mantenimiento';
   }
 }
 function despDimeSolChange(){
@@ -3089,12 +3093,12 @@ function notifSol(s,evento){
         SP.pushNotif('Nueva Solicitud',`Nueva solicitud ${s.urgencia==='Urgente'?'URGENTE ':'' }${refPlain} — Supervisor: ${s.supervisor}`,{codigo:s.codigo,area:s.areaSolicitud||'',urgencia:s.urgencia});
       }
       break;
-    case 'aprobada':
+    case 'aprobada':{
       const _apLbl2=solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide';
       notify(dueños,'✔️',`Tu solicitud ${ref} fue aprobada por ${s.aprobadoPor}${s.aprobModificada?' <b>con cantidades modificadas</b>':''}`,s.id);
       notify(deposito,'📥',`Nueva solicitud aprobada por ${_apLbl2}: ${ref} — ${s.supervisor}`,s.id);
       SP.pushNotif('Solicitud Aprobada',`Solicitud ${refPlain} aprobada por ${s.aprobadoPor||''}`,{codigo:s.codigo,area:s.areaSolicitud||_apLbl2,urgencia:s.urgencia});
-      break;
+      break;}
     case 'rechazada':
       notify(dueños,'✕',`Tu solicitud ${ref} fue rechazada por ${s.rechazadoPor}: ${s.motivoRechazo||'sin motivo'}`,s.id);break;
     case 'preparacion':
@@ -3880,7 +3884,7 @@ function nsAreaChanged(){
   if(isSpecial){
     const sel=document.getElementById('ns-solicitante');
     sel.innerHTML='<option value="">— Seleccionar —</option>';
-    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):DB.getAll('cuadrillas');
+    const areaCuads=isDime?DB.getAll('cuadrillas').filter(c=>c.area==='Dime Mide'):isMant?DB.getAll('cuadrillas').filter(c=>c.area==='Mantenimiento'):DB.getAll('cuadrillas');
     areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
     areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
     document.getElementById('ns-usredenor').value='';
