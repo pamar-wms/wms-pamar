@@ -2455,7 +2455,7 @@ function addDespacho(){
       <div class="field" id="d-grafo-field"><label>Grafo</label><input id="d-grafo" readonly style="background:#f0f2f4"></div>
       <div class="field" id="d-cuad-wrap"><label>Cuadrilla</label><select id="d-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
       <div class="field" id="d-dimecuad-field" style="display:none"><label>Cuadrilla</label><select id="d-solicitante" onchange="despDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
-      <div class="field" id="d-usredenor-field" style="display:none"><label>Usuario Edenor</label><input id="d-usredenor" placeholder="Se autocompleta" style="background:#f0f2f4" readonly></div>
+      <div class="field" id="d-usredenor-field" style="display:none"><label>Usuario Edenor</label><select id="d-usredenor"><option value="">— Seleccionar —</option></select></div>
       <div class="field"><label>Supervisor</label><select id="d-sup">${sups.map(s=>`<option>${s}</option>`).join('')}</select></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
@@ -2491,6 +2491,7 @@ function despAreaChanged(){
     areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
     areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
     document.getElementById('d-usredenor').value='';
+    fillUsrEdenorSelect('d-usredenor');
   }
   if(isDime){
     document.getElementById('d-obra').value='';
@@ -3727,7 +3728,7 @@ SCREENS.nuevasol=()=>{
           <div class="pf" id="ns-obra-wrap"><label>Obra</label><select id="ns-obra" onchange="nsObraChanged()">${obras.map(o=>`<option>${o}</option>`).join('')}</select></div>
           <div id="ns-dime-fields" style="display:none">
             <div class="pf"><label id="ns-sol-label">Cuadrilla</label><select id="ns-solicitante" onchange="nsDimeSolChange()"><option value="">— Seleccionar —</option></select></div>
-            <div class="pf"><label id="ns-usr-label">Usuario Edenor a asignar</label><input id="ns-usredenor" placeholder="Ej: PM001"></div>
+            <div class="pf"><label id="ns-usr-label">Usuario Edenor a asignar</label><select id="ns-usredenor"><option value="">— Seleccionar —</option></select></div>
           </div>
           <div class="pf" id="ns-cuad-wrap"><label>Cuadrilla</label><select id="ns-cuad">${cuads.map(c=>`<option>${c}</option>`).join('')}</select></div>
           <div class="pf"><label>Supervisor (para quién se pide)</label><select id="ns-sup">${supOpts()}</select></div>
@@ -3792,6 +3793,7 @@ function nsAreaChanged(){
     areaCuads.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||''));
     areaCuads.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.apellido+' '+c.nombre;sel.appendChild(o)});
     document.getElementById('ns-usredenor').value='';
+    fillUsrEdenorSelect('ns-usredenor');
   }
 }
 function nsDimeSolChange(){
@@ -3802,6 +3804,12 @@ function nsDimeSolChange(){
   if(!cId){usrInp.value='';return}
   const c=DB.get('cuadrillas',cId);
   if(c&&c.usuarioEdenor)usrInp.value=c.usuarioEdenor;else usrInp.value='';
+}
+function fillUsrEdenorSelect(selId){
+  const sel=document.getElementById(selId);if(!sel)return;
+  const usrs=['ddadin','jugutierrez','maolivera','lmgaleano','fserrano','eromano','jcasazola','segromero','megomez','sbohos','balfonso','alemiranda','rinsaurralde','gugimenez','grepisarda','pojeda','nimfernandez','sachavez','julilopez','iggutierrez','laumartinez','mpesce','juobregon','enores'];
+  sel.innerHTML='<option value="">— Seleccionar —</option>';
+  usrs.forEach(u=>{const o=document.createElement('option');o.value=u;o.textContent=u;sel.appendChild(o)});
 }
 function nsObraChanged(){
   const sel=document.getElementById('ns-obra');if(!sel)return;
