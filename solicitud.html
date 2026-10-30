@@ -243,12 +243,13 @@ async function loadMaestros(){
     const resp = await fetch(SCRIPT_URL);
     const data = await resp.json();
     if(data.obras) OBRAS = data.obras;
-    if(data.cuadrillas) CUADRILLAS = data.cuadrillas;
+    // Cuadrillas: solo sobreescribir si el Sheet trae MÁS que las hardcodeadas
+    if(data.cuadrillas && data.cuadrillas.length >= CUADRILLAS.length) CUADRILLAS = data.cuadrillas;
     if(data.materiales) MATERIALES = data.materiales;
     if(data.supervisores) SUPERVISORES = data.supervisores;
-    if(data.dimeCuadrillas) DIME_CUADRILLAS = data.dimeCuadrillas;
-    if(data.mantCuadrillas) MANT_CUADRILLAS = data.mantCuadrillas;
-    if(data.usuariosEdenor) USR_EDENOR = data.usuariosEdenor;
+    if(data.dimeCuadrillas && data.dimeCuadrillas.length >= DIME_CUADRILLAS.length) DIME_CUADRILLAS = data.dimeCuadrillas;
+    if(data.mantCuadrillas && data.mantCuadrillas.length >= MANT_CUADRILLAS.length) MANT_CUADRILLAS = data.mantCuadrillas;
+    if(data.usuariosEdenor && data.usuariosEdenor.length > 0) USR_EDENOR = data.usuariosEdenor;
     // Cache para offline
     localStorage.setItem('sol_maestros', JSON.stringify({
       obras:OBRAS, cuadrillas:CUADRILLAS, materiales:MATERIALES,
@@ -259,12 +260,13 @@ async function loadMaestros(){
     try {
       const cached = JSON.parse(localStorage.getItem('sol_maestros')||'{}');
       if(cached.obras) OBRAS = cached.obras;
-      if(cached.cuadrillas) CUADRILLAS = cached.cuadrillas;
+      // Solo usar cache si tiene al menos la misma cantidad que las hardcodeadas
+      if(cached.cuadrillas && cached.cuadrillas.length >= 71) CUADRILLAS = cached.cuadrillas;
       if(cached.materiales) MATERIALES = cached.materiales;
       if(cached.supervisores) SUPERVISORES = cached.supervisores || [];
-      if(cached.dimeCuadrillas) DIME_CUADRILLAS = cached.dimeCuadrillas || [];
-      if(cached.mantCuadrillas) MANT_CUADRILLAS = cached.mantCuadrillas || [];
-      if(cached.usuariosEdenor) USR_EDENOR = cached.usuariosEdenor || [];
+      if(cached.dimeCuadrillas && cached.dimeCuadrillas.length >= 71) DIME_CUADRILLAS = cached.dimeCuadrillas;
+      if(cached.mantCuadrillas && cached.mantCuadrillas.length >= 71) MANT_CUADRILLAS = cached.mantCuadrillas;
+      if(cached.usuariosEdenor && cached.usuariosEdenor.length > 0) USR_EDENOR = cached.usuariosEdenor;
     } catch(ce){}
   }
 }
