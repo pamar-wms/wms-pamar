@@ -76,6 +76,32 @@
   .loading .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--line);border-top-color:var(--edenor);border-radius:50%;animation:sp .6s linear infinite;margin-bottom:8px}
   @keyframes sp{to{transform:rotate(360deg)}}
 
+  /* ── PROGRESS BAR ── */
+  .mis-pedidos{margin-top:18px;padding:14px 0;border-top:2px solid var(--edenor-lt)}
+  .mis-pedidos h3{font-size:14px;color:var(--steel);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .mis-pedidos .mp-empty{font-size:12px;color:var(--gray);text-align:center;padding:16px}
+  .mp-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .mp-card .mp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .mp-card .mp-code{font-weight:700;font-size:13px;color:var(--steel)}
+  .mp-card .mp-date{font-size:11px;color:var(--gray)}
+  .mp-card .mp-detail{font-size:11.5px;color:var(--ink);margin-bottom:8px;line-height:1.4}
+  .mp-card .mp-detail span{color:var(--gray)}
+  .mp-card .mp-estado{font-size:11px;font-weight:700;margin-bottom:6px}
+  .mp-card .mp-estado.est-ok{color:#2e7d32}
+  .mp-card .mp-estado.est-warn{color:#e65100}
+  .mp-card .mp-estado.est-err{color:#c53727}
+  .mp-card .mp-estado.est-done{color:var(--edenor)}
+  .prog-bar{display:flex;align-items:center;gap:0;margin-bottom:4px;position:relative}
+  .prog-step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1}
+  .prog-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .3s}
+  .prog-dot.active{border-color:var(--edenor);background:var(--edenor);color:#fff}
+  .prog-dot.done{border-color:var(--edenor);background:var(--edenor-lt);color:var(--edenor)}
+  .prog-dot.rejected{border-color:#c53727;background:#fde7e5;color:#c53727}
+  .prog-label{font-size:8.5px;color:var(--gray);margin-top:3px;text-align:center;line-height:1.2;max-width:60px;word-wrap:break-word}
+  .prog-label.active{color:var(--edenor);font-weight:700}
+  .prog-line{position:absolute;top:9px;left:0;right:0;height:2px;background:var(--line);z-index:0}
+  .prog-line-fill{position:absolute;top:9px;left:0;height:2px;background:var(--edenor);z-index:0;transition:width .3s}
+
   /* ── DIME MIDE ── */
   .dime-check{display:flex;align-items:center;gap:8px;margin-bottom:11px}
   .dime-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--edenor)}
@@ -197,6 +223,11 @@
   </div>
 
   <button class="phone-send" id="btnSend" onclick="sendSolicitud()">📤 Enviar solicitud al depósito</button>
+
+  <div class="mis-pedidos" id="misPedidos">
+    <h3>📋 Mis pedidos</h3>
+    <div id="misPedidosList"></div>
+  </div>
 </div>
 
 <!-- SUCCESS -->
@@ -236,6 +267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('formWrap').style.display = 'block';
   nsObraChanged();
+  loadMisPedidos();
 });
 
 async function loadMaestros(){
@@ -269,6 +301,19 @@ async function loadMaestros(){
       if(cached.usuariosEdenor && cached.usuariosEdenor.length > 0) USR_EDENOR = cached.usuariosEdenor;
     } catch(ce){}
   }
+  // Fallback: si SUPERVISORES sigue vacío, leer del WMS localStorage
+  if(!SUPERVISORES.length){
+    try {
+      const wms = JSON.parse(localStorage.getItem('wms_supervisores')||'[]');
+      if(Array.isArray(wms) && wms.length){
+        SUPERVISORES = wms.map(s => {
+          if(typeof s === 'string') return s;
+          // Si es objeto {nombre, apellido}, armar nombre completo
+          return [s.apellido, s.nombre].filter(Boolean).join(' ').trim();
+        }).filter(Boolean);
+      }
+    } catch(e){}
+  }
 }
 
 // ── SEARCHABLE SELECT (buscar mientras escribís) ──
@@ -301,6 +346,7 @@ function ssFilter(inputId, listId, dataArr){
       inp.value = this.dataset.val;
       list.classList.remove('open');
       if(inputId === 'ns-obra') nsObraChanged();
+      if(inputId === 'ns-obra'||inputId === 'ns-cuad'||inputId === 'ns-solicitante') setTimeout(loadMisPedidos,50);
     });
   });
 }
@@ -342,6 +388,7 @@ function nsAreaChanged(){
     document.getElementById('ns-solicitante').value = '';
     document.getElementById('ns-usredenor').value = '';
   }
+  loadMisPedidos();
 }
 
 // ── URGENCIA ──
@@ -503,6 +550,129 @@ function toast(msg, type='ok'){
 }
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── MIS PEDIDOS (progress bar) ──
+// Cache de solicitudes desde Google Sheets
+let _misSolCache=null;
+let _misSolCacheTime=0;
+
+async function fetchMisSolicitudes(){
+  // Cache por 30 segundos para no hacer fetch en cada filtro
+  if(_misSolCache && (Date.now()-_misSolCacheTime)<30000) return _misSolCache;
+  try{
+    const resp=await fetch(SCRIPT_URL+'?action=mis_solicitudes');
+    const data=await resp.json();
+    _misSolCache=data.solicitudes||[];
+    _misSolCacheTime=Date.now();
+    return _misSolCache;
+  }catch(e){
+    console.log('Error fetching solicitudes:',e);
+    // Fallback a localStorage
+    try{return JSON.parse(localStorage.getItem('wms_solicitudes')||'[]')}catch(e2){return[]}
+  }
+}
+
+async function loadMisPedidos(){
+  const area=document.getElementById('ns-area').value;
+  const isDime=area==='Dime Mide';
+  const isMant=area==='Mantenimiento';
+  const isSpecial=isDime||isMant;
+  // Get filter value
+  let filterVal='';
+  if(isSpecial){
+    filterVal=(document.getElementById('ns-solicitante').value||'').trim().toLowerCase();
+  } else {
+    const obraInp=document.getElementById('ns-obra').value||'';
+    const cuadInp=document.getElementById('ns-cuad').value||'';
+    filterVal=(obraInp+'|||'+cuadInp).toLowerCase();
+  }
+  const wrap=document.getElementById('misPedidos');
+  const list=document.getElementById('misPedidosList');
+  if(!filterVal||filterVal==='|||'){list.innerHTML='<div class="mp-empty">Seleccioná una obra o cuadrilla para ver tus pedidos anteriores</div>';return}
+  // Fetch solicitudes from Google Sheets (con fallback a localStorage)
+  list.innerHTML='<div class="mp-empty">⏳ Cargando pedidos…</div>';
+  wrap.style.display='block';
+  let sols=await fetchMisSolicitudes();
+  // Filter
+  let filtered=[];
+  if(isSpecial){
+    filtered=sols.filter(s=>{
+      const solArea=(s.areaSolicitud||'').toLowerCase();
+      if(isDime&&solArea!=='dime mide')return false;
+      if(isMant&&solArea!=='mantenimiento')return false;
+      const cuad=(s.solicitanteDime||s.cuadrilla||'').toLowerCase();
+      return cuad&&filterVal&&cuad.includes(filterVal);
+    });
+  } else {
+    const [obraF,cuadF]=filterVal.split('|||');
+    filtered=sols.filter(s=>{
+      const solArea=(s.areaSolicitud||'').toLowerCase();
+      if(solArea==='dime mide'||solArea==='mantenimiento')return false;
+      const obraMatch=!obraF||(s.obra||'').toLowerCase().includes(obraF);
+      const cuadMatch=!cuadF||(s.cuadrilla||'').toLowerCase().includes(cuadF);
+      return obraMatch&&(cuadMatch||!cuadF);
+    });
+  }
+  // Sort by date desc
+  filtered.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  // Limit to last 10
+  filtered=filtered.slice(0,10);
+  if(!filtered.length){
+    wrap.style.display='block';
+    list.innerHTML='<div class="mp-empty">No hay pedidos anteriores con estos datos</div>';
+    return;
+  }
+  wrap.style.display='block';
+  list.innerHTML=filtered.map(s=>renderPedidoCard(s,isDime||isMant)).join('');
+}
+
+function renderPedidoCard(s,needsApproval){
+  const estado=s.estado||'Pendiente';
+  const rechazada=estado==='Rechazada';
+  // Define steps
+  const steps=needsApproval||s.esDime||s.esMant
+    ?['Pend. aprobación','Pendiente','En preparación','Listo','Entregado']
+    :['Pendiente','En preparación','Listo','Entregado'];
+  // Current step index
+  let curIdx=steps.indexOf(estado);
+  if(curIdx<0)curIdx=rechazada?0:-1;
+  // Items summary
+  const items=s.items||[];
+  const itemsText=items.length
+    ? items.slice(0,3).map(it=>it.matricula+' ×'+it.cantidad).join(', ')+(items.length>3?' (+'+( items.length-3)+' más)':'')
+    : '';
+  // Estado class
+  let estCls='est-warn';
+  if(estado==='Entregado')estCls='est-done';
+  else if(rechazada)estCls='est-err';
+  else if(estado==='Listo')estCls='est-ok';
+  // Date
+  const fecha=s.fecha?(s.fecha+'').slice(0,10):'';
+  // Progress bar
+  const pctFill=steps.length>1?Math.max(0,curIdx)/(steps.length-1)*100:0;
+  const bar=`<div style="position:relative;margin:0 9px">
+    <div class="prog-line"></div>
+    <div class="prog-line-fill" style="width:${rechazada?0:pctFill}%"></div>
+    <div class="prog-bar">
+      ${steps.map((st,i)=>{
+        let dotCls='';
+        if(rechazada&&i===0)dotCls='rejected';
+        else if(i<curIdx)dotCls='done';
+        else if(i===curIdx)dotCls='active';
+        const icon=rechazada&&i===0?'✕':dotCls==='done'?'✓':dotCls==='active'?'●':'';
+        const lblCls=i===curIdx?' active':'';
+        return `<div class="prog-step"><div class="prog-dot ${dotCls}">${icon}</div><div class="prog-label${lblCls}">${st}</div></div>`;
+      }).join('')}
+    </div>
+  </div>`;
+  return `<div class="mp-card">
+    <div class="mp-head"><span class="mp-code">${esc(s.codigo||'—')}</span><span class="mp-date">${fecha}</span></div>
+    <div class="mp-detail">${itemsText?esc(itemsText):'<span>Sin detalle</span>'}${s.obra?' · <span>'+esc(s.obra)+'</span>':''}</div>
+    <div class="mp-estado ${estCls}">${rechazada?'❌ Rechazada — '+(s.motivoRechazo||'sin motivo'):estado==='Entregado'?'✅ Entregado':estado}</div>
+    ${bar}
+    ${rechazada&&s.motivoRechazo?'<div style="font-size:11px;color:#c53727;margin-top:4px">Motivo: '+esc(s.motivoRechazo)+'</div>':''}
+  </div>`;
+}
 
 // Retry pending when back online
 window.addEventListener('online', async () => {
