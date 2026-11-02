@@ -775,8 +775,29 @@ async function msLoginFromApp(){
   }
 }
 
-// ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
+// ── GOOGLE SHEETS SYNC ──
 const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJs6eURETO66H_Wf1DGQv8zW-HB2ANyKmjChrWDCo2PLGHPknQ/exec';
+
+// ── SYNC ESTADO SOLICITUD A GOOGLE SHEETS ──
+// Envía el cambio de estado al Sheets central para que todas las PCs lo vean
+function syncEstadoSheet(codigo, nuevoEstado){
+  if(!codigo) return;
+  fetch(GSCRIPT_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'update_estado', codigo, estado:nuevoEstado})
+  }).catch(e=>console.log('syncEstado error:',e));
+}
+function syncEliminarSheet(codigo){
+  if(!codigo) return;
+  fetch(GSCRIPT_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'eliminar_solicitud', codigo})
+  }).catch(e=>console.log('syncEliminar error:',e));
+}
+
+// ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
 
 // Función interna que hace la exportación real (sin UI)
 async function _doExportMaestros(){
@@ -1781,7 +1802,10 @@ function confirmImportStock(){
 // ─── GENERIC CRUD (supervisores, cuadrillas, sectores, proveedores) ──
 function delRecord(table,id,screen){
   if(!confirm('¿Eliminar este registro?'))return;
-  DB.del(table,id);toast('Registro eliminado');go(screen);
+  DB.del(table,id);
+  // Actualizar localStorage si es supervisores o cuadrillas
+  if(table==='supervisores')try{localStorage.setItem('wms_supervisores',JSON.stringify(DB.getAll('supervisores').map(s=>supNombreCompleto(s))));}catch(e){}
+  toast('Registro eliminado');go(screen);
 }
 
 // ─── SUPERVISORES ────────────────────────
@@ -1819,6 +1843,8 @@ function saveSupervisor(editId){
   const d={legajo:document.getElementById('s-legajo').value.trim(),nombre:document.getElementById('s-nombre').value.trim(),apellido:document.getElementById('s-apellido').value.trim(),area:document.getElementById('s-area').value,region:document.getElementById('s-region').value};
   if(!d.nombre){toast('El nombre es obligatorio','err');return}
   if(editId)DB.update('supervisores',editId,d);else DB.add('supervisores',d);
+  // Actualizar localStorage para solicitud.html y piqueteo.html
+  try{localStorage.setItem('wms_supervisores',JSON.stringify(DB.getAll('supervisores').map(s=>supNombreCompleto(s))));}catch(e){}
   autoExportMaestros();
   closeModal();toast('Supervisor guardado');go('supervisores');
 }
@@ -3215,6 +3241,7 @@ function delSolicitud(id){
   if(s&&s.codigo){
     const deleted=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');
     if(!deleted.includes(s.codigo)){deleted.push(s.codigo);localStorage.setItem('wms_sol_deleted',JSON.stringify(deleted));}
+    syncEliminarSheet(s.codigo);
   }
   DB.del('solicitudes',id);toast('Solicitud eliminada');go('solicitudes');
 }
@@ -3353,6 +3380,7 @@ function imprimirSolicitud(id){
   w.document.close();w.focus();setTimeout(()=>w.print(),250);
   if(s.estado==='Pendiente'){
     notifSol(DB.update('solicitudes',id,{estado:'En preparación',preparadoPor:currentUser.nombre,fechaPrep:nowLocal()}),'preparacion');
+    syncEstadoSheet(s.codigo,'En preparación');
     closeModal();toast('Picking impreso · '+s.codigo+' pasó a En preparación');go('solicitudes');
   }
 }
@@ -3382,6 +3410,7 @@ function marcarListoSol(id){
   const newItems=(s.items||[]).map(it=>({...it,cantEntregada:ent[it.matricula]??it.cantidad,nBobina:bobs[it.matricula]||it.nBobina,nEdenor:edns[it.matricula]||it.nEdenor}));
   const _ls=DB.update('solicitudes',id,{estado:'Listo',items:newItems,preparadoPor:currentUser.nombre,fechaPrep:nowLocal(),entregaModificada:mod});
   notifSol(_ls,'listo');
+  syncEstadoSheet(s.codigo,'Listo');
   closeModal();toast(s.codigo+' lista para entregar');go('solicitudes');
 }
 function verRemitoSol(remito){const d=DB.getAll('despachos').find(x=>x.remito===remito);if(d)viewRemito(d.id,'solicitudes');else toast('Remito no encontrado','err')}
@@ -3445,6 +3474,7 @@ function confirmarConFirma(id){
   const s=DB.get('solicitudes',id);if(!s)return;
   const rem=generarRemitoEntrega(s);
   notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+  syncEstadoSheet(s.codigo,'Entregado');
   closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️');
   viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
 }
@@ -3453,6 +3483,7 @@ function confirmarSinFirma(id){
   const s=DB.get('solicitudes',id);if(!s)return;
   const rem=generarRemitoEntrega(s);
   notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+  syncEstadoSheet(s.codigo,'Entregado');
   closeModal();toast(s.codigo+' entregada');
   viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
 }
@@ -3740,6 +3771,7 @@ function confirmAprobar(id){
   const quitados=(s.items||[]).filter((it,i)=>!(parseFloat(document.querySelector(`.ap-cant[data-i="${i}"]`).value)>0)).map(it=>({...it,cantidad:0,cantPedida:it.cantPedida??it.cantidad}));
   DB.update('solicitudes',id,{estado:'Pendiente',items,itemsQuitados:quitados,aprobadoPor:currentUser.nombre,fechaAprob:new Date().toISOString(),aprobModificada:mod,obsAprob:document.getElementById('ap-obs').value.trim()});
   notifSol(DB.get('solicitudes',id),'aprobada');
+  syncEstadoSheet(s.codigo,'Pendiente');
   closeModal();
   toast(mod?'Aprobada con cantidades modificadas':'Solicitud aprobada · pasa al depósito');go('solicitudes');
 }
@@ -3749,12 +3781,14 @@ function rechazarSol(id){
   if(motivo===null)return;
   const _rs=DB.update('solicitudes',id,{estado:'Rechazada',rechazadoPor:currentUser.nombre,motivoRechazo:motivo.trim(),fechaRechazo:new Date().toISOString()});
   notifSol(_rs,'rechazada');
+  syncEstadoSheet(_rs.codigo,'Rechazada');
   toast('Solicitud rechazada','err');go('solicitudes');
 }
 function moveSol(id,newState){
   const s=DB.getAll('solicitudes').find(x=>x.id===id);
   if(s&&s.estado===EST_APROB){toast(`Falta la aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}`,'err');return}
   DB.update('solicitudes',id,{estado:newState});
+  if(s&&s.codigo) syncEstadoSheet(s.codigo, newState);
   toast('Solicitud movida a: '+newState);
   go('solicitudes');
 }
