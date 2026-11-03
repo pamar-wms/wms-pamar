@@ -437,7 +437,7 @@
   </div>
 
   <div class="menubar">
-    <span>Archivo</span><span>Edición</span><span>Ver</span><span>Registros</span><span>Herramientas</span><span>Ayuda</span>
+    <span>Archivo</span><span>Edición</span><span>Ver</span><span>Registros</span><span>Herramientas</span><span>Ayuda</span><span onclick="btnActualizar()" style="margin-left:auto;cursor:pointer;background:#e74c3c;color:#fff;padding:2px 10px;border-radius:4px;font-weight:600;font-size:11px" title="Actualizar solicitudes y datos">🔄 Actualizar</span>
   </div>
 
   <div class="body">
@@ -841,6 +841,20 @@ function autoExportMaestros(){
 let _solPollTimer=null;
 let _solImporting=false;
 
+async function btnActualizar(){
+  toast('🔄 Actualizando…');
+  try{
+    await solImportarNuevas();
+    await syncEstadosDesdeSheet();
+    updateStats();
+    if(document.querySelector('.sol-tabs')) go('solicitudes');
+    toast('✅ Datos actualizados');
+  }catch(e){
+    console.log('btnActualizar error:',e);
+    toast('❌ Error al actualizar','err');
+  }
+}
+
 function solStartPolling(){
   solStopPolling();
   solImportarNuevas(); // una vez ahora
@@ -911,6 +925,60 @@ async function solImportarNuevas(){
     console.log('Poll solicitudes error:',e);
   }
   _solImporting=false;
+  // Después de importar nuevas, sincronizar estados desde Google Sheets
+  syncEstadosDesdeSheet();
+}
+
+// ── SYNC ESTADOS: trae todos los estados del Sheet y actualiza la DB local ──
+let _syncingEstados=false;
+async function syncEstadosDesdeSheet(){
+  if(_syncingEstados) return;
+  _syncingEstados=true;
+  try{
+    const resp=await fetch(GSCRIPT_URL+'?action=mis_solicitudes');
+    const data=await resp.json();
+    if(!data.solicitudes||!data.solicitudes.length){_syncingEstados=false;return;}
+    const sheetMap={};
+    data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s.estado;});
+    const locales=DB.getAll('solicitudes');
+    const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+    let cambios=0;
+    locales.forEach(s=>{
+      if(!s.codigo) return;
+      // Si fue eliminada en el Sheet, eliminarla localmente
+      if(!(s.codigo in sheetMap) && !deleted.has(s.codigo)){
+        // La solicitud no existe en el Sheet (puede haber sido eliminada por otro usuario)
+        return;
+      }
+      const estadoSheet=sheetMap[s.codigo];
+      if(!estadoSheet) return;
+      // Solo actualizar si el estado del Sheet es "más avanzado" o diferente
+      // y no revertir estados que ya avanzaron localmente
+      const orden={'Pend. aprobación':0,'Pendiente':1,'En preparación':2,'Listo':3,'Entregado':4,'Rechazada':5,'Eliminada':6};
+      const nivelLocal=orden[s.estado]??-1;
+      const nivelSheet=orden[estadoSheet]??-1;
+      if(estadoSheet==='Eliminada'){
+        // Eliminar localmente
+        if(!deleted.has(s.codigo)){deleted.add(s.codigo);}
+        s._eliminar=true;
+        cambios++;
+      } else if(nivelSheet>nivelLocal){
+        // El Sheet tiene un estado más avanzado — otro usuario lo cambió
+        s.estado=estadoSheet;
+        cambios++;
+      }
+    });
+    if(cambios>0){
+      const filtradas=locales.filter(s=>!s._eliminar);
+      DB.save('solicitudes',filtradas);
+      localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));
+      // Refrescar pantalla si estamos en solicitudes
+      if(document.querySelector('.sol-tabs')) go('solicitudes');
+    }
+  }catch(e){
+    console.log('Sync estados error:',e);
+  }
+  _syncingEstados=false;
 }
 
 /* Microsoft login flow (from login screen) */
