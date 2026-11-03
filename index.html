@@ -911,6 +911,11 @@ async function solImportarNuevas(){
       };
       existentes.push(nueva);
       nuevas++;
+      // Si es Dime o Mant, actualizar el Sheet a "Pend. aprobación"
+      // para que todas las PCs vean el estado correcto
+      if(nueva.estado===EST_APROB && sol.codigo){
+        syncEstadoSheet(sol.codigo, EST_APROB);
+      }
     }
 
     if(nuevas>0){
@@ -962,6 +967,9 @@ async function syncEstadosDesdeSheet(){
         if(!deleted.has(s.codigo)){deleted.add(s.codigo);}
         s._eliminar=true;
         cambios++;
+      } else if(s.estado===EST_APROB && estadoSheet==='Pendiente'){
+        // No pisar "Pend. aprobación" con "Pendiente" — la aprobación es manual
+        return;
       } else if(nivelSheet>nivelLocal){
         // El Sheet tiene un estado más avanzado — otro usuario lo cambió
         s.estado=estadoSheet;
