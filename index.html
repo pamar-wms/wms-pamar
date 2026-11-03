@@ -951,8 +951,13 @@ async function syncEstadosDesdeSheet(){
     locales.forEach(s=>{
       if(!s.codigo) return;
       // Si fue eliminada en el Sheet, eliminarla localmente
-      if(!(s.codigo in sheetMap) && !deleted.has(s.codigo)){
-        // La solicitud no existe en el Sheet (puede haber sido eliminada por otro usuario)
+      if(!(s.codigo in sheetMap)){
+        // La solicitud no existe en el Sheet — fue eliminada o borrada por otro usuario
+        if(s.origen==='google_sheets'){
+          if(!deleted.has(s.codigo)){deleted.add(s.codigo);}
+          s._eliminar=true;
+          cambios++;
+        }
         return;
       }
       const estadoSheet=sheetMap[s.codigo];
