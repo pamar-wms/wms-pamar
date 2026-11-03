@@ -155,7 +155,7 @@
 
   <div id="ns-dime-fields" style="display:none">
     <div class="pf">
-      <label id="ns-sol-label">Cuadrilla</label>
+      <label id="ns-sol-label">Solicitante</label>
       <div class="search-select">
         <input type="text" id="ns-solicitante" placeholder="Escribí apellido o nombre…" autocomplete="off" oninput="ssFilter('ns-solicitante','ns-sol-list',_solCuads)" onfocus="ssFilter('ns-solicitante','ns-sol-list',_solCuads)">
         <div class="ss-list" id="ns-sol-list"></div>
@@ -171,7 +171,7 @@
   </div>
 
   <div class="pf" id="ns-cuad-wrap">
-    <label>Cuadrilla</label>
+    <label>Solicitante</label>
     <div class="search-select">
       <input type="text" id="ns-cuad" placeholder="Escribí nombre o número…" autocomplete="off" oninput="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)" onfocus="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)">
       <div class="ss-list" id="ns-cuad-list"></div>
@@ -379,7 +379,7 @@ function nsAreaChanged(){
   if(ow) ow.style.display = isDime ? 'none' : 'block';
   const solLabel = document.getElementById('ns-sol-label');
   const usrLabel = document.getElementById('ns-usr-label');
-  if(solLabel) solLabel.textContent = 'Cuadrilla';
+  if(solLabel) solLabel.textContent = 'Solicitante';
   if(usrLabel) usrLabel.textContent = 'Usuario Edenor a asignar';
   if(isSpecial){
     const srcList = isDime ? DIME_CUADRILLAS : CUADRILLAS;
@@ -552,27 +552,7 @@ function toast(msg, type='ok'){
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── MIS PEDIDOS (progress bar) ──
-// Cache de solicitudes desde Google Sheets
-let _misSolCache=null;
-let _misSolCacheTime=0;
-
-async function fetchMisSolicitudes(){
-  // Cache por 30 segundos para no hacer fetch en cada filtro
-  if(_misSolCache && (Date.now()-_misSolCacheTime)<30000) return _misSolCache;
-  try{
-    const resp=await fetch(SCRIPT_URL+'?action=mis_solicitudes');
-    const data=await resp.json();
-    _misSolCache=data.solicitudes||[];
-    _misSolCacheTime=Date.now();
-    return _misSolCache;
-  }catch(e){
-    console.log('Error fetching solicitudes:',e);
-    // Fallback a localStorage
-    try{return JSON.parse(localStorage.getItem('wms_solicitudes')||'[]')}catch(e2){return[]}
-  }
-}
-
-async function loadMisPedidos(){
+function loadMisPedidos(){
   const area=document.getElementById('ns-area').value;
   const isDime=area==='Dime Mide';
   const isMant=area==='Mantenimiento';
@@ -589,10 +569,9 @@ async function loadMisPedidos(){
   const wrap=document.getElementById('misPedidos');
   const list=document.getElementById('misPedidosList');
   if(!filterVal||filterVal==='|||'){list.innerHTML='<div class="mp-empty">Seleccioná una obra o cuadrilla para ver tus pedidos anteriores</div>';return}
-  // Fetch solicitudes from Google Sheets (con fallback a localStorage)
-  list.innerHTML='<div class="mp-empty">⏳ Cargando pedidos…</div>';
-  wrap.style.display='block';
-  let sols=await fetchMisSolicitudes();
+  // Read solicitudes from WMS localStorage
+  let sols=[];
+  try{sols=JSON.parse(localStorage.getItem('wms_solicitudes')||'[]')}catch(e){sols=[]}
   // Filter
   let filtered=[];
   if(isSpecial){
