@@ -894,7 +894,7 @@ async function solImportarNuevas(){
         areaSolicitud:sol.areaSolicitud||'',
         cuadrilla:sol.cuadrilla||'',
         supervisor:sol.supervisor||sol.cuadrilla||'',
-        pidioUsuario:'Cuadrilla (formulario)',
+        pidioUsuario:sol.cuadrilla||sol.solicitanteDime||'Cuadrilla (formulario)',
         fecha:sol.fecha||new Date().toLocaleString('es-AR'),
         items:items.map(it=>({
           matricula:it.matricula||'',
@@ -944,12 +944,18 @@ async function syncEstadosDesdeSheet(){
     const data=await resp.json();
     if(!data.solicitudes||!data.solicitudes.length){_syncingEstados=false;return;}
     const sheetMap={};
-    data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s.estado;});
+    data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s;});
     const locales=DB.getAll('solicitudes');
     const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
     let cambios=0;
     locales.forEach(s=>{
       if(!s.codigo) return;
+      // Corregir pidioUsuario si quedó como genérico
+      const solSheet=sheetMap[s.codigo];
+      if(solSheet && s.pidioUsuario==='Cuadrilla (formulario)'){
+        const nombre=solSheet.cuadrilla||solSheet.solicitanteDime||'';
+        if(nombre){s.pidioUsuario=nombre;cambios++;}
+      }
       // Si fue eliminada en el Sheet, eliminarla localmente
       if(!(s.codigo in sheetMap)){
         // La solicitud no existe en el Sheet — fue eliminada o borrada por otro usuario
@@ -960,7 +966,7 @@ async function syncEstadosDesdeSheet(){
         }
         return;
       }
-      const estadoSheet=sheetMap[s.codigo];
+      const estadoSheet=solSheet?solSheet.estado:null;
       if(!estadoSheet) return;
       // Solo actualizar si el estado del Sheet es "más avanzado" o diferente
       // y no revertir estados que ya avanzaron localmente
