@@ -3511,8 +3511,7 @@ function solBuildCard(s,st){
     <div class="sc-obra">${s.obra||s.areaSolicitud||'—'}</div>
     <div class="sc-who">
       <div>🧑‍💼 <span>Supervisor:</span> <b>${s.supervisor}</b></div>
-      <div>👤 <span>Pidió:</span> <b>${pidio}</b>${pidio!==s.supervisor?' <em class="sc-otro">en su nombre</em>':''}</div>
-      ${s.cuadrilla?`<div>👷 <span>Cuadrilla:</span> ${s.cuadrilla}</div>`:''}
+      <div>👤 <span>Pidió:</span> <b>${s.cuadrilla||s.solicitanteDime||pidio}</b>${pidio!==s.supervisor?' <em class="sc-otro">en su nombre</em>':''}</div>
       <div>🕒 ${fmtFechaHora(s.fecha)}${s.remito?` · <b>${s.remito}</b>`:''}</div>
     </div>
     ${itemsText?`<div class="sc-items">📦 ${itemsText}</div>`:''}
