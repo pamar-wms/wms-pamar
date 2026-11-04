@@ -1702,22 +1702,50 @@ const POST_RENDER={
 
 // ─── HOME ────────────────────────────────
 SCREENS.home=()=>{
-  const mCount=DB.count('materiales'),oCount=DB.count('obras'),sCount=DB.count('solicitudes');
+  const oCount=DB.count('obras');
+  const despCount=DB.count('despachos');
+  const devCount=DB.count('devoluciones');
+  const pendDev=despCount-devCount;
   const heroText=['super','gerencial','admin','jefedep'].includes(currentUser.rol)?'Control de stock, despachos a obra y trazabilidad de materiales · PAMAR'
     :currentUser.rol==='sup'?'Acceso supervisor · Solicitar material y ver estado de solicitudes'
     :currentUser.rol==='administrativo'?'Consultas y reportes del depósito · PAMAR'
     :currentUser.rol==='dime'?'Aprobador Dime Mide · Revisá y aprobá los materiales que piden las cuadrillas'
     :currentUser.rol==='mant'?'Aprobador Mantenimiento · Revisá y aprobá los materiales que piden las cuadrillas'
     :'Acceso operativo · Cargá ingresos, despachos, devoluciones y traspasos';
+  /* Últimos 10 movimientos (despachos + devoluciones) */
+  const movs=[];
+  DB.getAll('despachos').forEach(r=>{
+    const items=r.items||[];
+    movs.push({fecha:r.fecha||'',tipo:'Despacho',obra:r.obra||'',cuadrilla:r.cuadrilla||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:r.remito||''});
+  });
+  DB.getAll('devoluciones').forEach(r=>{
+    const items=r.items||[];
+    movs.push({fecha:r.fecha||'',tipo:'Devolución',obra:r.obra||'',cuadrilla:r.cuadrilla||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:''});
+  });
+  movs.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.id-a.id));
+  const last10=movs.slice(0,10);
+  let movTbody=last10.map(m=>`<tr>
+    <td>${fmtDate(m.fecha)}</td>
+    <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;${m.tipo==='Despacho'?'background:#fff3e0;color:#e65100':'background:#e8f5e9;color:#2e7d32'}">${m.tipo==='Despacho'?'🚚 Salida':'↩️ Devolución'}</span></td>
+    <td>${m.obra||'—'}</td><td>${m.cuadrilla||'—'}</td>
+    <td style="text-align:center">${m.items}</td>
+    <td style="font-size:11px;color:var(--gray);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.detalle||'—'}</td>
+  </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="hero"><h2>Sistema de Gestión de Depósito</h2><span>${heroText}</span></div>
     <div class="stat-row">
-      <div class="stat"><div class="sv">${mCount}</div><div class="sl">Materiales registrados</div></div>
       <div class="stat"><div class="sv">${oCount}</div><div class="sl">Obras activas</div></div>
-      <div class="stat"><div class="sv">${DB.count('despachos')}</div><div class="sl">Despachos realizados</div></div>
+      <div class="stat"><div class="sv">${despCount}</div><div class="sl">Despachos realizados</div></div>
       <div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado==='Pendiente').length}</div><div class="sl">Solicitudes pendientes</div></div>
       ${can('aprobardime')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Dime Mide').length}</div><div class="sl">Esperan aprobación Dime</div></div>`:''}
       ${can('aprobarmant')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Mantenimiento').length}</div><div class="sl">Esperan aprobación Mant.</div></div>`:''}
+    </div>
+    <div style="margin-top:18px">
+      <h3 style="font-size:14px;color:var(--steel);margin-bottom:8px">📋 Últimos movimientos</h3>
+      <div class="tablewrap"><table style="font-size:12px">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Obra</th><th>Cuadrilla</th><th>Ítems</th><th>Matrículas</th></tr></thead>
+        <tbody>${movTbody||'<tr><td colspan="6" class="empty">Sin movimientos</td></tr>'}</tbody>
+      </table></div>
     </div>
     <div class="cards">
       <div class="card admin-only" onclick="go('materiales')"><div class="cic">📦</div><h3>Maestros</h3><p>Materiales, cuadrillas, supervisores, obras, sectores, áreas y regiones.</p></div>
