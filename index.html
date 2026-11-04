@@ -2565,13 +2565,27 @@ function ingCantEnter(){
 function renderIngItemsList(){
   const c=document.getElementById('ing-items-list');if(!c)return;
   if(!ingItems.length){c.innerHTML='<div style="color:var(--gray);font-size:11px;text-align:center;padding:10px">Escribí matrícula + Enter, cantidad + Enter para agregar</div>';return}
+  const sects=DB.getAll('sectores').map(s=>s.codigo);
   c.innerHTML='<div style="font-size:10px;color:var(--gray);font-weight:700;margin-bottom:4px">MATERIALES CARGADOS ('+ingItems.length+')</div>'+ingItems.map((it,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#f7f9fb;border-radius:4px;margin-bottom:3px;font-size:12px">
-    <code style="font-weight:700;min-width:70px">${it.matricula}</code>
-    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.descripcion}</span>
-    <b style="min-width:50px;text-align:right">${it.cantidad}</b>
-    <span style="color:var(--gray);font-size:10px">${it.sector||''}</span>
+    <input value="${it.matricula}" onchange="ingItemEdit(${i},'matricula',this.value)" style="font-weight:700;width:80px;padding:2px 4px;border:1px solid var(--line);border-radius:3px;font-family:monospace;font-size:12px" title="Editar matrícula">
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ing-desc-${i}">${it.descripcion}</span>
+    <input type="number" value="${it.cantidad}" onchange="ingItemEdit(${i},'cantidad',this.value)" style="width:60px;padding:2px 4px;border:1px solid var(--line);border-radius:3px;font-size:12px;text-align:right;font-weight:700" title="Editar cantidad">
+    <select onchange="ingItemEdit(${i},'sector',this.value)" style="width:80px;padding:2px;border:1px solid var(--line);border-radius:3px;font-size:11px" title="Editar sector">${sects.map(s=>`<option${s===it.sector?' selected':''}>${s}</option>`).join('')}</select>
     <button onclick="ingItems.splice(${i},1);renderIngItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
+}
+function ingItemEdit(idx,field,val){
+  if(field==='matricula'){
+    const mat=DB.getAll('materiales').find(m=>String(m.matricula)===String(val));
+    ingItems[idx].matricula=val;
+    ingItems[idx].descripcion=mat?mat.descripcion:'(no encontrada)';
+    const descEl=document.getElementById('ing-desc-'+idx);
+    if(descEl) descEl.textContent=ingItems[idx].descripcion;
+  } else if(field==='cantidad'){
+    ingItems[idx].cantidad=parseFloat(val)||0;
+  } else if(field==='sector'){
+    ingItems[idx].sector=val;
+  }
 }
 function saveIngreso(){
   const validItems=ingItems.filter(it=>it.matricula&&it.cantidad>0);
