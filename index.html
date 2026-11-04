@@ -3136,12 +3136,17 @@ function saveDevolucion(){
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const devRec={fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''};
   DB.add('devoluciones',devRec);
-  /* Notificar devolución a TODOS los usuarios activos */
+  /* Notificar devolución a TODOS los usuarios activos (incluyendo al que registra) */
   const _devMats=validItems.map(it=>it.matricula).join(', ');
   const _devObra=obra||area||'';
   const _devCuad=devRec.cuadrilla||'';
+  const _devTexto=`Devolución registrada — ${_devObra}${_devCuad?' · '+_devCuad:''} — ${validItems.length} ítem(s): ${_devMats}`;
   const _allUserIds=DB.getAll('usuarios').filter(u=>u.activo).map(u=>u.id);
-  notify(_allUserIds,'📦',`Devolución registrada — ${_devObra}${_devCuad?' · '+_devCuad:''} — ${validItems.length} ítem(s): ${_devMats}`);
+  notify(_allUserIds,'📦',_devTexto,null,'devoluciones');
+  /* notify excluye al usuario actual, lo agregamos manualmente */
+  const _nAll=DB.getAll('notificaciones');const _nid=_nAll.reduce((m,x)=>Math.max(m,x.id||0),0)+1;
+  _nAll.push({id:_nid,para:currentUser.id,icon:'📦',texto:_devTexto,solId:null,screen:'devoluciones',fecha:nowLocal(),leida:false});
+  DB.save('notificaciones',_nAll);refreshBell(true);
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 function editDevolucion(id){
@@ -3435,12 +3440,12 @@ function usersForPerson(nombre){
     (ape.length>2&&u.rol==='sup'&&u.nombre.toLowerCase().split(/[ .]+/).pop()===ape)
   )).map(u=>u.id);
 }
-function notify(ids,icon,texto,solId){
+function notify(ids,icon,texto,solId,screen){
   const set=[...new Set(ids)].filter(id=>id!==currentUser.id);
   if(!set.length)return;
   const all=DB.getAll('notificaciones');let nid=all.reduce((m,x)=>Math.max(m,x.id||0),0);
   const f=nowLocal();
-  set.forEach(uid=>all.push({id:++nid,para:uid,icon,texto,solId:solId||null,fecha:f,leida:false}));
+  set.forEach(uid=>all.push({id:++nid,para:uid,icon,texto,solId:solId||null,screen:screen||null,fecha:f,leida:false}));
   DB.save('notificaciones',all.slice(-1500));
 }
 function notifSol(s,evento){
@@ -3544,6 +3549,7 @@ function openNotif(id){
   const all=DB.getAll('notificaciones');const n=all.find(x=>x.id===id);if(!n)return;
   n.leida=true;DB.save('notificaciones',all);refreshBell();
   document.getElementById('notif-panel').classList.remove('on');
+  if(n.screen){go(n.screen);return}
   if(n.solId&&DB.get('solicitudes',n.solId)){
     if(can('solicitudes')){go('solicitudes');verSolicitud(n.solId)}
     else if(can('missol')){misFiltro='todas';go('missol')}
