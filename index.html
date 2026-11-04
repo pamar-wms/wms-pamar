@@ -1740,19 +1740,19 @@ SCREENS.home=()=>{
       ${can('aprobardime')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Dime Mide').length}</div><div class="sl">Esperan aprobación Dime</div></div>`:''}
       ${can('aprobarmant')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Mantenimiento').length}</div><div class="sl">Esperan aprobación Mant.</div></div>`:''}
     </div>
-    <div style="margin-top:18px">
-      <h3 style="font-size:14px;color:var(--steel);margin-bottom:8px">📋 Últimos movimientos</h3>
-      <div class="tablewrap"><table style="font-size:12px">
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Obra</th><th>Cuadrilla</th><th>Ítems</th><th>Matrículas</th></tr></thead>
-        <tbody>${movTbody||'<tr><td colspan="6" class="empty">Sin movimientos</td></tr>'}</tbody>
-      </table></div>
-    </div>
     <div class="cards">
       <div class="card admin-only" onclick="go('materiales')"><div class="cic">📦</div><h3>Maestros</h3><p>Materiales, cuadrillas, supervisores, obras, sectores, áreas y regiones.</p></div>
       <div class="card panolero-only" onclick="go('despachos')"><div class="cic">🚚</div><h3>Operaciones</h3><p>Registrar ingresos, despachar material e imprimir remitos.</p></div>
       <div class="card" onclick="go('solicitudes')"><div class="cic">📥</div><h3>Solicitudes</h3><p>Bandeja de pedidos de supervisores.</p></div>
       <div class="card" onclick="go('stockfull')"><div class="cic">📊</div><h3>Consultas</h3><p>Stock completo, movimientos por obra y consultas libres.</p></div>
       ${can('medidores')?`<div class="card" onclick="go('medidores')"><div class="cic">⚡</div><h3>Medidores</h3><p>Ingreso, salida y devolución de medidores serializados · Dime Mide</p></div>`:''}
+    </div>
+    <div style="margin-top:18px">
+      <h3 style="font-size:14px;color:var(--steel);margin-bottom:8px">📋 Últimos movimientos</h3>
+      <div class="tablewrap"><table style="font-size:12px">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Obra</th><th>Cuadrilla</th><th>Ítems</th><th>Matrículas</th></tr></thead>
+        <tbody>${movTbody||'<tr><td colspan="6" class="empty">Sin movimientos</td></tr>'}</tbody>
+      </table></div>
     </div>
   </div>`;
 };
@@ -3134,7 +3134,13 @@ function saveDevolucion(){
   if(!isDime&&!obra){toast('Seleccioná una obra','err');return}
   const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
+  const devRec={fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''};
+  DB.add('devoluciones',devRec);
+  /* Notificar devolución a usuarios con permiso despachos */
+  const _devMats=validItems.map(it=>it.matricula).join(', ');
+  const _devObra=obra||area||'';
+  const _devCuad=devRec.cuadrilla||'';
+  notify(usersWith('despachos'),'📦',`Devolución registrada — ${_devObra}${_devCuad?' · '+_devCuad:''} — ${validItems.length} ítem(s): ${_devMats}`);
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 function editDevolucion(id){
