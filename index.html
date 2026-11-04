@@ -1540,6 +1540,9 @@ const PERM_MODULES=[
     {id:'meddevol',label:'Devolución de medidores',icon:'🔄'},
     {id:'medconsulta',label:'Consulta de medidores',icon:'🔍'}
   ]},
+  {group:'Edición',items:[
+    {id:'editarops',label:'Editar/eliminar operaciones',icon:'✏️'}
+  ]},
   {group:'Admin',items:[
     {id:'usuarios',label:'Gestión de usuarios',icon:'👤'}
   ]}
@@ -1559,6 +1562,7 @@ function fmtNum(n){return Number(n).toLocaleString('es-AR')}
 function can(p){return (currentUser.permisos||[]).includes(p)}
 function isAdminLevel(){return ['super','gerencial','admin'].includes(currentUser.rol)}
 function canEditMaestro(){return isAdminLevel()}
+function canEditOps(){return isAdminLevel()||can('editarops')}
 function obraArea(nombre){const o=DB.getAll('obras').find(x=>x.nombre===nombre);return o?o.area:''}
 const EST_APROB='Pend. aprobación';
 
@@ -2480,22 +2484,33 @@ function getReservaObra(obraNombre){
 // ─── INGRESOS ────────────────────────────
 SCREENS.ingresos=()=>{
   const rows=DB.getAll('ingresos');
-  let tbody=rows.map(r=>{
+  const editable=canEditOps();
+  let tbody='';
+  rows.forEach(r=>{
     const items=r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}];
-    const matCell=items.map(it=>`<div style="font-size:12px"><code>${it.matricula}</code> ${(it.descripcion||'').substring(0,25)} — <b>${fmtNum(it.cantidad)}</b>${it.sector?' · '+it.sector:''}</div>`).join('');
-    return `<tr>
-    <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.proveedor||'—'}</td><td>${r.remitoOrigen||'—'}</td>
-    <td>${matCell}</td>
-    <td class="act-btns"><button onclick="delRecord('ingresos',${r.id},'ingresos')">🗑️</button></td>
-  </tr>`;
-  }).join('');
+    items.forEach((it,idx)=>{
+      const isFirst=idx===0;
+      const rowspan=items.length;
+      tbody+=`<tr style="border-top:${isFirst?'2px solid var(--line)':'none'}">
+        ${isFirst?`<td class="idcell" rowspan="${rowspan}">${r.id}</td>
+        <td rowspan="${rowspan}">${fmtDate(r.fecha)}</td>
+        <td rowspan="${rowspan}">${r.proveedor||'—'}</td>
+        <td rowspan="${rowspan}">${r.remitoOrigen||'—'}</td>`:''}
+        <td><code>${it.matricula}</code></td>
+        <td>${(it.descripcion||'').substring(0,40)}</td>
+        <td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
+        <td>${it.sector||'—'}</td>
+        ${isFirst?`<td class="act-btns" rowspan="${rowspan}">${editable?`<button onclick="editIngreso(${r.id})" title="Editar">✏️</button><button onclick="delRecord('ingresos',${r.id},'ingresos')" title="Eliminar">🗑️</button>`:'—'}</td>`:''}
+      </tr>`;
+    });
+  });
+  const cols=editable?9:8;
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">⬇️</div><div><h1>Ingresos de Material</h1><p>Recepción desde Edenor u otras contratistas</p></div></div>
     <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="addIngreso()">＋ Registrar ingreso</button><button class="btn" onclick="importIngresoMasivo()">📥 Ingreso masivo</button>${canEditMaestro()?'<button class="btn" onclick="importStockMasivo()">📥 Carga inicial de stock</button>':''}</div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Proveedor</th><th>Remito</th><th>Materiales</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="6" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Proveedor</th><th>Remito</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Sector</th>${editable?'<th class="th-acc">Acc.</th>':''}</tr></thead>
+      <tbody>${tbody||`<tr><td colspan="${cols}" class="empty">Sin registros</td></tr>`}</tbody>
     </table></div>
   </div>`;
 };
@@ -2563,6 +2578,44 @@ function saveIngreso(){
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   DB.add('ingresos',{fecha:document.getElementById('i-fecha').value,proveedor:document.getElementById('i-prov').value,remitoOrigen:document.getElementById('i-remito').value.trim(),items:validItems});
   closeModal();toast('Ingreso registrado — '+validItems.length+' ítem(s)');go('ingresos');
+}
+let _editIngId=null;
+function editIngreso(id){
+  const r=DB.get('ingresos',id);if(!r){toast('No encontrado','err');return}
+  _editIngId=id;
+  ingItems=(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}]).map(it=>({...it}));
+  const provs=DB.getAll('proveedores').map(p=>p.corto);
+  const sects=DB.getAll('sectores').map(s=>s.codigo);
+  openModal(`<h3>✏️ Editar ingreso #${id}</h3>
+    <div class="fgrid">
+      <div class="field"><label>Fecha</label><input type="date" id="i-fecha" value="${r.fecha||today()}"></div>
+      <div class="field"><label>Proveedor</label><select id="i-prov">${provs.map(p=>`<option${p===r.proveedor?' selected':''}>${p}</option>`).join('')}</select></div>
+      <div class="field"><label>Remito de origen</label><input id="i-remito" value="${r.remitoOrigen||''}"></div>
+    </div>
+    <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales</h4>
+    <div style="display:grid;grid-template-columns:110px 1fr 80px 90px;gap:6px;align-items:end;margin-bottom:8px">
+      <div><label style="font-size:10px;color:var(--gray)">Matrícula</label><input id="i-mat-inp" placeholder="Matrícula" oninput="ingMatAuto()" onkeydown="if(event.key==='Enter'){event.preventDefault();ingMatEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Descripción</label><input id="i-desc-inp" readonly placeholder="—" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;background:#f0f2f4"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Cantidad</label><input type="number" id="i-cant-inp" placeholder="Cant." onkeydown="if(event.key==='Enter'){event.preventDefault();ingCantEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Sector</label><select id="i-sect-inp" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px">${sects.map(s=>`<option>${s}</option>`).join('')}</select></div>
+    </div>
+    <div id="ing-items-list" style="margin-top:6px"></div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveEditIngreso()">💾 Guardar cambios</button></div>`);
+  renderIngItemsList();
+}
+function saveEditIngreso(){
+  const validItems=ingItems.filter(it=>it.matricula&&it.cantidad>0);
+  if(!validItems.length){toast('Agregá al menos un material','err');return}
+  const r=DB.get('ingresos',_editIngId);if(!r){toast('No encontrado','err');return}
+  r.fecha=document.getElementById('i-fecha').value;
+  r.proveedor=document.getElementById('i-prov').value;
+  r.remitoOrigen=document.getElementById('i-remito').value.trim();
+  r.items=validItems;
+  // Limpiar campos legacy si existían
+  delete r.matricula;delete r.descripcion;delete r.cantidad;delete r.sector;
+  DB.update('ingresos',r);
+  _editIngId=null;
+  closeModal();toast('Ingreso actualizado');go('ingresos');
 }
 
 // ─── INGRESO MASIVO (Excel copy/paste) ──────────
