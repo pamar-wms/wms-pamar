@@ -2690,18 +2690,28 @@ function confirmImportIngreso(){
 // ─── DESPACHOS ───────────────────────────
 SCREENS.despachos=()=>{
   const rows=DB.getAll('despachos');
-  let tbody=rows.map(r=>`<tr>
-    <td class="idcell">${r.remito}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.area}</td><td>${pillRegion(r.region)}</td>
-    <td>${r.cuadrilla}</td><td>${r.usuarioEdenor||'—'}</td><td>${r.supervisor}</td>
-    <td class="act-btns"><button onclick="viewRemito(${r.id})" title="Ver remito">🧾</button>${isAdminLevel()?`<button onclick="delDespacho(${r.id})" title="Eliminar despacho" style="color:#c53727">🗑️</button>`:''}</td>
-  </tr>`).join('');
+  const editable=canEditOps();
+  let tbody='';
+  rows.forEach(r=>{
+    const items=r.items||[{matricula:r.matricula||'—',descripcion:r.descripcion||'',cantidad:r.cantidad||0}];
+    items.forEach((it,idx)=>{
+      const isFirst=idx===0;
+      const rs=items.length;
+      tbody+=`<tr style="border-top:${isFirst?'2px solid var(--line)':'none'}">
+        ${isFirst?`<td class="idcell" rowspan="${rs}">${r.remito}</td>
+        <td rowspan="${rs}">${fmtDate(r.fecha)}</td><td rowspan="${rs}">${r.obra}</td><td rowspan="${rs}">${r.area}</td><td rowspan="${rs}">${pillRegion(r.region)}</td>
+        <td rowspan="${rs}">${r.cuadrilla}</td><td rowspan="${rs}">${r.usuarioEdenor||'—'}</td><td rowspan="${rs}">${r.supervisor}</td>`:''}
+        <td><code>${it.matricula}</code></td><td>${(it.descripcion||'').substring(0,30)}</td><td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
+        ${isFirst?`<td class="act-btns" rowspan="${rs}"><button onclick="viewRemito(${r.id})" title="Ver remito">🧾</button>${editable?`<button onclick="editDespacho(${r.id})" title="Editar">✏️</button><button onclick="delDespacho(${r.id})" title="Eliminar" style="color:#c53727">🗑️</button>`:''}</td>`:''}
+      </tr>`;
+    });
+  });
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🚚</div><div><h1>Despachos a Obra</h1><p>Al confirmar se descuenta stock y se genera el remito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDespacho()">＋ Nuevo despacho</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Remito</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Región</th><th>Cuadrilla</th><th>Usr. Edenor</th><th>Supervisor</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>Remito</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Región</th><th>Cuadrilla</th><th>Usr. Edenor</th><th>Supervisor</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="12" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -2910,10 +2920,43 @@ function saveDespacho(){
   closeModal();toast('Despacho registrado — '+remito);go('despachos');
 }
 function delDespacho(id){
-  if(!isAdminLevel()){toast('Solo superusuarios pueden eliminar despachos','err');return}
+  if(!canEditOps()){toast('No tenés permiso para eliminar despachos','err');return}
   const r=DB.get('despachos',id);if(!r)return;
   if(!confirm('¿Eliminar despacho '+r.remito+'?\n\nEsto eliminará el registro completo y revertirá el descuento de stock.'))return;
   DB.del('despachos',id);toast('Despacho '+r.remito+' eliminado');go('despachos');
+}
+function editDespacho(id){
+  const r=DB.get('despachos',id);if(!r){toast('No encontrado','err');return}
+  despItems=(r.items||[]).map(it=>({...it}));
+  const sups=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
+  const cuads=DB.getAll('cuadrillas').map(c=>cuaNombreCompleto(c));
+  openModal(`<h3>✏️ Editar despacho ${r.remito}</h3>
+    <div class="fgrid">
+      <div class="field"><label>Fecha</label><input type="date" id="d-fecha" value="${r.fecha||today()}"></div>
+      <div class="field"><label>Obra</label><input id="d-obra" value="${r.obra||''}" readonly style="background:#f0f2f4"></div>
+      <div class="field"><label>Cuadrilla</label><select id="d-cuad">${cuads.map(c=>`<option${c===r.cuadrilla?' selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Supervisor</label><select id="d-sup">${sups.map(s=>`<option${s===r.supervisor?' selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales</h4>
+    <div style="display:grid;grid-template-columns:110px 1fr 80px;gap:6px;align-items:end;margin-bottom:8px">
+      <div><label style="font-size:10px;color:var(--gray)">Matrícula</label><input id="d-mat-inp" placeholder="Matrícula" oninput="despMatAuto()" onkeydown="if(event.key==='Enter'){event.preventDefault();despMatEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Descripción</label><input id="d-desc-inp" readonly placeholder="—" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;background:#f0f2f4"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Cantidad</label><input type="number" id="d-cant-inp" placeholder="Cant." onkeydown="if(event.key==='Enter'){event.preventDefault();despCantEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+    </div>
+    <div id="desp-items-list" style="margin-top:6px"></div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveEditDespacho(${id})">💾 Guardar cambios</button></div>`);
+  renderDespItemsList();
+}
+function saveEditDespacho(id){
+  const validItems=despItems.filter(it=>it.matricula&&it.cantidad>0);
+  if(!validItems.length){toast('Agregá al menos un material','err');return}
+  const r=DB.get('despachos',id);if(!r){toast('No encontrado','err');return}
+  r.fecha=document.getElementById('d-fecha').value;
+  r.cuadrilla=document.getElementById('d-cuad').value;
+  r.supervisor=document.getElementById('d-sup').value;
+  r.items=validItems;
+  DB.update('despachos',r);
+  closeModal();toast('Despacho actualizado');go('despachos');
 }
 function viewRemito(id,back){
   const r=DB.get('despachos',id);if(!r)return;
@@ -2955,22 +2998,28 @@ function viewRemito(id,back){
 // ─── DEVOLUCIONES ────────────────────────
 SCREENS.devoluciones=()=>{
   const rows=DB.getAll('devoluciones');
-  let tbody=rows.map(r=>{
+  const editable=canEditOps();
+  let tbody='';
+  rows.forEach(r=>{
     const items=r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}];
-    const matCell=items.map(it=>`${it.matricula} · ${(it.descripcion||'').substring(0,22)} (${fmtNum(it.cantidad)}) ${it.estado==='Bueno – reingresa'?'<span class="pill ok">Reingresa</span>':'<span class="pill fin">Dañado</span>'}`).join('<br>');
-    return `<tr>
-    <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.obra}</td><td>${r.area||'—'}</td><td>${r.cuadrilla||'—'}</td><td>${r.supervisor||'—'}</td>
-    <td style="font-size:11px">${matCell}</td><td>${items.length} ítem${items.length>1?'s':''}</td>
-    <td class="act-btns"><button onclick="delRecord('devoluciones',${r.id},'devoluciones')">🗑️</button></td>
-  </tr>`;
-  }).join('');
+    items.forEach((it,idx)=>{
+      const isFirst=idx===0;
+      const rs=items.length;
+      tbody+=`<tr style="border-top:${isFirst?'2px solid var(--line)':'none'}">
+        ${isFirst?`<td class="idcell" rowspan="${rs}">${r.id}</td>
+        <td rowspan="${rs}">${fmtDate(r.fecha)}</td><td rowspan="${rs}">${r.obra}</td><td rowspan="${rs}">${r.area||'—'}</td><td rowspan="${rs}">${r.cuadrilla||'—'}</td><td rowspan="${rs}">${r.supervisor||'—'}</td>`:''}
+        <td><code>${it.matricula}</code></td><td>${(it.descripcion||'').substring(0,30)}</td><td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
+        <td>${it.estado==='Bueno – reingresa'?'<span class="pill ok">Reingresa</span>':'<span class="pill fin">Dañado</span>'}</td>
+        ${isFirst?`<td class="act-btns" rowspan="${rs}">${editable?`<button onclick="editDevolucion(${r.id})" title="Editar">✏️</button><button onclick="delRecord('devoluciones',${r.id},'devoluciones')" title="Eliminar">🗑️</button>`:'—'}</td>`:''}
+      </tr>`;
+    });
+  });
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">↩️</div><div><h1>Devoluciones de Obra</h1><p>Material que retorna al depósito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDevolucion()">＋ Registrar devolución</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Cuadrilla</th><th>Supervisor</th><th>Materiales</th><th>Ítems</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Cuadrilla</th><th>Supervisor</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>Estado</th>${editable?'<th>Acc.</th>':''}</tr></thead>
+      <tbody>${tbody||`<tr><td colspan="${editable?11:10}" class="empty">Sin registros</td></tr>`}</tbody>
     </table></div>
   </div>`;
 };
@@ -3060,22 +3109,63 @@ function saveDevolucion(){
   DB.add('devoluciones',{fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''});
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
+function editDevolucion(id){
+  const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
+  devItems=(r.items||[]).map(it=>({...it}));
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
+  const sups=DB.getAll('supervisores').map(s=>(s.nombre+' '+s.apellido).trim());
+  const cuads=DB.getAll('cuadrillas').map(c=>(c.nombre+' '+c.apellido).trim()).sort((a,b)=>a.localeCompare(b));
+  openModal(`<h3>✏️ Editar devolución #${id}</h3>
+    <div class="fgrid">
+      <div class="field" style="grid-column:1/-1"><label>Fecha</label><input type="date" id="dv-fecha" value="${r.fecha||today()}" style="width:100%;max-width:220px;display:block"></div>
+      <div class="field" style="grid-column:1/-1"><label>Obra origen</label><select id="dv-obra" style="width:100%;display:block">${obras.map(o=>`<option${o===r.obra?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Área</label><select id="dv-area"><option${r.area==='Obra y Distribución'?' selected':''}>Obra y Distribución</option><option${r.area==='Mantenimiento'?' selected':''}>Mantenimiento</option><option${r.area==='Dime Mide'?' selected':''}>Dime Mide</option></select></div>
+      <div class="field"><label>Cuadrilla</label><select id="dv-cuad"><option value="">— Seleccionar —</option>${cuads.map(c=>`<option${c===r.cuadrilla?' selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Supervisor</label><select id="dv-sup"><option value="">— Seleccionar —</option>${sups.map(s=>`<option${s===r.supervisor?' selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field wide"><label>Observaciones</label><input id="dv-obs" value="${r.obs||''}"></div>
+    </div>
+    <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales</h4>
+    <div style="display:grid;grid-template-columns:110px 1fr 80px 1fr;gap:6px;align-items:end;margin-bottom:8px">
+      <div><label style="font-size:10px;color:var(--gray)">Matrícula</label><input id="dv-mat-inp" placeholder="Matrícula" oninput="devMatAuto()" onkeydown="if(event.key==='Enter'){event.preventDefault();devMatEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Descripción</label><input id="dv-desc-inp" readonly placeholder="—" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;background:#f0f2f4"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Cantidad</label><input type="number" id="dv-cant-inp" placeholder="Cant." onkeydown="if(event.key==='Enter'){event.preventDefault();devCantEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
+      <div><label style="font-size:10px;color:var(--gray)">Estado</label><select id="dv-est-inp" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px"><option>Bueno – reingresa</option><option>Dañado – no reingresa</option></select></div>
+    </div>
+    <div id="dev-items-list" style="margin-top:6px"></div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveEditDevolucion(${id})">💾 Guardar cambios</button></div>`);
+  renderDevItemsList();
+}
+function saveEditDevolucion(id){
+  const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
+  if(!validItems.length){toast('Agregá al menos un material','err');return}
+  const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
+  r.fecha=document.getElementById('dv-fecha').value;
+  r.obra=(document.getElementById('dv-obra')||{}).value||'';
+  r.area=(document.getElementById('dv-area')||{}).value||'';
+  r.cuadrilla=(document.getElementById('dv-cuad')||{}).value||'';
+  r.supervisor=(document.getElementById('dv-sup')||{}).value||'';
+  r.obs=(document.getElementById('dv-obs')||{}).value||'';
+  r.items=validItems;
+  DB.update('devoluciones',r);
+  closeModal();toast('Devolución actualizada');go('devoluciones');
+}
 
 // ─── TRASPASOS ENTRE OBRAS ───────────────
 SCREENS.traspasos=()=>{
   const rows=DB.getAll('traspasos');
+  const editable=canEditOps();
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.id}</td>
     <td>${fmtDate(r.fecha)}</td><td>${r.obraOrigen}</td><td>${r.obraDestino}</td>
-    <td>${r.matricula} · ${(r.descripcion||'').substring(0,20)}</td><td>${fmtNum(r.cantidad)}</td><td>${r.autorizadoPor}</td>
-    <td class="act-btns"><button onclick="delRecord('traspasos',${r.id},'traspasos')">🗑️</button></td>
+    <td><code>${r.matricula}</code></td><td>${(r.descripcion||'').substring(0,25)}</td><td style="text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td>${r.autorizadoPor}</td>
+    <td class="act-btns">${editable?`<button onclick="editTraspaso(${r.id})" title="Editar">✏️</button><button onclick="delRecord('traspasos',${r.id},'traspasos')" title="Eliminar">🗑️</button>`:'—'}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🔄</div><div><h1>Traspasos entre Obras</h1><p>Reasignación de material de una obra a otra</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addTraspaso()">＋ Nuevo traspaso</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Obra origen</th><th>Obra destino</th><th>Material</th><th>Cantidad</th><th>Autorizado</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="8" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Obra origen</th><th>Obra destino</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>Autorizado</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -3150,15 +3240,50 @@ function saveTraspaso(){
   });
   closeModal();toast('Traspaso registrado — '+validItems.length+' ítem(s)');go('traspasos');
 }
+function editTraspaso(id){
+  const r=DB.get('traspasos',id);if(!r){toast('No encontrado','err');return}
+  const obras=DB.getAll('obras').filter(o=>o.estado==='Activa').map(o=>o.nombre);
+  const sups=DB.getAll('supervisores').map(s=>supNombreCompleto(s));
+  openModal(`<h3>✏️ Editar traspaso #${id}</h3>
+    <div class="fgrid">
+      <div class="field"><label>Fecha</label><input type="date" id="tr-ed-fecha" value="${r.fecha||today()}"></div>
+      <div class="field"><label>Obra origen</label><select id="tr-ed-origen">${obras.map(o=>`<option${o===r.obraOrigen?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Obra destino</label><select id="tr-ed-destino">${obras.map(o=>`<option${o===r.obraDestino?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Autorizado por</label><select id="tr-ed-aut">${sups.map(s=>`<option${s===r.autorizadoPor?' selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field wide"><label>Motivo</label><input id="tr-ed-motivo" value="${r.motivo||''}"></div>
+      <div class="field"><label>Matrícula</label><input id="tr-ed-mat" value="${r.matricula||''}"></div>
+      <div class="field"><label>Cantidad</label><input type="number" id="tr-ed-cant" value="${r.cantidad||0}"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveEditTraspaso(${id})">💾 Guardar cambios</button></div>`);
+}
+function saveEditTraspaso(id){
+  const r=DB.get('traspasos',id);if(!r){toast('No encontrado','err');return}
+  const origen=document.getElementById('tr-ed-origen').value;
+  const destino=document.getElementById('tr-ed-destino').value;
+  if(origen===destino){toast('Obra origen y destino no pueden ser iguales','err');return}
+  r.fecha=document.getElementById('tr-ed-fecha').value;
+  r.obraOrigen=origen;
+  r.obraDestino=destino;
+  r.autorizadoPor=document.getElementById('tr-ed-aut').value;
+  r.motivo=document.getElementById('tr-ed-motivo').value;
+  const mat=document.getElementById('tr-ed-mat').value.trim();
+  const desc=matLookup(mat);
+  r.matricula=mat;
+  r.descripcion=desc||r.descripcion||'';
+  r.cantidad=parseFloat(document.getElementById('tr-ed-cant').value)||0;
+  DB.update('traspasos',r);
+  closeModal();toast('Traspaso actualizado');go('traspasos');
+}
 
 // ─── TRASPASO A CONTRATISTA ──────────────
 SCREENS.traspcontra=()=>{
   const rows=DB.getAll('traspcontra');
+  const editable=canEditOps();
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td>${r.matricula}</td><td>${(r.descripcion||'').substring(0,25)}</td>
-    <td>${fmtNum(r.cantidad)}</td><td>${r.contratista}</td><td class="um">${r.obs||'—'}</td>
-    <td class="act-btns"><button onclick="delRecord('traspcontra',${r.id},'traspcontra')">🗑️</button></td>
+    <td>${fmtDate(r.fecha)}</td><td><code>${r.matricula}</code></td><td>${(r.descripcion||'').substring(0,25)}</td>
+    <td style="text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td>${r.contratista}</td><td class="um">${r.obs||'—'}</td>
+    <td class="act-btns">${editable?`<button onclick="editTraspContra(${r.id})" title="Editar">✏️</button><button onclick="delRecord('traspcontra',${r.id},'traspcontra')" title="Eliminar">🗑️</button>`:'—'}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🏭</div><div><h1>Traspaso a Contratista</h1><p>Material que se entrega a otra contratista por pedido de Edenor</p></div></div>
@@ -3235,6 +3360,34 @@ function saveTraspContra(){
     DB.add('traspcontra',{fecha,contratista:contra,autorizadoPor:aut,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,obs});
   });
   closeModal();toast('Traspaso a contratista registrado — '+validItems.length+' ítem(s)');go('traspcontra');
+}
+function editTraspContra(id){
+  const r=DB.get('traspcontra',id);if(!r){toast('No encontrado','err');return}
+  const contras=DB.getAll('proveedores').filter(p=>p.tipo!=='Distribuidora').map(p=>p.corto);
+  openModal(`<h3>✏️ Editar traspaso contratista #${id}</h3>
+    <div class="fgrid">
+      <div class="field"><label>Fecha</label><input type="date" id="tc-ed-fecha" value="${r.fecha||today()}"></div>
+      <div class="field"><label>Contratista destino</label><select id="tc-ed-contra">${contras.map(c=>`<option${c===r.contratista?' selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Autorizado por</label><input id="tc-ed-aut" value="${r.autorizadoPor||''}"></div>
+      <div class="field wide"><label>Observaciones</label><input id="tc-ed-obs" value="${r.obs||''}"></div>
+      <div class="field"><label>Matrícula</label><input id="tc-ed-mat" value="${r.matricula||''}"></div>
+      <div class="field"><label>Cantidad</label><input type="number" id="tc-ed-cant" value="${r.cantidad||0}"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveEditTraspContra(${id})">💾 Guardar cambios</button></div>`);
+}
+function saveEditTraspContra(id){
+  const r=DB.get('traspcontra',id);if(!r){toast('No encontrado','err');return}
+  r.fecha=document.getElementById('tc-ed-fecha').value;
+  r.contratista=document.getElementById('tc-ed-contra').value;
+  r.autorizadoPor=document.getElementById('tc-ed-aut').value;
+  r.obs=document.getElementById('tc-ed-obs').value;
+  const mat=document.getElementById('tc-ed-mat').value.trim();
+  const desc=matLookup(mat);
+  r.matricula=mat;
+  r.descripcion=desc||r.descripcion||'';
+  r.cantidad=parseFloat(document.getElementById('tc-ed-cant').value)||0;
+  DB.update('traspcontra',r);
+  closeModal();toast('Traspaso contratista actualizado');go('traspcontra');
 }
 
 // ─── NOTIFICACIONES ──────────────────────
