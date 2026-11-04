@@ -3136,11 +3136,12 @@ function saveDevolucion(){
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const devRec={fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''};
   DB.add('devoluciones',devRec);
-  /* Notificar devolución a usuarios con permiso despachos */
+  /* Notificar devolución a TODOS los usuarios activos */
   const _devMats=validItems.map(it=>it.matricula).join(', ');
   const _devObra=obra||area||'';
   const _devCuad=devRec.cuadrilla||'';
-  notify(usersWith('despachos'),'📦',`Devolución registrada — ${_devObra}${_devCuad?' · '+_devCuad:''} — ${validItems.length} ítem(s): ${_devMats}`);
+  const _allUserIds=DB.getAll('usuarios').filter(u=>u.activo).map(u=>u.id);
+  notify(_allUserIds,'📦',`Devolución registrada — ${_devObra}${_devCuad?' · '+_devCuad:''} — ${validItems.length} ítem(s): ${_devMats}`);
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 function editDevolucion(id){
