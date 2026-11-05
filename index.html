@@ -1725,7 +1725,7 @@ SCREENS.home=()=>{
   const movs=[];
   DB.getAll('despachos').forEach(r=>{
     const items=r.items||[];
-    movs.push({fecha:r.fecha||'',tipo:'Despacho',obra:r.obra||r.area||'',cuadrilla:r.cuadrilla||r.supervisor||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:r.remito||''});
+    movs.push({fecha:r.fecha||'',tipo:'Despacho',obra:r.obra||r.area||'',cuadrilla:r.cuadrilla||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:r.remito||''});
   });
   DB.getAll('devoluciones').forEach(r=>{
     const items=r.items||[];
@@ -1759,7 +1759,7 @@ SCREENS.home=()=>{
     <div style="margin-top:18px">
       <h3 style="font-size:14px;color:var(--steel);margin-bottom:8px">📋 Últimos movimientos</h3>
       <div class="tablewrap"><table style="font-size:12px">
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Obra</th><th>Cuadrilla</th><th>Ítems</th><th>Matrículas</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Obra</th><th>Pidió</th><th>Ítems</th><th>Matrículas</th></tr></thead>
         <tbody>${movTbody||'<tr><td colspan="6" class="empty">Sin movimientos</td></tr>'}</tbody>
       </table></div>
     </div>
@@ -3849,7 +3849,7 @@ function generarRemitoEntrega(s){
   DB.save('config',{...cfg,remitoSeq:seq});
   const o=DB.getAll('obras').find(x=>x.nombre===s.obra)||{};
   const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
-  const desp=DB.add('despachos',{fecha:today(),fechaHora:nowLocal(),obra:s.obra,area:o.area||'',region:o.region||'',cuadrilla:s.cuadrilla||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo});
+  const desp=DB.add('despachos',{fecha:today(),fechaHora:nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo});
   checkStockBajo(items);
   return {remito,desp};
 }
