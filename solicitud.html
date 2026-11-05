@@ -51,6 +51,8 @@
   .mat-row .mat-del{background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
 
   .mat-hint{color:var(--gray);font-size:11px;text-align:center;padding:10px}
+  .btn-agregar{display:block;width:100%;margin-top:8px;padding:10px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;text-align:center}
+  .btn-agregar:active{background:#c8e6c9}
 
   /* ── ENVIAR ── */
   .phone-send{background:var(--edenor);color:#fff;border:none;border-radius:10px;width:100%;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
@@ -166,8 +168,9 @@
         <input type="number" id="ns-cant-inp" placeholder="Cant." inputmode="numeric" onkeydown="if(event.key==='Enter'){event.preventDefault();nsCantEnter()}">
       </div>
     </div>
+    <button type="button" class="btn-agregar" onclick="nsCantEnter()">＋ Agregar material</button>
     <div id="ns-items">
-      <div class="mat-hint">Escribí matrícula + Enter, cantidad + Enter para agregar</div>
+      <div class="mat-hint">Completá matrícula y cantidad, luego tocá Agregar</div>
     </div>
   </div>
 
@@ -291,7 +294,8 @@ function selUrg(el, val){
 
 // ── MATERIALES CARGA RÁPIDA ──
 function matLookup(mat){
-  const m = MATERIALES.find(r => r.matricula === mat);
+  const k = String(mat).trim();
+  const m = MATERIALES.find(r => String(r.matricula) === k);
   return m ? m.descripcion : null;
 }
 
@@ -318,7 +322,7 @@ function nsCantEnter(){
   if(!mat || cant <= 0){ toast('Matrícula y cantidad requeridas','err'); return; }
   const desc = matLookup(mat);
   if(!desc){ toast('Matrícula no encontrada','err'); mi.select(); return; }
-  const m = MATERIALES.find(x => x.matricula === mat);
+  const m = MATERIALES.find(x => String(x.matricula) === String(mat));
   nsItems.push({matricula:mat, descripcion:desc, cantidad:cant, unidad:m&&m.unidad==='Metro'?'m':'u'});
   mi.value = ''; ci.value = '';
   document.getElementById('ns-desc-inp').value = '';
@@ -330,7 +334,7 @@ function renderNsItemsList(){
   const c = document.getElementById('ns-items');
   if(!c) return;
   if(!nsItems.length){
-    c.innerHTML = '<div class="mat-hint">Escribí matrícula + Enter, cantidad + Enter para agregar</div>';
+    c.innerHTML = '<div class="mat-hint">Completá matrícula y cantidad, luego tocá Agregar</div>';
     return;
   }
   c.innerHTML = '<div class="mat-items-list"><div class="mat-header">MATERIALES CARGADOS ('+nsItems.length+')</div>'
