@@ -780,12 +780,14 @@ const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJ
 
 // ── SYNC ESTADO SOLICITUD A GOOGLE SHEETS ──
 // Envía el cambio de estado al Sheets central para que todas las PCs lo vean
-function syncEstadoSheet(codigo, nuevoEstado){
+function syncEstadoSheet(codigo, nuevoEstado, items){
   if(!codigo) return;
+  const payload={action:'update_estado', codigo, estado:nuevoEstado};
+  if(items) payload.materiales=JSON.stringify(items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'u'})));
   fetch(GSCRIPT_URL,{
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'update_estado', codigo, estado:nuevoEstado})
+    body:JSON.stringify(payload)
   }).catch(e=>console.log('syncEstado error:',e));
 }
 function syncEliminarSheet(codigo){
@@ -984,6 +986,13 @@ async function syncEstadosDesdeSheet(){
       } else if(nivelSheet>nivelLocal){
         // El Sheet tiene un estado más avanzado — otro usuario lo cambió
         s.estado=estadoSheet;
+        // Sincronizar items actualizados desde el Sheet (ej: cantidades ajustadas por pañol)
+        if(solSheet.materiales){
+          try{
+            const sheetItems=JSON.parse(solSheet.materiales);
+            if(sheetItems.length) s.items=sheetItems.map(it=>({matricula:it.matricula||'',descripcion:it.descripcion||it.material||'',cantidad:it.cantidad||0,unidad:it.unidad||'u',cantEntregada:it.cantEntregada||it.cantidad||0}));
+          }catch(e){}
+        }
         cambios++;
       }
     });
@@ -3758,7 +3767,7 @@ function marcarListoSol(id){
   const newItems=(s.items||[]).map(it=>({...it,cantEntregada:ent[it.matricula]??it.cantidad,nBobina:bobs[it.matricula]||it.nBobina,nEdenor:edns[it.matricula]||it.nEdenor}));
   const _ls=DB.update('solicitudes',id,{estado:'Listo',items:newItems,preparadoPor:currentUser.nombre,fechaPrep:nowLocal(),entregaModificada:mod});
   notifSol(_ls,'listo');
-  syncEstadoSheet(s.codigo,'Listo');
+  syncEstadoSheet(s.codigo,'Listo',newItems);
   closeModal();toast(s.codigo+' lista para entregar');go('solicitudes');
 }
 function verRemitoSol(remito){const d=DB.getAll('despachos').find(x=>x.remito===remito);if(d)viewRemito(d.id,'solicitudes');else toast('Remito no encontrado','err')}
@@ -5697,7 +5706,7 @@ function loginAs(nombre,rol,permisos){
 function applyPermisos(){
   document.querySelectorAll('.nav a[data-screen]').forEach(a=>{
     const scr=a.dataset.screen;
-    if(scr==='home'){a.style.display=['sup'].includes(currentUser.rol)?'none':'';return}
+    if(scr==='home'){a.style.display='';return}
     if(currentUser.permisos.includes(scr)){
       a.style.display='';
     }else{
