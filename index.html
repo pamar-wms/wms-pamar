@@ -980,9 +980,6 @@ async function syncEstadosDesdeSheet(){
         if(!deleted.has(s.codigo)){deleted.add(s.codigo);}
         s._eliminar=true;
         cambios++;
-      } else if(s.estado===EST_APROB && estadoSheet==='Pendiente'){
-        // No pisar "Pend. aprobación" con "Pendiente" — la aprobación es manual
-        return;
       } else if(nivelSheet>nivelLocal){
         // El Sheet tiene un estado más avanzado — otro usuario lo cambió
         s.estado=estadoSheet;
