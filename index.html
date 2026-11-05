@@ -437,7 +437,7 @@
   </div>
 
   <div class="menubar">
-    <span>Archivo</span><span>Edición</span><span>Ver</span><span>Registros</span><span>Herramientas</span><span>Ayuda</span><span onclick="btnActualizar()" style="margin-left:auto;cursor:pointer;background:#e74c3c;color:#fff;padding:2px 10px;border-radius:4px;font-weight:600;font-size:11px" title="Actualizar solicitudes y datos">🔄 Actualizar</span>
+    <span>Archivo</span><span>Edición</span><span>Ver</span><span>Registros</span><span>Herramientas</span><span>Ayuda</span><span onclick="btnActualizar()" style="margin-left:auto;cursor:pointer;background:#2e7d32;color:#fff;padding:2px 10px;border-radius:4px;font-weight:600;font-size:11px" title="Actualizar solicitudes y datos sin recargar">🔄 Actualizar</span><span onclick="btnRecargaTotal()" style="margin-left:6px;cursor:pointer;background:#e74c3c;color:#fff;padding:2px 10px;border-radius:4px;font-weight:600;font-size:11px" title="Recarga completa de la página (como Ctrl+Shift+R) sin perder sesión">🔃 Recargar</span>
   </div>
 
   <div class="body">
@@ -855,6 +855,10 @@ async function btnActualizar(){
     console.log('btnActualizar error:',e);
     toast('❌ Error al actualizar','err');
   }
+}
+function btnRecargaTotal(){
+  /* Recarga forzada del HTML/JS (como Ctrl+Shift+R) sin perder sesión */
+  location.reload(true);
 }
 
 function solStartPolling(){
