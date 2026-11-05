@@ -899,9 +899,9 @@ async function solImportarNuevas(){
         pidioUsuario:sol.cuadrilla||sol.solicitanteDime||'Cuadrilla (formulario)',
         fecha:sol.fecha||new Date().toLocaleString('es-AR'),
         items:items.map(it=>({
-          matricula:it.matricula||'',
+          matricula:String(it.matricula||''),
           descripcion:it.descripcion||it.material||'',
-          cantidad:it.cantidad||0,
+          cantidad:+it.cantidad||0,
           unidad:it.unidad||'u'
         })),
         obs:sol.observaciones||'',
@@ -3502,11 +3502,12 @@ function checkStockBajo(itemsDespachados){
   const matriculasDesp=new Set((itemsDespachados||[]).map(it=>it.matricula));
 
   mats.filter(m=>matriculasDesp.has(m.matricula)&&(+m.stockMin||0)>0).forEach(m=>{
+    const mk=String(m.matricula);
     let ing=0,des=0,dev=0,tc=0;
-    ingresos.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)ing+=+it.cantidad||0}));
-    despachos.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)des+=+it.cantidad||0}));
-    devoluciones.forEach(r=>(r.items||[]).forEach(it=>{if(it.matricula===m.matricula)dev+=+it.cantidad||0}));
-    traspContra.forEach(r=>{if(r.matricula===m.matricula)tc+=+r.cantidad||0});
+    ingresos.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)ing+=+it.cantidad||0}));
+    despachos.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)des+=+it.cantidad||0}));
+    devoluciones.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)dev+=+it.cantidad||0}));
+    traspContra.forEach(r=>{if(String(r.matricula)===mk)tc+=+r.cantidad||0});
     const stock=ing-des+dev-tc;
     if(stock<=m.stockMin){
       const estado=stock<=0?'SIN STOCK':'BAJO MÍNIMO';
@@ -3578,11 +3579,11 @@ function supOpts(){
 function nowLocal(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19)}
 function fmtFechaHora(iso){if(!iso)return'—';const d=iso.slice(0,10),t=iso.length>10?iso.slice(11,16):'';return fmtDate(d)+(t?' · '+t+' hs':'')}
 function stockMap(){
-  const S={};DB.getAll('materiales').forEach(m=>S[m.matricula]=0);
-  DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{if(it.matricula in S)S[it.matricula]+=it.cantidad}));
-  DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>{if(it.matricula in S)S[it.matricula]-=it.cantidad}));
-  DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{if(it.matricula in S&&it.estado==='Bueno – reingresa')S[it.matricula]+=it.cantidad}));
-  DB.getAll('traspcontra').forEach(r=>{if(r.matricula in S)S[r.matricula]-=r.cantidad});
+  const S={};DB.getAll('materiales').forEach(m=>S[String(m.matricula)]=0);
+  DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]+= +it.cantidad||0}));
+  DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]-= +it.cantidad||0}));
+  DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(k in S&&it.estado==='Bueno – reingresa')S[k]+= +it.cantidad||0}));
+  DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(k in S)S[k]-= +r.cantidad||0});
   return S;
 }
 function solItemsDet(s){
@@ -4386,11 +4387,11 @@ SCREENS.stockfull=()=>{
   const traspContra=DB.getAll('traspcontra');
 
   const stock={};
-  mats.forEach(m=>{stock[m.matricula]={mat:m,ing:0,des:0,dev:0,tc:0}});
-  ingresos.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{if(stock[it.matricula])stock[it.matricula].ing+=it.cantidad}));
-  despachos.forEach(d=>{(d.items||[]).forEach(it=>{if(stock[it.matricula])stock[it.matricula].des+=it.cantidad})});
-  devoluciones.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{if(stock[it.matricula]&&it.estado==='Bueno – reingresa')stock[it.matricula].dev+=it.cantidad}));
-  traspContra.forEach(r=>{if(stock[r.matricula])stock[r.matricula].tc+=r.cantidad});
+  mats.forEach(m=>{stock[String(m.matricula)]={mat:m,ing:0,des:0,dev:0,tc:0}});
+  ingresos.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(stock[k])stock[k].ing+= +it.cantidad||0}));
+  despachos.forEach(d=>{(d.items||[]).forEach(it=>{const k=String(it.matricula);if(stock[k])stock[k].des+= +it.cantidad||0})});
+  devoluciones.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(stock[k]&&it.estado==='Bueno – reingresa')stock[k].dev+= +it.cantidad||0}));
+  traspContra.forEach(r=>{const k=String(r.matricula);if(stock[k])stock[k].tc+= +r.cantidad||0});
 
   let tbody=Object.values(stock).map(s=>{
     const total=s.ing-s.des+s.dev-s.tc;
@@ -5402,11 +5403,11 @@ const QL_SRC={
     ],
     rows:(f)=>{
       const corte=f._corte||'9999-12-31';const ok=r=>(r.fecha||'')<=corte;
-      const S={};DB.getAll('materiales').forEach(m=>S[m.matricula]={matricula:m.matricula,descripcion:m.descripcion,unidad:m.unidad==='Metro'?'m':'u',sector:m.sector||'',stockMin:+m.stockMin||0,ing:0,des:0,dev:0,tc:0});
-      DB.getAll('ingresos').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{if(S[it.matricula])S[it.matricula].ing+=it.cantidad}));
-      DB.getAll('despachos').filter(ok).forEach(d=>(d.items||[]).forEach(it=>{if(S[it.matricula])S[it.matricula].des+=it.cantidad}));
-      DB.getAll('devoluciones').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{if(S[it.matricula]&&it.estado==='Bueno – reingresa')S[it.matricula].dev+=it.cantidad}));
-      DB.getAll('traspcontra').filter(ok).forEach(r=>{if(S[r.matricula])S[r.matricula].tc+=r.cantidad});
+      const S={};DB.getAll('materiales').forEach(m=>S[String(m.matricula)]={matricula:m.matricula,descripcion:m.descripcion,unidad:m.unidad==='Metro'?'m':'u',sector:m.sector||'',stockMin:+m.stockMin||0,ing:0,des:0,dev:0,tc:0});
+      DB.getAll('ingresos').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(S[k])S[k].ing+= +it.cantidad||0}));
+      DB.getAll('despachos').filter(ok).forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(S[k])S[k].des+= +it.cantidad||0}));
+      DB.getAll('devoluciones').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(S[k]&&it.estado==='Bueno – reingresa')S[k].dev+= +it.cantidad||0}));
+      DB.getAll('traspcontra').filter(ok).forEach(r=>{const k=String(r.matricula);if(S[k])S[k].tc+= +r.cantidad||0});
       return Object.values(S).map(s=>{s.stock=s.ing-s.des+s.dev-s.tc;s.faltante=Math.max(0,s.stockMin-s.stock);s.estado=s.stock<0?'Negativo':s.stock===0?'Sin stock':s.stock<=s.stockMin?'Bajo mínimo':'OK';return s});
     }
   },
