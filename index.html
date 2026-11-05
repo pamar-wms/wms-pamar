@@ -1585,7 +1585,8 @@ const PERM_MODULES=[
 ];
 
 function matLookup(mat){
-  const m=DB.getAll('materiales').find(r=>r.matricula===mat);
+  const k=String(mat).trim();
+  const m=DB.getAll('materiales').find(r=>String(r.matricula)===k);
   return m?m.descripcion:null;
 }
 function fmtDate(d){if(!d)return'—';const p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0]}
@@ -2886,7 +2887,7 @@ function despRenderTraza(mat){
   const wrap=document.getElementById('d-traza-wrap');
   const fields=document.getElementById('d-traza-fields');
   if(!wrap||!fields)return;
-  const m=DB.getAll('materiales').find(x=>x.matricula===mat);
+  const m=DB.getAll('materiales').find(x=>String(x.matricula)===String(mat));
   if(!m||(!m.reqBobina&&!m.reqEdenor)){wrap.style.display='none';fields.innerHTML='';return}
   let h='';
   if(m.reqBobina)h+='<div><label style="font-size:10px;color:#8a5a00;font-weight:700">N° Bobina *</label><input id="d-bob-inp" placeholder="N° de bobina" style="width:100%;padding:6px;border:1px solid #e8a838;border-radius:4px;font-size:12px"></div>';
@@ -2908,7 +2909,7 @@ function despCantEnter(){
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
-  const m=DB.getAll('materiales').find(x=>x.matricula===mat);
+  const m=DB.getAll('materiales').find(x=>String(x.matricula)===String(mat));
   const bi=document.getElementById('d-bob-inp');
   const ei=document.getElementById('d-edn-inp');
   if(m&&m.reqBobina&&(!bi||!bi.value.trim())){toast('Falta N° de Bobina','err');if(bi)bi.focus();return}
@@ -3061,30 +3062,57 @@ function viewRemito(id,back){
 
 // ─── DEVOLUCIONES ────────────────────────
 SCREENS.devoluciones=()=>{
-  const rows=DB.getAll('devoluciones');
+  const rows=DB.getAll('devoluciones').sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||b.id-a.id);
   const editable=canEditOps();
-  let tbody='';
-  rows.forEach(r=>{
+  const cards=rows.map(r=>{
     const items=r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}];
-    items.forEach((it,idx)=>{
-      const isFirst=idx===0;
-      const rs=items.length;
-      tbody+=`<tr style="border-top:${isFirst?'2px solid var(--line)':'none'}">
-        ${isFirst?`<td class="idcell" rowspan="${rs}">${r.id}</td>
-        <td rowspan="${rs}">${fmtDate(r.fecha)}</td><td rowspan="${rs}">${r.obra}</td><td rowspan="${rs}">${r.area||'—'}</td><td rowspan="${rs}">${r.cuadrilla||'—'}</td><td rowspan="${rs}">${r.supervisor||'—'}</td>`:''}
-        <td><code>${it.matricula}</code></td><td>${(it.descripcion||'').substring(0,30)}</td><td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
-        <td>${it.estado==='Bueno – reingresa'?'<span class="pill ok">Reingresa</span>':'<span class="pill fin">Dañado</span>'}</td>
-        ${isFirst?`<td class="act-btns" rowspan="${rs}">${editable?`<button onclick="editDevolucion(${r.id})" title="Editar">✏️</button><button onclick="delRecord('devoluciones',${r.id},'devoluciones')" title="Eliminar">🗑️</button>`:'—'}</td>`:''}
-      </tr>`;
-    });
-  });
+    const totalItems=items.length;
+    const reingresa=items.filter(it=>it.estado==='Bueno – reingresa').length;
+    const danado=totalItems-reingresa;
+    const itemRows=items.map(it=>`<tr>
+      <td style="font-family:Consolas,monospace;font-weight:600;color:var(--edenor);white-space:nowrap">${it.matricula}</td>
+      <td style="white-space:normal">${it.descripcion||'—'}</td>
+      <td style="text-align:right;font-weight:700">${fmtNum(it.cantidad)}</td>
+      <td>${it.estado==='Bueno – reingresa'?'<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Reingresa</span>':'<span style="background:#fef2f2;color:#c53727;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Dañado</span>'}</td>
+    </tr>`).join('');
+    return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f7f9fb;border-bottom:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-family:Consolas,monospace;font-weight:700;color:var(--edenor);font-size:13px">#${r.id}</span>
+          <span style="font-size:12px;color:var(--gray)">📅 ${fmtDate(r.fecha)}</span>
+          ${r.obra?`<span style="font-size:12px">🏗️ ${r.obra}</span>`:''}
+          ${r.area?`<span style="font-size:10px;background:#eef1f4;padding:2px 8px;border-radius:8px;color:var(--steel);font-weight:600">${r.area}</span>`:''}
+        </div>
+        ${editable?`<div style="display:flex;gap:4px">
+          <button onclick="editDevolucion(${r.id})" title="Editar" style="background:#fff4d6;border:1px solid #e8a838;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button>
+          <button onclick="delRecord('devoluciones',${r.id},'devoluciones')" title="Eliminar" style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🗑️</button>
+        </div>`:''}
+      </div>
+      <div style="padding:8px 16px 4px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--gray)">
+        ${r.cuadrilla?`<span>👷 ${r.cuadrilla}</span>`:''}
+        ${r.supervisor?`<span>🧑‍💼 ${r.supervisor}</span>`:''}
+        <span>📦 ${totalItems} material${totalItems>1?'es':''}</span>
+        ${reingresa?`<span style="color:#2e7d32">✅ ${reingresa} reingresa${reingresa>1?'n':''}</span>`:''}
+        ${danado?`<span style="color:#c53727">⚠ ${danado} dañado${danado>1?'s':''}</span>`:''}
+      </div>
+      <div style="padding:6px 12px 12px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--line)">
+            <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase">Matrícula</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase">Descripción</th>
+            <th style="text-align:right;padding:6px 8px;font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase">Cant.</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase">Estado</th>
+          </tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+      </div>
+      ${r.obs?`<div style="padding:0 16px 10px;font-size:11px;color:var(--gray)">💬 ${r.obs}</div>`:''}
+    </div>`;
+  }).join('');
   return `<div class="screen on" style="display:block">
-    <div class="shead"><div class="sicon">↩️</div><div><h1>Devoluciones de Obra</h1><p>Material que retorna al depósito</p></div></div>
+    <div class="shead"><div class="sicon">↩️</div><div><h1>Devoluciones</h1><p>Material que retorna al depósito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDevolucion()">＋ Registrar devolución</button></div>
-    <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Cuadrilla</th><th>Supervisor</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>Estado</th>${editable?'<th>Acc.</th>':''}</tr></thead>
-      <tbody>${tbody||`<tr><td colspan="${editable?11:10}" class="empty">Sin registros</td></tr>`}</tbody>
-    </table></div>
+    <div style="display:flex;flex-direction:column;gap:12px">${cards||'<div class="empty" style="padding:40px;background:#fff;border-radius:10px;border:1px solid var(--line);text-align:center">Sin registros de devoluciones</div>'}</div>
   </div>`;
 };
 let devItems=[];
@@ -3615,7 +3643,7 @@ function stockMap(){
 }
 function solItemsDet(s){
   const mats=DB.getAll('materiales');const st=stockMap();
-  return (s.items||[]).map(it=>{const m=mats.find(x=>x.matricula===it.matricula)||{};return{...it,sector:m.sector||'Sin sector',stock:st[it.matricula]??null,unidad:it.unidad||(m.unidad==='Metro'?'m':'u')}})
+  return (s.items||[]).map(it=>{const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};return{...it,sector:m.sector||'Sin sector',stock:st[String(it.matricula)]??null,unidad:it.unidad||(m.unidad==='Metro'?'m':'u')}})
     .sort((a,b)=>a.sector.localeCompare(b.sector,'es',{numeric:true})||String(a.matricula).localeCompare(String(b.matricula),'es',{numeric:true}));
 }
 function canDeleteSol(){return ['super','gerencial','admin'].includes(currentUser.rol)}
@@ -3634,7 +3662,7 @@ function editarSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
   const mats=DB.getAll('materiales');
   const itemRows=(s.items||[]).map((it,i)=>{
-    const m=mats.find(x=>x.matricula===it.matricula)||{};
+    const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};
     return `<div class="item-row ed-item" data-idx="${i}"><input class="ed-mat" value="${it.matricula}" oninput="edMatAuto(this)"><input class="ed-desc" readonly value="${m.descripcion||it.descripcion}" style="background:#f0f2f4"><input class="ed-cant" type="number" min="0" value="${it.cantidad}"><input class="ed-um" value="${it.unidad||'u'}" style="text-align:center" readonly><button class="del-btn" onclick="this.parentElement.remove()">✕</button></div>`;
   }).join('');
   openModal(`<h3>✏️ Editar solicitud ${s.codigo}</h3>
@@ -3646,7 +3674,8 @@ function editarSolicitud(id){
 }
 function edMatAuto(inp){
   const desc=inp.nextElementSibling;
-  const m=DB.getAll('materiales').find(x=>x.matricula===inp.value.trim());
+  const k=String(inp.value).trim();
+  const m=DB.getAll('materiales').find(x=>String(x.matricula)===k);
   desc.value=m?m.descripcion:'';
   desc.style.color=m?'var(--ink)':'#c53727';
 }
@@ -3662,7 +3691,7 @@ function guardarEdSol(id){
     const mat=(r.querySelector('.ed-mat').value||'').trim();
     const cant=parseFloat(r.querySelector('.ed-cant').value)||0;
     if(mat&&cant>0){
-      const m=mats.find(x=>x.matricula===mat);
+      const m=mats.find(x=>String(x.matricula)===String(mat));
       items.push({matricula:mat,descripcion:m?m.descripcion:(r.querySelector('.ed-desc').value||mat),cantidad:cant,unidad:m?(m.unidad==='Metro'?'m':'u'):'u'});
     }
   });
@@ -3693,7 +3722,7 @@ function verSolicitud(id){
   const editQ=s.estado==='En preparación'&&can('despachos');
   const matDb=DB.getAll('materiales');
   const rows=its.map(it=>{
-    const m=matDb.find(x=>x.matricula===it.matricula)||{};
+    const m=matDb.find(x=>String(x.matricula)===String(it.matricula))||{};
     const needBob=!!m.reqBobina,needEdn=!!m.reqEdenor;
     const trazaRow=(editQ&&(needBob||needEdn))?`<tr class="traza-row"><td colspan="5" style="background:#fff9e6;padding:6px 10px;border-top:1px dashed #e8a838">
       <div style="font-size:10px;color:#8a5a00;font-weight:700;margin-bottom:4px">⚠ Trazabilidad obligatoria · ${it.matricula}</div>
@@ -3780,7 +3809,7 @@ function marcarListoSol(id){
   const falt=[];
   (s.items||[]).forEach(it=>{
     const q=ent[it.matricula]??it.cantidad;if(q<=0)return;
-    const m=mats.find(x=>x.matricula===it.matricula)||{};
+    const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};
     if(m.reqBobina&&!bobs[it.matricula])falt.push(it.matricula+' (N° Bobina)');
     if(m.reqEdenor&&!edns[it.matricula])falt.push(it.matricula+' (N° Edenor)');
   });
@@ -3789,7 +3818,7 @@ function marcarListoSol(id){
   (s.items||[]).forEach(it=>{
     const q=ent[it.matricula]??it.cantidad;
     if(q!==it.cantidad)mod=true;
-    if(q>0){const m=mats.find(x=>x.matricula===it.matricula)||{};const item={matricula:it.matricula,descripcion:m.descripcion||it.descripcion,cantidad:q,unidad:m.unidad||'Unidad'};if(bobs[it.matricula])item.nBobina=bobs[it.matricula];if(edns[it.matricula])item.nEdenor=edns[it.matricula];items.push(item);if(st[it.matricula]!=null&&q>st[it.matricula])falta.push(it.matricula)}
+    if(q>0){const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};const item={matricula:it.matricula,descripcion:m.descripcion||it.descripcion,cantidad:q,unidad:m.unidad||'Unidad'};if(bobs[it.matricula])item.nBobina=bobs[it.matricula];if(edns[it.matricula])item.nEdenor=edns[it.matricula];items.push(item);if(st[String(it.matricula)]!=null&&q>st[String(it.matricula)])falta.push(it.matricula)}
   });
   if(!items.length){toast('No hay cantidades a entregar','err');return}
   if(falta.length&&!confirm('Stock insuficiente en: '+falta.join(', ')+'.\n¿Marcar listo igual?'))return;
@@ -4147,7 +4176,7 @@ function confirmAprobar(id){
     const mat=(r.querySelector('.ap-new-mat').value||'').trim();
     const cant=parseFloat(r.querySelector('.ap-new-cant').value)||0;
     if(mat&&cant>0){
-      const m=mats.find(x=>x.matricula===mat);
+      const m=mats.find(x=>String(x.matricula)===String(mat));
       items.push({matricula:mat,descripcion:m?m.descripcion:mat,cantidad:cant,unidad:m?(m.unidad==='Metro'?'m':'u'):'u',agregadoPor:currentUser.nombre});
       mod=true;
     }
@@ -4359,7 +4388,7 @@ function nsCantEnterQ(){
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
-  const m=DB.getAll('materiales').find(x=>x.matricula===mat);
+  const m=DB.getAll('materiales').find(x=>String(x.matricula)===String(mat));
   nsItems.push({matricula:mat,descripcion:desc,cantidad:cant,unidad:m?(m.unidad==='Metro'?'m':'u'):'u'});
   mi.value='';ci.value='';
   document.getElementById('ns-desc-inp').value='';
@@ -4508,7 +4537,7 @@ function exportMovObra(){
 // ─── CONSULTA PERSONALIZADA ──────────────
 const uniq=a=>[...new Set(a.filter(x=>x!==undefined&&x!==null&&x!==''))].sort((x,y)=>String(x).localeCompare(String(y),'es'));
 function qlObra(n){return DB.getAll('obras').find(o=>o.nombre===n)||{}}
-function qlMat(m){return DB.getAll('materiales').find(x=>x.matricula===m)||{}}
+function qlMat(m){return DB.getAll('materiales').find(x=>String(x.matricula)===String(m))||{}}
 function qlUM(m){const u=qlMat(m).unidad;return u==='Metro'?'m':u?'u':''}
 // ─── EXTRACCIÓN DE MOVIMIENTOS ──────────────
 SCREENS.extraccion=()=>{
