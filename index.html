@@ -987,11 +987,41 @@ async function syncEstadosDesdeSheet(){
         if(solSheet.materiales){
           try{
             const sheetItems=JSON.parse(solSheet.materiales);
-            if(sheetItems.length) s.items=sheetItems.map(it=>({matricula:it.matricula||'',descripcion:it.descripcion||it.material||'',cantidad:it.cantidad||0,unidad:it.unidad||'u',cantEntregada:it.cantEntregada||it.cantidad||0}));
+            if(sheetItems.length) s.items=sheetItems.map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u',cantEntregada:+(it.cantEntregada||it.cantidad)||0}));
           }catch(e){}
         }
         cambios++;
       }
+    });
+    /* Importar solicitudes del Sheet que no existen localmente (creadas en otra PC) */
+    const codigosLocales=new Set(locales.map(s=>s.codigo));
+    Object.values(sheetMap).forEach(solSheet=>{
+      if(!solSheet.codigo||codigosLocales.has(solSheet.codigo)||deleted.has(solSheet.codigo)) return;
+      if(solSheet.estado==='Eliminada') return;
+      let items=[];
+      try{items=JSON.parse(solSheet.materiales||'[]').map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u'}));}catch(e){}
+      const esDime=solSheet.esDime==='Si'||solSheet.esDime===true;
+      const esMant=solSheet.areaSolicitud==='Mantenimiento';
+      locales.push({
+        id:Date.now()+Math.floor(Math.random()*10000),
+        codigo:solSheet.codigo,
+        estado:solSheet.estado||'Pendiente',
+        urgencia:solSheet.urgencia||'Normal',
+        obra:solSheet.obra||'',
+        areaSolicitud:solSheet.areaSolicitud||'',
+        cuadrilla:solSheet.cuadrilla||'',
+        supervisor:solSheet.supervisor||solSheet.cuadrilla||'',
+        pidioUsuario:solSheet.cuadrilla||solSheet.solicitanteDime||'',
+        fecha:solSheet.fecha||'',
+        items:items,
+        obs:solSheet.observaciones||'',
+        esDime:esDime,
+        esMant:esMant,
+        solicitanteDime:solSheet.solicitanteDime||'',
+        usuarioEdenor:solSheet.usuarioEdenor||'',
+        origen:'google_sheets'
+      });
+      cambios++;
     });
     if(cambios>0){
       const filtradas=locales.filter(s=>!s._eliminar);
@@ -3641,6 +3671,7 @@ function guardarEdSol(id){
   const s=DB.get('solicitudes',id);
   const obsNueva=[s.obs,obsEd?`[Editado por ${currentUser.nombre} ${fmtFechaHora(nowLocal())}] ${obsEd}`:null].filter(Boolean).join(' · ');
   DB.update('solicitudes',id,{items,obs:obsNueva,editadoPor:currentUser.nombre,fechaEdit:nowLocal()});
+  if(s.codigo) syncEstadoSheet(s.codigo, s.estado, items);
   closeModal();toast('Solicitud '+s.codigo+' actualizada');go('solicitudes');
 }
 function solActionBtns(s,inModal){
@@ -4125,7 +4156,7 @@ function confirmAprobar(id){
   const quitados=(s.items||[]).filter((it,i)=>!(parseFloat(document.querySelector(`.ap-cant[data-i="${i}"]`).value)>0)).map(it=>({...it,cantidad:0,cantPedida:it.cantPedida??it.cantidad}));
   DB.update('solicitudes',id,{estado:'Pendiente',items,itemsQuitados:quitados,aprobadoPor:currentUser.nombre,fechaAprob:new Date().toISOString(),aprobModificada:mod,obsAprob:document.getElementById('ap-obs').value.trim()});
   notifSol(DB.get('solicitudes',id),'aprobada');
-  syncEstadoSheet(s.codigo,'Pendiente');
+  syncEstadoSheet(s.codigo,'Pendiente',items);
   closeModal();
   toast(mod?'Aprobada con cantidades modificadas':'Solicitud aprobada · pasa al depósito');go('solicitudes');
 }
@@ -4370,6 +4401,26 @@ function sendSolicitud(){
     if(usrEdn)solData.usuarioEdenor=usrEdn.trim();
   }
   DB.add('solicitudes',solData);
+  /* Enviar al Sheet para que otras PCs la reciban con el mismo código */
+  fetch(GSCRIPT_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      codigo:solData.codigo,
+      fecha:solData.fecha,
+      cuadrilla:solData.cuadrilla||solData.pidioUsuario||'',
+      obra:solData.obra||'',
+      urgencia:solData.urgencia||'Normal',
+      materiales:JSON.stringify(solData.items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,unidad:it.unidad||'u'}))),
+      observaciones:solData.obs||'',
+      estado:solData.estado,
+      areaSolicitud:solData.areaSolicitud||'',
+      supervisor:solData.supervisor||'',
+      esDime:solData.esDime,
+      solicitanteDime:solData.solicitanteDime||'',
+      usuarioEdenor:solData.usuarioEdenor||''
+    })
+  }).catch(e=>console.log('Sync nueva sol error:',e));
   notifSol(DB.getAll('solicitudes').slice(-1)[0],'nueva');
   toast((esDime||isMant)?`Solicitud enviada · espera aprobación de ${esDime?'Dime Mide':'Mantenimiento'}`:'Solicitud enviada al depósito');
   go(can('missol')&&currentUser.rol==='sup'?'missol':can('solicitudes')?'solicitudes':can('missol')?'missol':'home');
