@@ -1725,7 +1725,7 @@ SCREENS.home=()=>{
   const movs=[];
   DB.getAll('despachos').forEach(r=>{
     const items=r.items||[];
-    movs.push({fecha:r.fecha||'',tipo:'Despacho',obra:r.obra||'',cuadrilla:r.cuadrilla||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:r.remito||''});
+    movs.push({fecha:r.fecha||'',tipo:'Despacho',obra:r.obra||r.area||'',cuadrilla:r.cuadrilla||r.supervisor||'',items:items.length,detalle:items.map(it=>it.matricula).join(', '),id:r.id,remito:r.remito||''});
   });
   DB.getAll('devoluciones').forEach(r=>{
     const items=r.items||[];
