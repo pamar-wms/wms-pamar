@@ -1752,6 +1752,44 @@ const POST_RENDER={
 };
 
 // ─── HOME ────────────────────────────────
+function _storageMonitor(){
+  const MAX=5*1024*1024; // 5 MB límite localStorage
+  let used=0;
+  const tablas=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    const v=localStorage.getItem(k)||'';
+    const bytes=new Blob([k+v]).size;
+    used+=bytes;
+    if(k.startsWith('wms_')){
+      const nombre=k.replace('wms_','');
+      let count=0;try{count=JSON.parse(v).length}catch(e){}
+      tablas.push({nombre,bytes,count});
+    }
+  }
+  tablas.sort((a,b)=>b.bytes-a.bytes);
+  const pct=Math.round(used/MAX*100);
+  const barColor=pct>85?'#c53727':pct>60?'#e8a838':'#2e7d32';
+  const fmtKB=b=>(b/1024).toFixed(1)+' KB';
+  const top5=tablas.slice(0,5);
+  return `<div style="margin-top:18px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:14px">
+    <h3 style="font-size:13px;color:var(--steel);margin:0 0 10px">💾 Monitor de almacenamiento local</h3>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;background:#e5e7eb;border-radius:6px;height:14px;overflow:hidden">
+        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barColor};border-radius:6px;transition:width .3s"></div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${barColor}">${pct}%</span>
+    </div>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:10px">${fmtKB(used)} de ~${(MAX/1024/1024).toFixed(0)} MB usados · ${tablas.length} tablas WMS</div>
+    ${pct>85?'<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:8px;font-size:11px;color:#991b1b;font-weight:600;margin-bottom:10px">⚠ Almacenamiento alto — Considerá hacer una extracción y limpiar registros antiguos</div>':''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px">
+      ${top5.map(t=>`<div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11px">
+        <div style="font-weight:700;color:var(--steel)">${t.nombre}</div>
+        <div style="color:var(--gray)">${t.count} reg · ${fmtKB(t.bytes)}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
 SCREENS.home=()=>{
   const oCount=DB.count('obras');
   const despCount=DB.count('despachos');
@@ -1798,6 +1836,7 @@ SCREENS.home=()=>{
       <div class="card" onclick="go('stockfull')"><div class="cic">📊</div><h3>Consultas</h3><p>Stock completo, movimientos por obra y consultas libres.</p></div>
       ${can('medidores')?`<div class="card" onclick="go('medidores')"><div class="cic">⚡</div><h3>Medidores</h3><p>Ingreso, salida y devolución de medidores serializados · Dime Mide</p></div>`:''}
     </div>
+    ${isAdminLevel()?_storageMonitor():''}
     <div style="margin-top:18px">
       <h3 style="font-size:14px;color:var(--steel);margin-bottom:8px">📋 Últimos movimientos</h3>
       <div class="tablewrap"><table style="font-size:12px">
