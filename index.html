@@ -1679,7 +1679,7 @@ function buildNav(){
 
 function go(id,el){
   // check permission (home always allowed)
-  if(id!=='home'&&currentUser.permisos&&!currentUser.permisos.includes(id)){
+  if(id!=='home'&&id!=='stormon'&&currentUser.permisos&&!currentUser.permisos.includes(id)){
     toast('No tenés permiso para acceder a esta sección','err');return;
   }
   // render screen
@@ -5965,6 +5965,7 @@ function applyPermisos(){
   document.querySelectorAll('.nav a[data-screen]').forEach(a=>{
     const scr=a.dataset.screen;
     if(scr==='home'){a.style.display='';return}
+    if(scr==='stormon'){a.style.display=isAdminLevel()?'':'none';return}
     if(currentUser.permisos.includes(scr)){
       a.style.display='';
     }else{
