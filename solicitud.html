@@ -78,10 +78,6 @@
   .loading .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--line);border-top-color:var(--edenor);border-radius:50%;animation:sp .6s linear infinite;margin-bottom:8px}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  /* ── DIME MIDE ── */
-  .dime-check{display:flex;align-items:center;gap:8px;margin-bottom:11px}
-  .dime-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--edenor)}
-  .dime-check label{font-weight:600;cursor:pointer;font-size:13px}
 </style>
 </head>
 <body>
@@ -107,33 +103,6 @@
   </div>
 
   <div class="pf">
-    <label>Área</label>
-    <select id="ns-area">
-      <option value="Obra y Distribución">Obra y Distribución</option>
-      <option value="Mantenimiento">Mantenimiento</option>
-      <option value="Dime Mide">Dime Mide</option>
-    </select>
-  </div>
-
-  <div class="dime-check">
-    <input type="checkbox" id="ns-dime-chk" onchange="nsDimeToggle()">
-    <label for="ns-dime-chk">Solicitud Dime Mide</label>
-  </div>
-
-  <div id="ns-dime-fields" style="display:none">
-    <div class="pf">
-      <label>Nombre del solicitante</label>
-      <select id="ns-solicitante">
-        <option value="">— Seleccionar —</option>
-      </select>
-    </div>
-    <div class="pf">
-      <label>Usuario Edenor a asignar</label>
-      <input id="ns-usredenor" placeholder="Ej: PM001">
-    </div>
-  </div>
-
-  <div class="pf" id="ns-cuad-wrap">
     <label>Cuadrilla</label>
     <select id="ns-cuad"></select>
   </div>
@@ -202,7 +171,6 @@ let OBRAS = [];       // ["id · nombre", ...]
 let CUADRILLAS = [];  // ["id · nombre apellido", ...]
 let MATERIALES = [];  // [{matricula, descripcion, unidad?}, ...]
 let SUPERVISORES = []; // ["nombre", ...]
-let DIME_CUADRILLAS = []; // cuadrillas del área Dime Mide
 
 // ── STATE ──
 let nsItems = [];
@@ -226,11 +194,10 @@ async function loadMaestros(){
     if(data.cuadrillas) CUADRILLAS = data.cuadrillas;
     if(data.materiales) MATERIALES = data.materiales;
     if(data.supervisores) SUPERVISORES = data.supervisores;
-    if(data.dimeCuadrillas) DIME_CUADRILLAS = data.dimeCuadrillas;
     // Cache para offline
     localStorage.setItem('sol_maestros', JSON.stringify({
       obras:OBRAS, cuadrillas:CUADRILLAS, materiales:MATERIALES,
-      supervisores:SUPERVISORES, dimeCuadrillas:DIME_CUADRILLAS
+      supervisores:SUPERVISORES
     }));
   } catch(e){
     try {
@@ -239,7 +206,6 @@ async function loadMaestros(){
       if(cached.cuadrillas) CUADRILLAS = cached.cuadrillas;
       if(cached.materiales) MATERIALES = cached.materiales;
       if(cached.supervisores) SUPERVISORES = cached.supervisores || [];
-      if(cached.dimeCuadrillas) DIME_CUADRILLAS = cached.dimeCuadrillas || [];
     } catch(ce){}
   }
 }
@@ -258,32 +224,8 @@ function populateDropdowns(){
   supSel.innerHTML = SUPERVISORES.map(s => `<option>${esc(s)}</option>`).join('');
 }
 
-// ── OBRA CHANGED → auto-set area ──
-function nsObraChanged(){
-  // Si la obra tiene un área asociada en los datos, intentamos setearla
-  // Por ahora no tenemos esa info en el standalone, el usuario la elige manual
-}
-
-// ── DIME MIDE TOGGLE ──
-function nsDimeToggle(){
-  const chk = document.getElementById('ns-dime-chk');
-  const df = document.getElementById('ns-dime-fields');
-  const cw = document.getElementById('ns-cuad-wrap');
-  const isDime = chk && chk.checked;
-  df.style.display = isDime ? 'block' : 'none';
-  cw.style.display = isDime ? 'none' : 'block';
-  if(isDime){
-    const sel = document.getElementById('ns-solicitante');
-    if(sel && sel.options.length <= 1 && DIME_CUADRILLAS.length){
-      DIME_CUADRILLAS.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c;
-        o.textContent = c;
-        sel.appendChild(o);
-      });
-    }
-  }
-}
+// ── OBRA CHANGED ──
+function nsObraChanged(){}
 
 // ── URGENCIA ──
 function selUrg(el, val){
@@ -352,38 +294,28 @@ async function sendSolicitud(){
   if(!items.length){ toast('Agregá al menos un material','err'); return; }
 
   const obraText = document.getElementById('ns-obra').value;
-  const areaSel = document.getElementById('ns-area');
-  const areaSolicitud = areaSel ? areaSel.value : '';
-  const dimeChk = document.getElementById('ns-dime-chk');
-  const esDime = dimeChk && dimeChk.checked;
-  const cuadText = esDime ? '' : document.getElementById('ns-cuad').value;
+  const cuadText = document.getElementById('ns-cuad').value;
   const supText = document.getElementById('ns-sup').value;
+
+  if(!cuadText){ toast('Seleccioná una cuadrilla','err'); return; }
+  if(!supText){ toast('Seleccioná un supervisor','err'); return; }
 
   const btn = document.getElementById('btnSend');
   btn.disabled = true;
   btn.textContent = '⏳ Enviando…';
 
-  const isMant = areaSolicitud === 'Mantenimiento';
-  const needsApproval = esDime || isMant;
   const solicitud = {
     obra: obraText,
-    areaSolicitud: areaSolicitud,
+    areaSolicitud: 'Obra y Distribución',
     cuadrilla: cuadText,
     supervisor: supText,
     urgencia: selectedUrg,
     materiales: JSON.stringify(items),
     observaciones: document.getElementById('ns-obs').value,
     fecha: new Date().toLocaleString('es-AR'),
-    estado: needsApproval ? 'Pend. aprobación' : 'Pendiente',
-    esDime: !!esDime
+    estado: 'Pendiente',
+    esDime: false
   };
-
-  if(esDime){
-    const solSel = document.getElementById('ns-solicitante');
-    const usrEdn = document.getElementById('ns-usredenor');
-    if(solSel && solSel.value) solicitud.solicitanteDime = solSel.value;
-    if(usrEdn && usrEdn.value.trim()) solicitud.usuarioEdenor = usrEdn.value.trim();
-  }
 
   try {
     await fetch(SCRIPT_URL, {
@@ -421,8 +353,6 @@ function nuevaSol(){
   document.getElementById('ns-mat-inp').value = '';
   document.getElementById('ns-desc-inp').value = '';
   document.getElementById('ns-cant-inp').value = '';
-  document.getElementById('ns-dime-chk').checked = false;
-  nsDimeToggle();
   document.querySelectorAll('.urgency label').forEach(l => l.classList.remove('sel'));
   document.querySelectorAll('.urgency label')[1].classList.add('sel');
   renderNsItemsList();
