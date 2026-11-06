@@ -1574,7 +1574,8 @@ const PERM_MODULES=[
     {id:'nuevasol',label:'Nueva solicitud',icon:'📱'},
     {id:'missol',label:'Mis solicitudes (seguimiento)',icon:'📍'},
     {id:'aprobardime',label:'Aprobar solicitudes Dime Mide',icon:'✔️'},
-    {id:'aprobarmant',label:'Aprobar solicitudes Mantenimiento',icon:'🔧'}
+    {id:'aprobarmant',label:'Aprobar solicitudes Mantenimiento',icon:'🔧'},
+    {id:'verificardime',label:'Verificar y cerrar entregas Dime/Mant',icon:'🔑'}
   ]},
   {group:'Consultas',items:[
     {id:'stockfull',label:'Stock completo',icon:'📊'},
@@ -3779,7 +3780,7 @@ function verSolicitud(id){
     ${s.preparadoPor?`<div style="font-size:11px;color:var(--gray);margin-top:6px">🔧 Picking: ${s.preparadoPor} · ${fmtFechaHora(s.fechaPrep)}${s.remitidoPor?` &nbsp; 🧾 Remito: ${s.remitidoPor} · ${fmtFechaHora(s.fechaRemito)}`:''}${s.entregadoPor?` &nbsp; 🚚 Entregó: ${s.entregadoPor} · ${fmtFechaHora(s.fechaEntrega)}`:''}</div>${s.receptorNombre?`<div style="font-size:11px;color:var(--edenor);margin-top:4px">✍️ Retiró: <b>${s.receptorNombre}</b>${s.receptorDni?' · DNI: '+s.receptorDni:''}${s.firmaReceptor?' · <span style="color:#059669">Firma registrada</span>':''}</div>`:''}`:''}
     ${(()=>{
       const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-      if(s.estado==='Entregado'&&_esDM&&!s.cerrada){
+      if(s.estado==='Entregado'&&_esDM&&!s.cerrada&&can('verificardime')){
         const verified=!!(s.nroDocumento&&s.nroReserva);
         const borderColor=verified?'#a3d9a3':'#f0b3b3';
         const bgColor=verified?'#f0f9f0':'#fef2f2';
