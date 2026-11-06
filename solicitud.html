@@ -51,8 +51,6 @@
   .mat-row .mat-del{background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
 
   .mat-hint{color:var(--gray);font-size:11px;text-align:center;padding:10px}
-  .btn-agregar{display:block;width:100%;margin-top:8px;padding:10px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;text-align:center}
-  .btn-agregar:active{background:#c8e6c9}
 
   /* ── ENVIAR ── */
   .phone-send{background:var(--edenor);color:#fff;border:none;border-radius:10px;width:100%;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
@@ -78,6 +76,47 @@
   .loading .spin{display:inline-block;width:24px;height:24px;border:3px solid var(--line);border-top-color:var(--edenor);border-radius:50%;animation:sp .6s linear infinite;margin-bottom:8px}
   @keyframes sp{to{transform:rotate(360deg)}}
 
+  /* ── PROGRESS BAR ── */
+  .mis-pedidos{margin-top:18px;padding:14px 0;border-top:2px solid var(--edenor-lt)}
+  .mis-pedidos h3{font-size:14px;color:var(--steel);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .mis-pedidos .mp-empty{font-size:12px;color:var(--gray);text-align:center;padding:16px}
+  .mp-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .mp-card .mp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .mp-card .mp-code{font-weight:700;font-size:13px;color:var(--steel)}
+  .mp-card .mp-date{font-size:11px;color:var(--gray)}
+  .mp-card .mp-detail{font-size:11.5px;color:var(--ink);margin-bottom:8px;line-height:1.4}
+  .mp-card .mp-detail span{color:var(--gray)}
+  .mp-card .mp-estado{font-size:11px;font-weight:700;margin-bottom:6px}
+  .mp-card .mp-estado.est-ok{color:#2e7d32}
+  .mp-card .mp-estado.est-warn{color:#e65100}
+  .mp-card .mp-estado.est-err{color:#c53727}
+  .mp-card .mp-estado.est-done{color:var(--edenor)}
+  .prog-bar{display:flex;align-items:center;gap:0;margin-bottom:4px;position:relative}
+  .prog-step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1}
+  .prog-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .3s}
+  .prog-dot.active{border-color:var(--edenor);background:var(--edenor);color:#fff}
+  .prog-dot.done{border-color:var(--edenor);background:var(--edenor-lt);color:var(--edenor)}
+  .prog-dot.rejected{border-color:#c53727;background:#fde7e5;color:#c53727}
+  .prog-label{font-size:8.5px;color:var(--gray);margin-top:3px;text-align:center;line-height:1.2;max-width:60px;word-wrap:break-word}
+  .prog-label.active{color:var(--edenor);font-weight:700}
+  .prog-line{position:absolute;top:9px;left:0;right:0;height:2px;background:var(--line);z-index:0}
+  .prog-line-fill{position:absolute;top:9px;left:0;height:2px;background:var(--edenor);z-index:0;transition:width .3s}
+
+  /* ── DIME MIDE ── */
+  .dime-check{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .dime-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--edenor)}
+  .dime-check label{font-weight:600;cursor:pointer;font-size:13px}
+
+  /* ── SEARCHABLE SELECT ── */
+  .search-select{position:relative}
+  .search-select input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;background:#f7f9fb}
+  .search-select input:focus{outline:none;border-color:var(--edenor);box-shadow:0 0 0 3px rgba(37,87,58,.15)}
+  .ss-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--edenor);border-top:none;border-radius:0 0 8px 8px;max-height:180px;overflow-y:auto;z-index:20;display:none;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .ss-list.open{display:block}
+  .ss-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0}
+  .ss-item:active,.ss-item:hover{background:var(--edenor-lt)}
+  .ss-item b{color:var(--edenor)}
+  .ss-empty{padding:10px 12px;font-size:12px;color:var(--gray);text-align:center}
 </style>
 </head>
 <body>
@@ -98,18 +137,53 @@
 <div class="form-wrap" id="formWrap" style="display:none">
 
   <div class="pf">
-    <label>Obra</label>
-    <select id="ns-obra" onchange="nsObraChanged()"></select>
+    <label>Área</label>
+    <select id="ns-area" onchange="nsAreaChanged()">
+      <option value="Obra y Distribución">Obra y Distribución</option>
+      <option value="Mantenimiento">Mantenimiento</option>
+      <option value="Dime Mide">Dime Mide</option>
+    </select>
   </div>
 
-  <div class="pf">
-    <label>Cuadrilla</label>
-    <select id="ns-cuad"></select>
+  <div class="pf" id="ns-obra-wrap">
+    <label>Obra</label>
+    <div class="search-select">
+      <input type="text" id="ns-obra" placeholder="Escribí número o nombre de obra…" autocomplete="off" oninput="ssFilter('ns-obra','ns-obra-list',OBRAS)" onfocus="ssFilter('ns-obra','ns-obra-list',OBRAS)">
+      <div class="ss-list" id="ns-obra-list"></div>
+    </div>
+  </div>
+
+  <div id="ns-dime-fields" style="display:none">
+    <div class="pf">
+      <label id="ns-sol-label">Solicitante</label>
+      <div class="search-select">
+        <input type="text" id="ns-solicitante" placeholder="Escribí apellido o nombre…" autocomplete="off" oninput="ssFilter('ns-solicitante','ns-sol-list',_solCuads)" onfocus="ssFilter('ns-solicitante','ns-sol-list',_solCuads)">
+        <div class="ss-list" id="ns-sol-list"></div>
+      </div>
+    </div>
+    <div class="pf">
+      <label id="ns-usr-label">Usuario Edenor a asignar</label>
+      <div class="search-select">
+        <input type="text" id="ns-usredenor" placeholder="Escribí usuario…" autocomplete="off" oninput="ssFilter('ns-usredenor','ns-usr-list',_solUsrs)" onfocus="ssFilter('ns-usredenor','ns-usr-list',_solUsrs)">
+        <div class="ss-list" id="ns-usr-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf" id="ns-cuad-wrap">
+    <label>Solicitante</label>
+    <div class="search-select">
+      <input type="text" id="ns-cuad" placeholder="Escribí nombre o número…" autocomplete="off" oninput="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)" onfocus="ssFilter('ns-cuad','ns-cuad-list',CUADRILLAS)">
+      <div class="ss-list" id="ns-cuad-list"></div>
+    </div>
   </div>
 
   <div class="pf">
     <label>Supervisor (para quién se pide)</label>
-    <select id="ns-sup"></select>
+    <div class="search-select">
+      <input type="text" id="ns-sup" placeholder="Escribí nombre del supervisor…" autocomplete="off" oninput="ssFilter('ns-sup','ns-sup-list',SUPERVISORES)" onfocus="ssFilter('ns-sup','ns-sup-list',SUPERVISORES)">
+      <div class="ss-list" id="ns-sup-list"></div>
+    </div>
   </div>
 
   <div class="pf">
@@ -137,9 +211,9 @@
         <input type="number" id="ns-cant-inp" placeholder="Cant." inputmode="numeric" onkeydown="if(event.key==='Enter'){event.preventDefault();nsCantEnter()}">
       </div>
     </div>
-    <button type="button" class="btn-agregar" onclick="nsCantEnter()">＋ Agregar material</button>
+    <button type="button" onclick="nsCantEnter()" style="width:100%;padding:10px;margin:6px 0 8px;background:#2e7d32;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">➕ Agregar material</button>
     <div id="ns-items">
-      <div class="mat-hint">Completá matrícula y cantidad, luego tocá Agregar</div>
+      <div class="mat-hint">Completá matrícula y cantidad, luego tocá "Agregar material"</div>
     </div>
   </div>
 
@@ -149,6 +223,11 @@
   </div>
 
   <button class="phone-send" id="btnSend" onclick="sendSolicitud()">📤 Enviar solicitud al depósito</button>
+
+  <div class="mis-pedidos" id="misPedidos">
+    <h3>📋 Mis pedidos</h3>
+    <div id="misPedidosList"></div>
+  </div>
 </div>
 
 <!-- SUCCESS -->
@@ -168,22 +247,27 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0Y
 
 // ── MASTER DATA ──
 let OBRAS = [];       // ["id · nombre", ...]
-let CUADRILLAS = [];  // ["id · nombre apellido", ...]
+let CUADRILLAS = ['Juan Carlos GUTIERREZ','Damian Joan DADIN','Juan Pablo CASAZOLA','Javier Carlos ROLON','Leandro Matias GALEANO','Sergio Gustavo ROMERO','Elias Maximiliano Jesus NORES','Federico Miguel SERRANO','Lucas Hector CALDENTEY','Ivan Emanuel ROMANO','Lucas Hernan GOMEZ','Gonzalo Matias DADI','Rosana Sabrina INSAURRALDE','Brenda Estefania ALFONSO','Nahuel Daniel SOTOMAYOR','Pablo Leonardo OJEDA','Agustin ARRIETA','Leandro Angel ORELLANA','Maximiliano Ezequiel GOMEZ','Cesar Nelson NUÑEZ','Juan Jose OBREGON','Sebastian Manuel BOHOS','Gustavo Ezequiel GIMENEZ','Alberto Ezequiel MIRANDA','Angel Tomas DE NICOLA PIKEL','Marina Soledad PESCE','Daniel Alberto VELIZ','Gustavo Ezequiel REPISARDA','Santiago Jesus CHAVEZ','Nicolas Maximiliano FERNANDEZ','Julio LOPEZ','Ignacio Gabriel GUTIERREZ','Arnaldo Nicola CONTRERAS','Dylan Leandro ORREGO','Santiague ARISTIDE','Maximo MARTIN','Mauro GEREZ','Elias Alejandro NUÑEZ','Bautista OBREGON','Juan GODOY','Joaquin Gabriel HOYOS','Pablo VILLANUEVA','Aldo SANCHEZ','Juan Ignacio VILLAREAL','Diego CASTRO','Claudio LEIVA','Ariel GOMEZ','Diego VIDELA','Gonzalo VELIZ','Lautaro MARTINEZ','Alexis GIMENEZ','Federico LEIVA','Alexis MEDINA','Santiago CANTOS','Leandro OSWALD','Diego SANCHEZ','Federico SILVA','Elias RODRIGUEZ','Nelson SILVA','Cristian MACIEL','Pablo GONZALEZ','Matias Ezequiel CANTOS','Misael Mauro LOPEZ','Ian Agustin PEREIRA','Maximo Federico ROJAS FERREYRA','Fernando Gabriel TULA','Lucas Ezequiel BONILLA','Leandro Isaias AVENDAÑO','Pablo Daniel AMARILLA','Jorge Martin REINOSO','Facundo Nicolas BOIKO'];
 let MATERIALES = [];  // [{matricula, descripcion, unidad?}, ...]
 let SUPERVISORES = []; // ["nombre", ...]
+let DIME_CUADRILLAS = ['GUTIERREZ Juan Carlos','DADIN Damian Joan','CASAZOLA Juan Pablo','ROLON Javier Carlos','GALEANO Leandro Matias','ROMERO Sergio Gustavo','NORES Elias Maximiliano Jesus','SERRANO Federico Miguel','CALDENTEY Lucas Hector','ROMANO Ivan Emanuel','GOMEZ Lucas Hernan','DADI Gonzalo Matias','INSAURRALDE Rosana Sabrina','ALFONSO Brenda Estefania','SOTOMAYOR Nahuel Daniel','OJEDA Pablo Leonardo','ARRIETA Agustin','ORELLANA Leandro Angel','GOMEZ Maximiliano Ezequiel','NUÑEZ Cesar Nelson','OBREGON Juan Jose','BOHOS Sebastian Manuel','GIMENEZ Gustavo Ezequiel','MIRANDA Alberto Ezequiel','DE NICOLA PIKEL Angel Tomas','PESCE Marina Soledad','VELIZ Daniel Alberto','REPISARDA Gustavo Ezequiel','CHAVEZ Santiago Jesus','FERNANDEZ Nicolas Maximiliano','LOPEZ Julio','GUTIERREZ Ignacio Gabriel','CONTRERAS Arnaldo Nicola','ORREGO Dylan Leandro','ARISTIDE Santiague','MARTIN Maximo','GEREZ Mauro','NUÑEZ Elias Alejandro','OBREGON Bautista','GODOY Juan','HOYOS Joaquin Gabriel','VILLANUEVA Pablo','SANCHEZ Aldo','VILLAREAL Juan Ignacio','CASTRO Diego','LEIVA Claudio','GOMEZ Ariel','VIDELA Diego','VELIZ Gonzalo','MARTINEZ Lautaro','GIMENEZ Alexis','LEIVA Federico','MEDINA Alexis','CANTOS Santiago','OSWALD Leandro','SANCHEZ Diego','SILVA Federico','RODRIGUEZ Elias','SILVA Nelson','MACIEL Cristian','GONZALEZ Pablo','CANTOS Matias Ezequiel','LOPEZ Misael Mauro','PEREIRA Ian Agustin','ROJAS FERREYRA Maximo Federico','TULA Fernando Gabriel','BONILLA Lucas Ezequiel','AVENDAÑO Leandro Isaias','AMARILLA Pablo Daniel','REINOSO Jorge Martin','BOIKO Facundo Nicolas'];
+let MANT_CUADRILLAS = ['GUTIERREZ Juan Carlos','DADIN Damian Joan','CASAZOLA Juan Pablo','ROLON Javier Carlos','GALEANO Leandro Matias','ROMERO Sergio Gustavo','NORES Elias Maximiliano Jesus','SERRANO Federico Miguel','CALDENTEY Lucas Hector','ROMANO Ivan Emanuel','GOMEZ Lucas Hernan','DADI Gonzalo Matias','INSAURRALDE Rosana Sabrina','ALFONSO Brenda Estefania','SOTOMAYOR Nahuel Daniel','OJEDA Pablo Leonardo','ARRIETA Agustin','ORELLANA Leandro Angel','GOMEZ Maximiliano Ezequiel','NUÑEZ Cesar Nelson','OBREGON Juan Jose','BOHOS Sebastian Manuel','GIMENEZ Gustavo Ezequiel','MIRANDA Alberto Ezequiel','DE NICOLA PIKEL Angel Tomas','PESCE Marina Soledad','VELIZ Daniel Alberto','REPISARDA Gustavo Ezequiel','CHAVEZ Santiago Jesus','FERNANDEZ Nicolas Maximiliano','LOPEZ Julio','GUTIERREZ Ignacio Gabriel','CONTRERAS Arnaldo Nicola','ORREGO Dylan Leandro','ARISTIDE Santiague','MARTIN Maximo','GEREZ Mauro','NUÑEZ Elias Alejandro','OBREGON Bautista','GODOY Juan','HOYOS Joaquin Gabriel','VILLANUEVA Pablo','SANCHEZ Aldo','VILLAREAL Juan Ignacio','CASTRO Diego','LEIVA Claudio','GOMEZ Ariel','VIDELA Diego','VELIZ Gonzalo','MARTINEZ Lautaro','GIMENEZ Alexis','LEIVA Federico','MEDINA Alexis','CANTOS Santiago','OSWALD Leandro','SANCHEZ Diego','SILVA Federico','RODRIGUEZ Elias','SILVA Nelson','MACIEL Cristian','GONZALEZ Pablo','CANTOS Matias Ezequiel','LOPEZ Misael Mauro','PEREIRA Ian Agustin','ROJAS FERREYRA Maximo Federico','TULA Fernando Gabriel','BONILLA Lucas Ezequiel','AVENDAÑO Leandro Isaias','AMARILLA Pablo Daniel','REINOSO Jorge Martin','BOIKO Facundo Nicolas'];
+let USR_EDENOR = ['ddadin','jugutierrez','maolivera','lmgaleano','fserrano','eromano','jcasazola','segromero','megomez','sbohos','balfonso','alemiranda','rinsaurralde','gugimenez','grepisarda','pojeda','nimfernandez','sachavez','julilopez','iggutierrez','laumartinez','mpesce','juobregon','enores'];
 
 // ── STATE ──
 let nsItems = [];
 let selectedUrg = 'Normal';
+let _solCuads = [];
+let _solUsrs = [];
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
   await loadMaestros();
-  populateDropdowns();
   renderNsItemsList();
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('formWrap').style.display = 'block';
   nsObraChanged();
+  loadMisPedidos();
 });
 
 async function loadMaestros(){
@@ -191,41 +275,121 @@ async function loadMaestros(){
     const resp = await fetch(SCRIPT_URL);
     const data = await resp.json();
     if(data.obras) OBRAS = data.obras;
-    if(data.cuadrillas) CUADRILLAS = data.cuadrillas;
+    // Cuadrillas: solo sobreescribir si el Sheet trae MÁS que las hardcodeadas
+    if(data.cuadrillas && data.cuadrillas.length >= CUADRILLAS.length) CUADRILLAS = data.cuadrillas;
     if(data.materiales) MATERIALES = data.materiales;
     if(data.supervisores) SUPERVISORES = data.supervisores;
+    if(data.dimeCuadrillas && data.dimeCuadrillas.length >= DIME_CUADRILLAS.length) DIME_CUADRILLAS = data.dimeCuadrillas;
+    if(data.mantCuadrillas && data.mantCuadrillas.length >= MANT_CUADRILLAS.length) MANT_CUADRILLAS = data.mantCuadrillas;
+    if(data.usuariosEdenor && data.usuariosEdenor.length > 0) USR_EDENOR = data.usuariosEdenor;
     // Cache para offline
     localStorage.setItem('sol_maestros', JSON.stringify({
       obras:OBRAS, cuadrillas:CUADRILLAS, materiales:MATERIALES,
-      supervisores:SUPERVISORES
+      supervisores:SUPERVISORES, dimeCuadrillas:DIME_CUADRILLAS, mantCuadrillas:MANT_CUADRILLAS,
+      usuariosEdenor:USR_EDENOR
     }));
   } catch(e){
     try {
       const cached = JSON.parse(localStorage.getItem('sol_maestros')||'{}');
       if(cached.obras) OBRAS = cached.obras;
-      if(cached.cuadrillas) CUADRILLAS = cached.cuadrillas;
+      // Solo usar cache si tiene al menos la misma cantidad que las hardcodeadas
+      if(cached.cuadrillas && cached.cuadrillas.length >= 71) CUADRILLAS = cached.cuadrillas;
       if(cached.materiales) MATERIALES = cached.materiales;
       if(cached.supervisores) SUPERVISORES = cached.supervisores || [];
+      if(cached.dimeCuadrillas && cached.dimeCuadrillas.length >= 71) DIME_CUADRILLAS = cached.dimeCuadrillas;
+      if(cached.mantCuadrillas && cached.mantCuadrillas.length >= 71) MANT_CUADRILLAS = cached.mantCuadrillas;
+      if(cached.usuariosEdenor && cached.usuariosEdenor.length > 0) USR_EDENOR = cached.usuariosEdenor;
     } catch(ce){}
+  }
+  // Fallback: si SUPERVISORES sigue vacío, leer del WMS localStorage
+  if(!SUPERVISORES.length){
+    try {
+      const wms = JSON.parse(localStorage.getItem('wms_supervisores')||'[]');
+      if(Array.isArray(wms) && wms.length){
+        SUPERVISORES = wms.map(s => {
+          if(typeof s === 'string') return s;
+          // Si es objeto {nombre, apellido}, armar nombre completo
+          return [s.apellido, s.nombre].filter(Boolean).join(' ').trim();
+        }).filter(Boolean);
+      }
+    } catch(e){}
   }
 }
 
-function populateDropdowns(){
-  // Obras
-  const obraSel = document.getElementById('ns-obra');
-  obraSel.innerHTML = OBRAS.map(o => `<option>${esc(o)}</option>`).join('');
+// ── SEARCHABLE SELECT (buscar mientras escribís) ──
+function ssFilter(inputId, listId, dataArr){
+  const inp = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const q = inp.value.trim().toLowerCase();
 
-  // Cuadrillas
-  const cuadSel = document.getElementById('ns-cuad');
-  cuadSel.innerHTML = CUADRILLAS.map(c => `<option>${esc(c)}</option>`).join('');
+  // Mostrar todos si el campo está vacío y tiene foco
+  const items = q.length < 1 ? dataArr.slice(0, 15) : dataArr.filter(x => x.toLowerCase().includes(q)).slice(0, 10);
 
-  // Supervisores
-  const supSel = document.getElementById('ns-sup');
-  supSel.innerHTML = SUPERVISORES.map(s => `<option>${esc(s)}</option>`).join('');
+  if(!items.length){
+    list.innerHTML = '<div class="ss-empty">No se encontró</div>';
+  } else {
+    list.innerHTML = items.map(item => {
+      let display = esc(item);
+      if(q.length >= 1){
+        const idx = item.toLowerCase().indexOf(q);
+        if(idx >= 0){
+          display = esc(item.substring(0,idx)) + '<b>' + esc(item.substring(idx, idx+q.length)) + '</b>' + esc(item.substring(idx+q.length));
+        }
+      }
+      return `<div class="ss-item" data-val="${esc(item)}">${display}</div>`;
+    }).join('');
+  }
+  list.classList.add('open');
+
+  list.querySelectorAll('.ss-item').forEach(el => {
+    el.addEventListener('click', function(){
+      inp.value = this.dataset.val;
+      list.classList.remove('open');
+      if(inputId === 'ns-obra') nsObraChanged();
+      if(inputId === 'ns-obra'||inputId === 'ns-cuad'||inputId === 'ns-solicitante') setTimeout(loadMisPedidos,50);
+    });
+  });
 }
 
-// ── OBRA CHANGED ──
-function nsObraChanged(){}
+// Cerrar listas al hacer click afuera
+document.addEventListener('click', function(e){
+  document.querySelectorAll('.ss-list.open').forEach(list => {
+    if(!list.parentElement.contains(e.target)) list.classList.remove('open');
+  });
+});
+
+// ── OBRA CHANGED → auto-set area ──
+function nsObraChanged(){
+  // Si la obra tiene un área asociada en los datos, intentamos setearla
+  // Por ahora no tenemos esa info en el standalone, el usuario la elige manual
+}
+
+// ── ÁREA CHANGED (auto-detect Dime Mide / Mantenimiento) ──
+function nsAreaChanged(){
+  const areaSel = document.getElementById('ns-area');
+  const area = areaSel ? areaSel.value : '';
+  const isDime = area === 'Dime Mide';
+  const isMant = area === 'Mantenimiento';
+  const isSpecial = isDime || isMant;
+  const df = document.getElementById('ns-dime-fields');
+  const cw = document.getElementById('ns-cuad-wrap');
+  const ow = document.getElementById('ns-obra-wrap');
+  if(df) df.style.display = isSpecial ? 'block' : 'none';
+  if(cw) cw.style.display = isSpecial ? 'none' : 'block';
+  if(ow) ow.style.display = isDime ? 'none' : 'block';
+  const solLabel = document.getElementById('ns-sol-label');
+  const usrLabel = document.getElementById('ns-usr-label');
+  if(solLabel) solLabel.textContent = 'Solicitante';
+  if(usrLabel) usrLabel.textContent = 'Usuario Edenor a asignar';
+  if(isSpecial){
+    const srcList = isDime ? DIME_CUADRILLAS : MANT_CUADRILLAS;
+    _solCuads = (srcList||[]).slice();
+    _solUsrs = (USR_EDENOR||[]).slice();
+    document.getElementById('ns-solicitante').value = '';
+    document.getElementById('ns-usredenor').value = '';
+  }
+  loadMisPedidos();
+}
 
 // ── URGENCIA ──
 function selUrg(el, val){
@@ -236,8 +400,7 @@ function selUrg(el, val){
 
 // ── MATERIALES CARGA RÁPIDA ──
 function matLookup(mat){
-  const k = String(mat).trim();
-  const m = MATERIALES.find(r => String(r.matricula) === k);
+  const m = MATERIALES.find(r => String(r.matricula) === String(mat));
   return m ? m.descripcion : null;
 }
 
@@ -269,14 +432,16 @@ function nsCantEnter(){
   mi.value = ''; ci.value = '';
   document.getElementById('ns-desc-inp').value = '';
   renderNsItemsList();
-  mi.focus();
+  toast('✓ Agregado: ' + mat + ' ×' + cant);
+  // Foco de vuelta a matrícula para seguir cargando
+  setTimeout(function(){ mi.focus(); mi.click(); }, 100);
 }
 
 function renderNsItemsList(){
   const c = document.getElementById('ns-items');
   if(!c) return;
   if(!nsItems.length){
-    c.innerHTML = '<div class="mat-hint">Completá matrícula y cantidad, luego tocá Agregar</div>';
+    c.innerHTML = '<div class="mat-hint">Escribí matrícula + Enter, cantidad + Enter para agregar</div>';
     return;
   }
   c.innerHTML = '<div class="mat-items-list"><div class="mat-header">MATERIALES CARGADOS ('+nsItems.length+')</div>'
@@ -290,15 +455,30 @@ function renderNsItemsList(){
 
 // ── ENVIAR ──
 async function sendSolicitud(){
+  const areaSel = document.getElementById('ns-area');
+  const areaSolicitud = areaSel ? areaSel.value : '';
+  const esDime = areaSolicitud === 'Dime Mide';
+  const isMant = areaSolicitud === 'Mantenimiento';
+  const isSpecial = esDime || isMant;
+  const obraText = esDime ? '' : document.getElementById('ns-obra').value.trim();
+  if(!esDime && !obraText){ toast('Seleccioná una obra','err'); return; }
+
   const items = nsItems.filter(it => it.matricula && it.cantidad > 0);
   if(!items.length){ toast('Agregá al menos un material','err'); return; }
 
-  const obraText = document.getElementById('ns-obra').value;
-  const cuadText = document.getElementById('ns-cuad').value;
-  const supText = document.getElementById('ns-sup').value;
-
-  if(!cuadText){ toast('Seleccioná una cuadrilla','err'); return; }
+  // Validar solicitante según área
+  if(isSpecial){
+    const solVal = (document.getElementById('ns-solicitante').value||'').trim();
+    if(!solVal){ toast('Seleccioná un solicitante','err'); return; }
+  } else {
+    const cuadVal = (document.getElementById('ns-cuad').value||'').trim();
+    if(!cuadVal){ toast('Seleccioná una cuadrilla','err'); return; }
+  }
+  // Validar supervisor
+  const supText = (document.getElementById('ns-sup').value||'').trim();
   if(!supText){ toast('Seleccioná un supervisor','err'); return; }
+
+  const cuadText = isSpecial ? '' : document.getElementById('ns-cuad').value;
 
   const btn = document.getElementById('btnSend');
   btn.disabled = true;
@@ -306,16 +486,25 @@ async function sendSolicitud(){
 
   const solicitud = {
     obra: obraText,
-    areaSolicitud: 'Obra y Distribución',
+    areaSolicitud: areaSolicitud,
     cuadrilla: cuadText,
     supervisor: supText,
     urgencia: selectedUrg,
     materiales: JSON.stringify(items),
     observaciones: document.getElementById('ns-obs').value,
     fecha: new Date().toLocaleString('es-AR'),
-    estado: 'Pendiente',
-    esDime: false
+    estado: isSpecial ? 'Pend. aprobación' : 'Pendiente',
+    esDime: !!esDime,
+    esMant: !!isMant
   };
+
+  if(isSpecial){
+    const solSel = document.getElementById('ns-solicitante');
+    const usrEdn = document.getElementById('ns-usredenor');
+    if(esDime && solSel && solSel.value) solicitud.solicitanteDime = solSel.value;
+    if(isMant && solSel && solSel.value) solicitud.cuadrilla = solSel.value;
+    if(usrEdn && usrEdn.value.trim()) solicitud.usuarioEdenor = usrEdn.value.trim();
+  }
 
   try {
     await fetch(SCRIPT_URL, {
@@ -349,10 +538,15 @@ function nuevaSol(){
   selectedUrg = 'Normal';
   document.getElementById('formWrap').style.display = 'block';
   document.getElementById('successScreen').style.display = 'none';
+  document.getElementById('ns-obra').value = '';
+  document.getElementById('ns-cuad').value = '';
+  document.getElementById('ns-sup').value = '';
   document.getElementById('ns-obs').value = '';
   document.getElementById('ns-mat-inp').value = '';
   document.getElementById('ns-desc-inp').value = '';
   document.getElementById('ns-cant-inp').value = '';
+  document.getElementById('ns-area').value = 'Obra y Distribución';
+  nsAreaChanged();
   document.querySelectorAll('.urgency label').forEach(l => l.classList.remove('sel'));
   document.querySelectorAll('.urgency label')[1].classList.add('sel');
   renderNsItemsList();
@@ -369,6 +563,108 @@ function toast(msg, type='ok'){
 }
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── MIS PEDIDOS (progress bar) ──
+function loadMisPedidos(){
+  const area=document.getElementById('ns-area').value;
+  const isDime=area==='Dime Mide';
+  const isMant=area==='Mantenimiento';
+  const isSpecial=isDime||isMant;
+  // Get filter value
+  let filterVal='';
+  if(isSpecial){
+    filterVal=(document.getElementById('ns-solicitante').value||'').trim().toLowerCase();
+  } else {
+    const obraInp=document.getElementById('ns-obra').value||'';
+    const cuadInp=document.getElementById('ns-cuad').value||'';
+    filterVal=(obraInp+'|||'+cuadInp).toLowerCase();
+  }
+  const wrap=document.getElementById('misPedidos');
+  const list=document.getElementById('misPedidosList');
+  if(!filterVal||filterVal==='|||'){list.innerHTML='<div class="mp-empty">Seleccioná una obra o cuadrilla para ver tus pedidos anteriores</div>';return}
+  // Read solicitudes from WMS localStorage
+  let sols=[];
+  try{sols=JSON.parse(localStorage.getItem('wms_solicitudes')||'[]')}catch(e){sols=[]}
+  // Filter
+  let filtered=[];
+  if(isSpecial){
+    filtered=sols.filter(s=>{
+      const solArea=(s.areaSolicitud||'').toLowerCase();
+      if(isDime&&solArea!=='dime mide')return false;
+      if(isMant&&solArea!=='mantenimiento')return false;
+      const cuad=(s.solicitanteDime||s.cuadrilla||'').toLowerCase();
+      return cuad&&filterVal&&cuad.includes(filterVal);
+    });
+  } else {
+    const [obraF,cuadF]=filterVal.split('|||');
+    filtered=sols.filter(s=>{
+      const solArea=(s.areaSolicitud||'').toLowerCase();
+      if(solArea==='dime mide'||solArea==='mantenimiento')return false;
+      const obraMatch=!obraF||(s.obra||'').toLowerCase().includes(obraF);
+      const cuadMatch=!cuadF||(s.cuadrilla||'').toLowerCase().includes(cuadF);
+      return obraMatch&&(cuadMatch||!cuadF);
+    });
+  }
+  // Sort by date desc
+  filtered.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  // Limit to last 10
+  filtered=filtered.slice(0,10);
+  if(!filtered.length){
+    wrap.style.display='block';
+    list.innerHTML='<div class="mp-empty">No hay pedidos anteriores con estos datos</div>';
+    return;
+  }
+  wrap.style.display='block';
+  list.innerHTML=filtered.map(s=>renderPedidoCard(s,isDime||isMant)).join('');
+}
+
+function renderPedidoCard(s,needsApproval){
+  const estado=s.estado||'Pendiente';
+  const rechazada=estado==='Rechazada';
+  // Define steps
+  const steps=needsApproval||s.esDime||s.esMant
+    ?['Pend. aprobación','Pendiente','En preparación','Listo','Entregado']
+    :['Pendiente','En preparación','Listo','Entregado'];
+  // Current step index
+  let curIdx=steps.indexOf(estado);
+  if(curIdx<0)curIdx=rechazada?0:-1;
+  // Items summary
+  const items=s.items||[];
+  const itemsText=items.length
+    ? items.slice(0,3).map(it=>it.matricula+' ×'+it.cantidad).join(', ')+(items.length>3?' (+'+( items.length-3)+' más)':'')
+    : '';
+  // Estado class
+  let estCls='est-warn';
+  if(estado==='Entregado')estCls='est-done';
+  else if(rechazada)estCls='est-err';
+  else if(estado==='Listo')estCls='est-ok';
+  // Date
+  const fecha=s.fecha?(s.fecha+'').slice(0,10):'';
+  // Progress bar
+  const pctFill=steps.length>1?Math.max(0,curIdx)/(steps.length-1)*100:0;
+  const bar=`<div style="position:relative;margin:0 9px">
+    <div class="prog-line"></div>
+    <div class="prog-line-fill" style="width:${rechazada?0:pctFill}%"></div>
+    <div class="prog-bar">
+      ${steps.map((st,i)=>{
+        let dotCls='';
+        if(rechazada&&i===0)dotCls='rejected';
+        else if(i<curIdx)dotCls='done';
+        else if(i===curIdx)dotCls='active';
+        const icon=rechazada&&i===0?'✕':dotCls==='done'?'✓':dotCls==='active'?'●':'';
+        const lblCls=i===curIdx?' active':'';
+        return `<div class="prog-step"><div class="prog-dot ${dotCls}">${icon}</div><div class="prog-label${lblCls}">${st}</div></div>`;
+      }).join('')}
+    </div>
+  </div>`;
+  return `<div class="mp-card">
+    <div class="mp-head"><span class="mp-code">${esc(s.codigo||'—')}</span><span class="mp-date">${fecha}</span></div>
+    <div class="mp-detail">${itemsText?esc(itemsText):'<span>Sin detalle</span>'}${s.obra?' · <span>'+esc(s.obra)+'</span>':''}</div>
+    <div class="mp-estado ${estCls}">${rechazada?'❌ Rechazada — '+(s.motivoRechazo||'sin motivo'):estado==='Entregado'?'✅ Entregado':estado}</div>
+    ${bar}
+    ${rechazada&&s.motivoRechazo?'<div style="font-size:11px;color:#c53727;margin-top:4px">Motivo: '+esc(s.motivoRechazo)+'</div>':''}
+  </div>`;
+}
 
 // Retry pending when back online
 window.addEventListener('online', async () => {
