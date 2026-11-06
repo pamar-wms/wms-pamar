@@ -5747,6 +5747,23 @@ function quickLogin(usuario,clave){
   document.getElementById('lg-pass').value=clave;
   doLogin();
 }
+/* Auto-limpieza: eliminar solicitudes "Entregado" de días anteriores al iniciar */
+function limpiarEntregadosAyer(){
+  const hoy=today();
+  const all=DB.getAll('solicitudes');
+  let borrados=0;
+  all.forEach(s=>{
+    if(s.estado!=='Entregado')return;
+    // Usar fechaEntrega si existe, sino fecha general
+    const f=s.fechaEntrega||s.fecha||'';
+    const dia=f.slice(0,10);
+    if(dia&&dia<hoy){
+      DB.del('solicitudes',s.id);
+      borrados++;
+    }
+  });
+  if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s)');
+}
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
   if(!permisos||!permisos.length){
@@ -5781,6 +5798,8 @@ function loginAs(nombre,rol,permisos){
   }else if(['super','gerencial','admin'].includes(rol)){
     var sbMs=document.getElementById('sb-ms');if(sbMs){sbMs.style.display='';sbMs.textContent='⚠ SharePoint desconectado';}
   }
+  // Limpiar solicitudes "Entregado" de días anteriores
+  limpiarEntregadosAyer();
   // Iniciar polling global de solicitudes cada 60 seg
   solStartPolling();
   go(rol==='sup'&&can('missol')?'missol':'home');
