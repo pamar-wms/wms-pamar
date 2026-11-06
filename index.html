@@ -3929,20 +3929,38 @@ function confirmarConFirma(id){
   const firmaData=canvas?canvas.toDataURL('image/png'):null;
   const dni=(document.getElementById('sig-dni').value||'').trim();
   const s=DB.get('solicitudes',id);if(!s)return;
-  const rem=generarRemitoEntrega(s);
-  notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-  syncEstadoSheet(s.codigo,'Entregado');
-  closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️');
-  viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
+  const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+  if(esDM){
+    // Dime/Mant: marcar Entregado SIN generar despacho — stock se afecta al verificar
+    notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+    syncEstadoSheet(s.codigo,'Entregado');
+    closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️ (stock pendiente de verificación)');go('solicitudes');
+  } else {
+    // OyD: genera remito y descuenta stock inmediatamente
+    const rem=generarRemitoEntrega(s);
+    notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+    syncEstadoSheet(s.codigo,'Entregado');
+    closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️');
+    viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
+  }
 }
 function confirmarSinFirma(id){
   if(!confirm('¿Confirmar entrega SIN firma del receptor?'))return;
   const s=DB.get('solicitudes',id);if(!s)return;
-  const rem=generarRemitoEntrega(s);
-  notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-  syncEstadoSheet(s.codigo,'Entregado');
-  closeModal();toast(s.codigo+' entregada');
-  viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
+  const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+  if(esDM){
+    // Dime/Mant: marcar Entregado SIN generar despacho
+    notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+    syncEstadoSheet(s.codigo,'Entregado');
+    closeModal();toast(s.codigo+' entregada (stock pendiente de verificación)');go('solicitudes');
+  } else {
+    // OyD: genera remito y descuenta stock inmediatamente
+    const rem=generarRemitoEntrega(s);
+    notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
+    syncEstadoSheet(s.codigo,'Entregado');
+    closeModal();toast(s.codigo+' entregada');
+    viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
+  }
 }
 function generarRemitoEntrega(s){
   const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
@@ -5484,7 +5502,7 @@ const QL_SRC={
       {k:'fecha',l:'Fecha',t:'date',d:1},{k:'tipo',l:'Tipo',d:1},{k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},
       {k:'unidad',l:'Unidad'},{k:'sector',l:'Sector'},{k:'cantidad',l:'Cantidad',n:1,d:1},{k:'entra',l:'Entrada',n:1},{k:'sale',l:'Salida',n:1},{k:'neto',l:'Neto stock',n:1},
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'inspector',l:'Inspector'},{k:'cuadrilla',l:'Cuadrilla'},{k:'supervisor',l:'Supervisor'},
-      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'mes',l:'Mes'}
+      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
       {k:'tipo',l:'Tipo de movimiento',type:'multi',opts:['Ingreso','Despacho','Devolución','Traspaso obra','Traspaso contratista']},
@@ -5500,14 +5518,17 @@ const QL_SRC={
       {k:'ref',l:'Remito / Referencia',type:'text',match:['ref','solicitud']},
       {k:'nBobina',l:'N° Bobina',type:'text',match:['nBobina']},
       {k:'nEdenor',l:'N° Edenor',type:'text',match:['nEdenor']},
+      {k:'nroDocumento',l:'N° Documento',type:'text',match:['nroDocumento']},
+      {k:'nroReserva',l:'N° Reserva',type:'text',match:['nroReserva']},
       {k:'inspector',l:'Inspector',type:'text',match:['inspector']},
       {k:'cantidad',l:'Cantidad',type:'numrange'}
     ],
     rows:()=>{
       const R=[];
-      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',nBobina:'',nEdenor:'',entra:0,sale:0,neto:0},extra)};
+      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',entra:0,sale:0,neto:0},extra)};
       DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}]).forEach(it=>R.push(base(r,{tipo:'Ingreso',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,entra:it.cantidad,neto:it.cantidad,contraparte:r.proveedor||'',ref:r.remitoOrigen||'',sector:it.sector||''}))));
-      DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''}))));
+      const _solCache={};const _getSol=c=>{if(!c)return{};if(!_solCache[c]){const all=DB.getAll('solicitudes');_solCache[c]=all.find(s=>s.codigo===c)||{}}return _solCache[c]};
+      DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:sol.nroDocumento||'',nroReserva:sol.nroReserva||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''})))});
       DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado}))}));
       DB.getAll('traspasos').forEach(r=>R.push(base(r,{tipo:'Traspaso obra',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,obra:r.obraOrigen,contraparte:r.obraDestino,autorizado:r.autorizadoPor||''})));
       DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||''})));
@@ -5811,8 +5832,10 @@ function verificarEntrega(id){
   const s=DB.get('solicitudes',id);if(!s)return;
   // Propagar a cada item para que aparezca en consulta personalizada
   const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
-  DB.update('solicitudes',id,{nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()});
-  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
+  // Generar despacho y afectar stock en el momento de la verificación
+  const rem=generarRemitoEntrega(s);
+  DB.update('solicitudes',id,{nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal(),remito:rem.remito,despachoId:rem.desp.id});
+  toast('✔ Verificación guardada y stock actualizado — Doc: '+nroDoc+' / Reserva: '+nroRes);
   closeModal();go('solicitudes');
 }
 function cerrarSolicitud(id){
