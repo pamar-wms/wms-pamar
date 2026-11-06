@@ -250,6 +250,14 @@
   .solcol-h.prep{background:#2e75b6}
   .solcol-h.listo{background:#70ad47}
   .solcol-h.entr{background:#6b7885}
+  .solcard.sc-no-verif{border-left:4px solid #c53727;background:#fef2f2}
+  .solcard.sc-no-verif:hover{background:#fde7e5}
+  .solcard.sc-no-verif .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#fde7e5;color:#c53727;padding:1px 6px;border-radius:6px;margin-left:6px}
+  .solcard.sc-verificada{border-left:4px solid #2e7d32;background:#f0f9f0}
+  .solcard.sc-verificada:hover{background:#e6f4e6}
+  .solcard.sc-verificada .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#e6f4e6;color:#2e7d32;padding:1px 6px;border-radius:6px;margin-left:6px}
+  .solcard.sc-cerrada{border-left:4px solid #6b7885;background:#f4f6f8;opacity:.7}
+  .solcard.sc-cerrada .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#e8ecef;color:#6b7885;padding:1px 6px;border-radius:6px;margin-left:6px}
   .solcol-h .cnt{background:rgba(255,255,255,.3);padding:1px 8px;border-radius:10px;font-size:10.5px}
   .solcol-body{padding:8px}
   .solcard{background:#f7f9fb;border:1px solid #e3e8ee;border-left:3px solid var(--edenor);border-radius:6px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:.12s}
@@ -3769,6 +3777,35 @@ function verSolicitud(id){
     </div>`})()}
     <div style="font-size:10.5px;color:var(--gray);margin-top:4px">${editQ?'Ajustá la cantidad que se entrega (0 = no se entrega). Al marcar listo, la solicitud pasa a <b>Listo para entregar</b>. El remito se genera cuando el cuadrillero firma.':s.estado==='Pendiente'?'Al imprimir el picking la solicitud pasa automáticamente a <b>En preparación</b>.':'Ordenado por sector. En rojo: stock insuficiente.'}</div>
     ${s.preparadoPor?`<div style="font-size:11px;color:var(--gray);margin-top:6px">🔧 Picking: ${s.preparadoPor} · ${fmtFechaHora(s.fechaPrep)}${s.remitidoPor?` &nbsp; 🧾 Remito: ${s.remitidoPor} · ${fmtFechaHora(s.fechaRemito)}`:''}${s.entregadoPor?` &nbsp; 🚚 Entregó: ${s.entregadoPor} · ${fmtFechaHora(s.fechaEntrega)}`:''}</div>${s.receptorNombre?`<div style="font-size:11px;color:var(--edenor);margin-top:4px">✍️ Retiró: <b>${s.receptorNombre}</b>${s.receptorDni?' · DNI: '+s.receptorDni:''}${s.firmaReceptor?' · <span style="color:#059669">Firma registrada</span>':''}</div>`:''}`:''}
+    ${(()=>{
+      const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+      if(s.estado==='Entregado'&&_esDM&&!s.cerrada){
+        const verified=!!(s.nroDocumento&&s.nroReserva);
+        const borderColor=verified?'#a3d9a3':'#f0b3b3';
+        const bgColor=verified?'#f0f9f0':'#fef2f2';
+        const txtColor=verified?'#2e7d32':'#c53727';
+        return `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:14px;margin:10px 0">
+          <div style="font-size:12px;font-weight:700;color:${txtColor};margin-bottom:10px">${verified?'✔ Verificación completa':'⚠ Verificación pendiente — Completar datos'}</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="flex:1;min-width:150px"><label style="font-size:10.5px;font-weight:600;color:var(--gray);display:block;margin-bottom:3px">N° Documento *</label><input id="verif-nroDoc" value="${s.nroDocumento||''}" placeholder="Número de documento" style="width:100%;border:1px solid ${borderColor};border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>
+            <div style="flex:1;min-width:150px"><label style="font-size:10.5px;font-weight:600;color:var(--gray);display:block;margin-bottom:3px">N° Reserva *</label><input id="verif-nroRes" value="${s.nroReserva||''}" placeholder="Número de reserva" style="width:100%;border:1px solid ${borderColor};border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>
+          </div>
+          <div style="font-size:10.5px;color:var(--gray);margin-bottom:10px">Se aplica a todos los materiales de esta solicitud (${(s.items||[]).length} materiales)</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button onclick="verificarEntrega(${s.id})" style="background:${verified?'#2e7d32':'#c53727'};color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">${verified?'✔ Actualizar':'✔ Verificar'}</button>
+            ${verified?`<button onclick="cerrarSolicitud(${s.id})" style="background:#6b7885;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📁 Cerrar solicitud</button>`:''}
+          </div>
+        </div>`;
+      }
+      if(s.estado==='Entregado'&&_esDM&&s.cerrada){
+        return `<div style="background:#f4f6f8;border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0">
+          <div style="font-size:12px;font-weight:700;color:#6b7885;margin-bottom:6px">📁 Solicitud cerrada</div>
+          <div style="font-size:12px;color:var(--ink)">N° Documento: <b>${s.nroDocumento||'—'}</b> · N° Reserva: <b>${s.nroReserva||'—'}</b></div>
+          <div style="font-size:10.5px;color:var(--gray);margin-top:4px">Cerrada por: ${s.cerradaPor||'—'} · ${fmtFechaHora(s.fechaCierre)}</div>
+        </div>`;
+      }
+      return '';
+    })()}
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cerrar</button>${s.estado==='Pendiente'||s.estado==='Listo'||s.estado==='Entregado'?'':`<button class="btn ghost" onclick="imprimirSolicitud(${s.id})">🖨️ Reimprimir picking</button>`}${s.remito?`<button class="btn ghost" onclick="closeModal();verRemitoSol('${s.remito}')">🧾 Ver remito</button>`:''}${act?act.replace(/class="pr"/g,'class="btn primary"').replace(/<button onclick/g,'<button class="btn ghost" onclick'):''}</div>`);
 }
 function imprimirSolicitud(id){
@@ -3926,7 +3963,15 @@ function solBuildCard(s,st){
   const btns=solActionBtns(s,false);
   const actions=btns?`<div class="sc-actions">${btns}</div>`:(st===EST_APROB?`<div class="sc-wait">Esperando aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}</div>`:'');
   const pidio=s.pidioUsuario||s.supervisor;
-  return `<div class="solcard" onclick="verSolicitud(${s.id})" title="Ver detalle">
+  /* Verificación post-entrega para Dime/Mant */
+  const esDimeMant=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+  let verifCls='',verifTag='';
+  if(st==='Entregado'&&esDimeMant){
+    if(s.cerrada){verifCls=' sc-cerrada';verifTag='<span class="sc-verif-tag">📁 Cerrada</span>'}
+    else if(s.nroDocumento&&s.nroReserva){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Verificada</span>'}
+    else{verifCls=' sc-no-verif';verifTag='<span class="sc-verif-tag">⚠ Sin verificar</span>'}
+  }
+  return `<div class="solcard${verifCls}" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
     <div class="sc-obra">${s.obra||s.areaSolicitud||'—'}</div>
     <div class="sc-who">
@@ -3936,6 +3981,7 @@ function solBuildCard(s,st){
     </div>
     ${itemsText?`<div class="sc-items">📦 ${itemsText}</div>`:''}
     ${s.aprobadoPor?`<div class="sc-ok">✔ Aprobó: ${s.aprobadoPor}${s.aprobModificada?' · <span style="color:#b07a00">cantidades modificadas</span>':''}</div>${s.obsAprob?`<div class="sc-ok" style="color:var(--gray);font-weight:400">💬 ${s.obsAprob}</div>`:''}`:''}
+    ${verifTag}
     ${actions}
   </div>`;
 }
@@ -5500,8 +5546,9 @@ const QL_SRC={
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'supervisor',l:'Supervisor',d:1},
       {k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},{k:'unidad',l:'Unidad'},
       {k:'cantPedida',l:'Cant. pedida',n:1,d:1},{k:'cantidad',l:'Cant. aprobada',n:1,d:1},{k:'diferencia',l:'Diferencia',n:1},
+      {k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},
       {k:'aprobadoPor',l:'Aprobó'},{k:'modificada',l:'Modificada'},{k:'rechazadoPor',l:'Rechazó'},{k:'motivoRechazo',l:'Motivo rechazo'},
-      {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'mes',l:'Mes'}
+      {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'verificada',l:'Verificada'},{k:'cerrada',l:'Cerrada'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
       {k:'estado',l:'Estado',type:'multi',opts:[EST_APROB,'Pendiente','En preparación','Listo','Entregado','Rechazada','Eliminada']},
@@ -5514,7 +5561,11 @@ const QL_SRC={
       {k:'aprobadoPor',l:'Aprobado por',type:'select',opts:uniq(DB.getAll('solicitudes').map(s=>s.aprobadoPor))},
       {k:'modificada',l:'Modificada por aprobador',type:'select',opts:['Sí','No']},
       {k:'codigo',l:'N° solicitud / remito',type:'text',match:['codigo','remito']},
-      {k:'inspector',l:'Inspector',type:'text',match:['inspector']}
+      {k:'inspector',l:'Inspector',type:'text',match:['inspector']},
+      {k:'nroDocumento',l:'N° Documento',type:'text',match:['nroDocumento']},
+      {k:'nroReserva',l:'N° Reserva',type:'text',match:['nroReserva']},
+      {k:'verificada',l:'Verificada',type:'select',opts:['Sí','No']},
+      {k:'cerrada',l:'Cerrada',type:'select',opts:['Sí','No']}
     ],
     rows:()=>{
       const R=[];
@@ -5522,8 +5573,10 @@ const QL_SRC={
         const o=qlObra(s.obra);
         const head={codigo:s.codigo,fecha:(s.fecha||'').slice(0,10),mes:(s.fecha||'').slice(0,7),estado:s.estado,urgencia:s.urgencia,obra:s.obra,area:o.area||'',region:o.region||'',inspector:o.inspector||'',supervisor:s.supervisor,aprobadoPor:s.aprobadoPor||'',modificada:s.aprobModificada?'Sí':'No',rechazadoPor:s.rechazadoPor||'',motivoRechazo:s.motivoRechazo||'',remito:s.remito||'',obs:[s.obs,s.obsAprob].filter(Boolean).join(' · ')};
         const its=(s.items||[]).concat(s.itemsQuitados||[]);
-        if(!its.length)R.push(Object.assign({},head,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
-        its.forEach(it=>{const ped=it.cantPedida??it.cantidad;R.push(Object.assign({},head,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}))});
+        const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+        const verifHead={verificada:_esDM?(s.nroDocumento&&s.nroReserva?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:s.nroDocumento||'',nroReserva:s.nroReserva||''};
+        if(!its.length)R.push(Object.assign({},head,verifHead,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
+        its.forEach(it=>{const ped=it.cantPedida??it.cantidad;R.push(Object.assign({},head,verifHead,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}))});
       });
       return R;
     }
@@ -5750,12 +5803,33 @@ function quickLogin(usuario,clave){
   doLogin();
 }
 /* Auto-limpieza: eliminar solicitudes "Entregado" de días anteriores al iniciar */
+function verificarEntrega(id){
+  const nroDoc=(document.getElementById('verif-nroDoc').value||'').trim();
+  const nroRes=(document.getElementById('verif-nroRes').value||'').trim();
+  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('verif-nroDoc').focus();return}
+  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('verif-nroRes').focus();return}
+  const s=DB.get('solicitudes',id);if(!s)return;
+  // Propagar a cada item para que aparezca en consulta personalizada
+  const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
+  DB.update('solicitudes',id,{nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()});
+  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
+  closeModal();go('solicitudes');
+}
+function cerrarSolicitud(id){
+  if(!confirm('¿Cerrar esta solicitud? Una vez cerrada no se puede modificar.'))return;
+  DB.update('solicitudes',id,{cerrada:true,cerradaPor:currentUser.nombre,fechaCierre:nowLocal()});
+  toast('📁 Solicitud cerrada');
+  closeModal();go('solicitudes');
+}
 function limpiarEntregadosAyer(){
   const hoy=today();
   const all=DB.getAll('solicitudes');
   let borrados=0;
   all.forEach(s=>{
     if(s.estado!=='Entregado')return;
+    // NO borrar Dime/Mantenimiento — se manejan con verificación y cierre
+    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(esDM)return;
     // Usar fechaEntrega si existe, sino fecha general
     const f=s.fechaEntrega||s.fecha||'';
     const dia=f.slice(0,10);
@@ -5764,7 +5838,7 @@ function limpiarEntregadosAyer(){
       borrados++;
     }
   });
-  if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s)');
+  if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s) (Dime/Mant excluidas)');
 }
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
