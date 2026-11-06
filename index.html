@@ -328,7 +328,8 @@
   .ql-saved a{cursor:pointer;color:var(--edenor);font-weight:600}
   .ql-saved b{cursor:pointer;color:var(--gray);padding:0 5px;font-weight:400}
   .ql-saved b:hover{color:#b3261e}
-  @media(max-width:900px){.ql-fgrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:900px){.ql-fgrid{grid-template-columns:repeat(2,1fr)}.cols-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:500px){.ql-fgrid{grid-template-columns:1fr}.cols-grid{grid-template-columns:repeat(2,1fr)}.qb-actions{flex-wrap:wrap}.qb-actions .btn{flex:1;min-width:120px;text-align:center}}
   .agg-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
   .agg-row .pf{display:flex;flex-direction:column;gap:4px}
   .agg-row label{font-size:11px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.3px}
@@ -5503,7 +5504,7 @@ const QL_SRC={
       {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
-      {k:'estado',l:'Estado',type:'multi',opts:[EST_APROB,'Pendiente','En preparación','Listo','Entregado','Rechazada']},
+      {k:'estado',l:'Estado',type:'multi',opts:[EST_APROB,'Pendiente','En preparación','Listo','Entregado','Rechazada','Eliminada']},
       {k:'fecha',l:'Fecha',type:'daterange'},
       {k:'urgencia',l:'Urgencia',type:'select',opts:['Urgente','Normal','Baja']},
       {k:'obra',l:'Obra',type:'select',opts:uniq(DB.getAll('obras').map(o=>o.nombre))},
@@ -5673,8 +5674,8 @@ function runConsulta(){
   }catch(e){toast('Error al ejecutar consulta: '+e.message,'err');console.error('runConsulta error:',e)}
 }
 function qlExport(){
-  if(!qlLast)runConsulta();
-  if(!qlLast||qlLast.err)return;
+  runConsulta();
+  if(!qlLast||qlLast.err){toast('Ejecutá la consulta primero o corregí los filtros','err');return}
   const {rows,cols}=qlLast;
   const esc=v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const fmt=(c,v)=>c.n?String(Math.round((+v||0)*100)/100).replace('.',','):c.t==='date'?fmtDate((v||'').slice(0,10)):v;
@@ -5684,8 +5685,8 @@ function qlExport(){
   toast('Archivo exportado · se abre con Excel');
 }
 function qlPrint(){
-  if(!qlLast)runConsulta();
-  const t=document.getElementById('ql-table');if(!t)return;
+  runConsulta();
+  const t=document.getElementById('ql-table');if(!t){toast('Ejecutá la consulta primero','err');return}
   const w=window.open('','_blank');
   w.document.write(`<html><head><title>Consulta</title><style>body{font-family:Segoe UI,sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:4px 6px}th{background:#1A3D27;color:#fff}</style></head><body><h3>Consulta personalizada · ${QL_SRC[qlLast.st.fuente].label} · ${fmtDate(today())}</h3>${t.outerHTML}</body></html>`);
   w.document.close();w.focus();w.print();
@@ -5698,18 +5699,19 @@ function qlSave(){
 function qlRenderSaved(){
   const el=document.getElementById('ql-saved');if(!el)return;
   const qs=DB.getAll('consultas');
-  el.innerHTML=qs.length?qs.map(q=>`<span class="ql-saved"><a onclick="qlLoad(${q.id})">${q.nombre}</a><span style="color:var(--gray);font-size:10px">${QL_SRC[q.estado.fuente]?QL_SRC[q.estado.fuente].label:''}</span><b onclick="qlDel(${q.id})" title="Eliminar">✕</b></span>`).join(''):'<span style="font-size:12px;color:var(--gray)">Todavía no guardaste consultas. Armá una y tocá "Guardar consulta".</span>';
+  el.innerHTML=qs.length?qs.map(q=>`<span class="ql-saved"><a onclick="qlLoad(${q.id})">${q.nombre}</a><span style="color:var(--gray);font-size:10px">${QL_SRC[q.estado&&q.estado.fuente]?QL_SRC[q.estado.fuente].label:'(fuente eliminada)'}</span><b onclick="qlDel(${q.id})" title="Eliminar">✕</b></span>`).join(''):'<span style="font-size:12px;color:var(--gray)">Todavía no guardaste consultas. Armá una y tocá "Guardar consulta".</span>';
 }
 function qlDel(id){if(!confirm('¿Eliminar esta consulta guardada?'))return;DB.del('consultas',id);qlRenderSaved()}
-function qlLoad(id){
-  const q=DB.getAll('consultas').find(x=>x.id===id);if(!q)return;const st=q.estado;
+function qlLoad(qid){
+  const q=DB.getAll('consultas').find(x=>x.id===qid);if(!q)return;const st=q.estado;
+  if(!QL_SRC[st.fuente]){toast('La fuente "'+st.fuente+'" ya no existe','err');return}
   const r=document.querySelector(`input[name="ql-src"][value="${st.fuente}"]`);if(r)r.checked=true;
   qlRenderSrc();
   QL_SRC[st.fuente].filters().forEach(f=>{
-    const id='qlf-'+f.k,v=st.f[f.k];if(v==null)return;
-    if(f.type==='multi')document.querySelectorAll('.'+id).forEach(c=>c.checked=v.includes(c.value));
-    else if(f.type==='daterange'||f.type==='numrange'){document.getElementById(id+'-d').value=v[0]||'';document.getElementById(id+'-h').value=v[1]||''}
-    else document.getElementById(id).value=v;
+    const fid='qlf-'+f.k,v=st.f[f.k];if(v==null)return;
+    if(f.type==='multi')document.querySelectorAll('.'+fid).forEach(c=>c.checked=v.includes(c.value));
+    else if(f.type==='daterange'||f.type==='numrange'){document.getElementById(fid+'-d').value=v[0]||'';document.getElementById(fid+'-h').value=v[1]||''}
+    else document.getElementById(fid).value=v;
   });
   document.querySelectorAll('.ql-col').forEach(c=>c.checked=st.cols.includes(c.value));
   document.getElementById('ql-group').value=st.group||'';document.getElementById('ql-sort').value=st.sort;document.getElementById('ql-dir').value=st.dir;document.getElementById('ql-limit').value=st.limit||'0';
