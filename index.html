@@ -5850,9 +5850,10 @@ function limpiarEntregadosAyer(){
   let borrados=0;
   all.forEach(s=>{
     if(s.estado!=='Entregado')return;
-    // NO borrar Dime/Mantenimiento — se manejan con verificación y cierre
+    // Dime/Mant: solo borrar si están cerradas (grises) y de un día anterior
     const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(esDM)return;
+    if(esDM&&!s.cerrada)return;
+    if(esDM&&s.cerrada){const fc=(s.fechaCierre||'').slice(0,10);if(!fc||fc>=hoy)return;DB.del('solicitudes',s.id);borrados++;return}
     // Usar fechaEntrega si existe, sino fecha general
     const f=s.fechaEntrega||s.fecha||'';
     const dia=f.slice(0,10);
