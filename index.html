@@ -1273,7 +1273,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1289,10 +1289,10 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
-  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   const permAdmin=['consultalibre','stockfull','movobra','medconsulta'];
   const users=DB.getAll('usuarios');
   let changed=false;
@@ -1546,6 +1546,12 @@ function migratePermisos(){
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v19','1');
   }
+  if(!localStorage.getItem('wms_mig_v20')){
+    const us=DB.getAll('usuarios');
+    us.forEach(u=>{if(['super','gerencial','admin','jefedep'].includes(u.rol)&&u.permisos&&!u.permisos.includes('editarlisto'))u.permisos.push('editarlisto')});
+    DB.save('usuarios',us);
+    localStorage.setItem('wms_mig_v20','1');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1578,7 +1584,8 @@ const PERM_MODULES=[
     {id:'missol',label:'Mis solicitudes (seguimiento)',icon:'📍'},
     {id:'aprobardime',label:'Aprobar solicitudes Dime Mide',icon:'✔️'},
     {id:'aprobarmant',label:'Aprobar solicitudes Mantenimiento',icon:'🔧'},
-    {id:'verificardime',label:'Verificar y cerrar entregas Dime/Mant',icon:'🔑'}
+    {id:'verificardime',label:'Verificar y cerrar entregas Dime/Mant',icon:'🔑'},
+    {id:'editarlisto',label:'Editar/modificar en Listo p/ entregar',icon:'📝'}
   ]},
   {group:'Consultas',items:[
     {id:'stockfull',label:'Stock completo',icon:'📊'},
@@ -2449,7 +2456,7 @@ function presetPerms(preset){
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
   const mantP=['solicitudes','aprobarmant','stockfull','movobra'];
-  const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
   const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='mant'?mantP:preset==='administrativo'?adminP:supP;
@@ -2775,16 +2782,20 @@ function editIngreso(id){
 function saveEditIngreso(){
   const validItems=ingItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  const r=DB.get('ingresos',_editIngId);if(!r){toast('No encontrado','err');return}
-  r.fecha=document.getElementById('i-fecha').value;
-  r.proveedor=document.getElementById('i-prov').value;
-  r.remitoOrigen=document.getElementById('i-remito').value.trim();
-  r.items=validItems;
-  // Limpiar campos legacy si existían
-  delete r.matricula;delete r.descripcion;delete r.cantidad;delete r.sector;
-  DB.update('ingresos',r);
+  const changes={
+    fecha:document.getElementById('i-fecha').value,
+    proveedor:document.getElementById('i-prov').value,
+    remitoOrigen:document.getElementById('i-remito').value.trim(),
+    items:validItems
+  };
+  // Actualizar y luego limpiar campos legacy directamente
+  const d=DB.getAll('ingresos');const i=d.findIndex(r=>r.id===_editIngId);
+  if(i<0){toast('No encontrado','err');return}
+  Object.assign(d[i],changes);
+  delete d[i].matricula;delete d[i].descripcion;delete d[i].cantidad;delete d[i].sector;
+  DB.save('ingresos',d);
   _editIngId=null;
-  closeModal();toast('Ingreso actualizado');go('ingresos');
+  closeModal();toast('Ingreso actualizado ✓');go('ingresos');
 }
 
 // ─── INGRESO MASIVO (Excel copy/paste) ──────────
@@ -3801,7 +3812,7 @@ function solActionBtns(s,inModal){
   if(['Pendiente','En preparación','Listo'].includes(st)&&!can('despachos'))return editBtn+delBtn;
   if(st==='Pendiente')return `<button class="pr" onclick="${stop}imprimirSolicitud(${s.id})">🖨️ Imprimir picking</button>`+editBtn+delBtn;
   if(st==='En preparación')return (inModal?`<button class="pr" onclick="${stop}marcarListoSol(${s.id})">✔ Marcar listo</button>`:`<button class="pr" onclick="${stop}verSolicitud(${s.id})">📦 Preparar</button>`)+editBtn+delBtn;
-  if(st==='Listo')return `<button class="pr" onclick="${stop}confirmarEntrega(${s.id})">✔ Confirmar entrega</button>${s.remito?`<button onclick="${stop}verRemitoSol('${s.remito}')">🧾 Ver remito</button>`:''}`+delBtn;
+  if(st==='Listo'){const listoEdit=can('editarlisto')?` <button onclick="${stop}${cm}editarSolicitud(${s.id})" title="Editar solicitud" style="background:#e8a838;color:#2a1a00;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button> <button onclick="${stop}${cm}volverPreparacion(${s.id})" title="Modificar cantidades (vuelve a En preparación)" style="background:#5b7cfa;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🔄 Modificar</button>`:'';return `<button class="pr" onclick="${stop}confirmarEntrega(${s.id})">✔ Confirmar entrega</button>${s.remito?`<button onclick="${stop}verRemitoSol('${s.remito}')">🧾 Ver remito</button>`:''}`+listoEdit+delBtn;}
   return delBtn;
 }
 function verSolicitud(id){
@@ -3884,6 +3895,14 @@ function verSolicitud(id){
       return '';
     })()}
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cerrar</button>${s.estado==='Pendiente'||s.estado==='Listo'||s.estado==='Entregado'?'':`<button class="btn ghost" onclick="imprimirSolicitud(${s.id})">🖨️ Reimprimir picking</button>`}${s.remito?`<button class="btn ghost" onclick="closeModal();verRemitoSol('${s.remito}')">🧾 Ver remito</button>`:''}${act?act.replace(/class="pr"/g,'class="btn primary"').replace(/<button onclick/g,'<button class="btn ghost" onclick'):''}</div>`);
+}
+function volverPreparacion(id){
+  const s=DB.get('solicitudes',id);if(!s)return;
+  if(!can('editarlisto')){toast('No tenés permiso para modificar en Listo','err');return}
+  if(!confirm(`¿Volver "${s.codigo}" a "En preparación"?\nPodrás modificar las cantidades a entregar.`))return;
+  DB.update('solicitudes',id,{estado:'En preparación',modificadoPor:currentUser.nombre,fechaModif:nowLocal()});
+  if(s.codigo)syncEstadoSheet(s.codigo,'En preparación',s.items);
+  closeModal();toast(s.codigo+' volvió a En preparación — podés modificar cantidades');go('solicitudes');
 }
 function imprimirSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
@@ -5947,7 +5966,7 @@ function loginAs(nombre,rol,permisos){
     const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
     const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra'];
     const supP=['nuevasol','missol'];
-    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
+    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','editarlisto'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
