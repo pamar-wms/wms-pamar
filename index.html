@@ -38,7 +38,8 @@
 
   .area{flex:1;overflow-y:auto;background:#eef2f5;padding:0}
   .screen{display:none;padding:18px 22px}
-  .screen.on{display:block}
+  .screen.on{display:block;animation:screenIn .3s ease-out}
+  @keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
   .shead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
   .shead .sicon{width:38px;height:38px;border-radius:8px;background:var(--steel);color:#fff;display:grid;place-items:center;font-size:18px}
@@ -94,8 +95,10 @@
 
   /* Modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(18,33,46,.5);z-index:900;display:none;place-items:center}
-  .modal-overlay.on{display:grid}
-  .modal{background:#fff;border-radius:12px;padding:24px 28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-overlay.on{display:grid;animation:overlayIn .2s ease-out}
+  @keyframes overlayIn{from{opacity:0}to{opacity:1}}
+  .modal{background:#fff;border-radius:12px;padding:24px 28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:modalIn .25s ease-out}
+  @keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
   .modal:has(.sol-info){width:800px}
   .modal h3{font-size:16px;color:var(--ink);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--edenor-lt);display:flex;align-items:center;gap:8px}
   .modal .fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 16px}
@@ -1985,25 +1988,37 @@ function confirmImportMat(){
 }
 
 function importStockMasivo(){
-  openModal(`<h3>📥 Carga Inicial de Stock Físico</h3>
+  openModal(`<h3>📥 Ajuste de Stock Físico</h3>
     <div style="background:#eef4ec;border:1px solid #bcd3b9;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--steel)">
       <b>Cómo usar:</b> Copiá las columnas desde Excel y pegá acá abajo (Ctrl+V).<br>
-      <b>Formato</b> (TAB entre columnas): <code style="font-size:11px">Matrícula &nbsp; Cantidad</code><br>
-      <span style="color:var(--gray);font-size:11px">• Se registra como un ingreso con proveedor "CARGA INICIAL"<br>• Las matrículas que no existan se omiten (deben estar primero en el maestro)</span>
+      <b>Formato</b> (TAB entre columnas): <code style="font-size:11px">Matrícula &nbsp; Cantidad real en depósito</code><br>
+      <span style="color:var(--gray);font-size:11px">• Cargá la cantidad <b>física real</b> que tenés — el sistema calcula el ajuste automáticamente<br>• Si el WMS dice −500 y cargás 500, queda en 500 ✓<br>• Las matrículas que no existan se omiten (deben estar primero en el maestro)</span>
     </div>
     <div class="field wide"><label>Pegá los datos acá</label><textarea id="imp-st-txt" rows="10" placeholder="2537&#9;850&#10;1558&#9;3&#10;3638&#9;120" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:11px;resize:vertical" oninput="previewImportStock()"></textarea></div>
     <div id="imp-st-preview" style="margin-top:8px;max-height:200px;overflow-y:auto"></div>
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="confirmImportStock()">💾 Cargar stock</button></div>`);
 }
+function _calcStockActual(){
+  const mats=DB.getAll('materiales');const st={};
+  mats.forEach(m=>{st[String(m.matricula)]={ing:0,des:0,dev:0,tc:0}});
+  DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(st[k])st[k].ing+= +it.cantidad||0}));
+  DB.getAll('despachos').forEach(d=>{(d.items||[]).forEach(it=>{const k=String(it.matricula);if(st[k])st[k].des+= +it.cantidad||0})});
+  DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(st[k]&&it.estado==='Bueno – reingresa')st[k].dev+= +it.cantidad||0}));
+  DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(st[k])st[k].tc+= +r.cantidad||0});
+  const res={};Object.keys(st).forEach(k=>{const s=st[k];res[k]=s.ing-s.des+s.dev-s.tc});
+  return res;
+}
 function parseImportStock(){
   const txt=document.getElementById('imp-st-txt').value.trim();if(!txt)return[];
-  const mats=DB.getAll('materiales');
+  const mats=DB.getAll('materiales');const stAct=_calcStockActual();
   return txt.split(/\r?\n/).map(line=>{
     const c=line.split('\t').map(x=>x.trim());
     const mat=c[0]||'';const cant=parseFloat((c[1]||'0').replace(',','.'))||0;
     const m=mats.find(x=>x.matricula===mat);
-    return{matricula:mat,cantidad:cant,descripcion:m?m.descripcion:'(sin maestro)',sector:m?m.sector:'',encontrado:!!m};
-  }).filter(r=>r.matricula&&r.cantidad>0);
+    const actual=stAct[String(mat)]||0;
+    const ajuste=cant-actual;
+    return{matricula:mat,cantidad:cant,descripcion:m?m.descripcion:'(sin maestro)',sector:m?m.sector:'',encontrado:!!m,stockActual:actual,ajuste:ajuste};
+  }).filter(r=>r.matricula&&r.cantidad>=0);
 }
 function previewImportStock(){
   const rows=parseImportStock();
@@ -2012,17 +2027,22 @@ function previewImportStock(){
   const c=document.getElementById('imp-st-preview');
   if(!rows.length){c.innerHTML='';return}
   c.innerHTML=`<div style="font-size:11px;color:var(--gray);margin-bottom:6px"><b>${rows.length}</b> filas · <span style="color:#1A3D27">${ok} válidas</span>${sin?` · <span style="color:#b3261e">${sin} sin maestro (se omiten)</span>`:''}</div>
-    <table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f7f9fb"><th style="padding:4px 6px;text-align:left">Matrícula</th><th style="padding:4px 6px;text-align:left">Descripción</th><th style="padding:4px 6px">Sector</th><th style="padding:4px 6px;text-align:right">Cantidad</th><th style="padding:4px 6px">Estado</th></tr></thead><tbody>${rows.slice(0,25).map(r=>`<tr style="border-top:1px solid #eef1f3;${r.encontrado?'':'background:#fde7e5'}"><td style="padding:3px 6px"><code>${r.matricula}</code></td><td style="padding:3px 6px">${r.descripcion}</td><td style="padding:3px 6px;text-align:center">${r.sector||'—'}</td><td style="padding:3px 6px;text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td style="padding:3px 6px;text-align:center">${r.encontrado?'✓':'⚠'}</td></tr>`).join('')}</tbody></table>${rows.length>25?`<div style="font-size:11px;color:var(--gray);text-align:center;padding:4px">... y ${rows.length-25} más</div>`:''}`;
+    <table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f7f9fb"><th style="padding:4px 6px;text-align:left">Matrícula</th><th style="padding:4px 6px;text-align:left">Descripción</th><th style="padding:4px 6px;text-align:right">Stock WMS</th><th style="padding:4px 6px;text-align:right">Stock físico</th><th style="padding:4px 6px;text-align:right">Ajuste</th><th style="padding:4px 6px">Estado</th></tr></thead><tbody>${rows.slice(0,30).map(r=>{const ajColor=r.ajuste>0?'#1A3D27':r.ajuste<0?'#b3261e':'var(--gray)';const ajSign=r.ajuste>0?'+':'';return`<tr style="border-top:1px solid #eef1f3;${r.encontrado?'':'background:#fde7e5'}"><td style="padding:3px 6px"><code>${r.matricula}</code></td><td style="padding:3px 6px">${r.descripcion}</td><td style="padding:3px 6px;text-align:right">${fmtNum(r.stockActual)}</td><td style="padding:3px 6px;text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td style="padding:3px 6px;text-align:right;color:${ajColor};font-weight:600">${r.ajuste===0?'—':ajSign+fmtNum(r.ajuste)}</td><td style="padding:3px 6px;text-align:center">${r.encontrado?(r.ajuste===0?'✓ OK':'🔄'):'⚠'}</td></tr>`}).join('')}</tbody></table>${rows.length>30?`<div style="font-size:11px;color:var(--gray);text-align:center;padding:4px">... y ${rows.length-30} más</div>`:''}`;
 }
 function confirmImportStock(){
-  const rows=parseImportStock().filter(r=>r.encontrado);
-  if(!rows.length){toast('No hay stock válido para cargar (revisá que las matrículas estén en el maestro)','err');return}
-  if(!confirm(`¿Cargar ${rows.length} ingresos de stock inicial? Esto NO se puede deshacer en bloque (debés borrar uno por uno).`))return;
+  const rows=parseImportStock().filter(r=>r.encontrado&&r.ajuste!==0);
+  if(!rows.length){toast('No hay ajustes necesarios — el stock ya coincide ✓');closeModal();return}
+  const pos=rows.filter(r=>r.ajuste>0).length;const neg=rows.filter(r=>r.ajuste<0).length;
+  if(!confirm(`¿Ajustar stock de ${rows.length} materiales?\n${pos?pos+' con ingreso de ajuste (+)\n':''}${neg?neg+' con despacho de ajuste (−)\n':''}El stock quedará igual al físico.`))return;
   const fecha=today();
   rows.forEach(r=>{
-    DB.add('ingresos',{fecha,proveedor:'CARGA INICIAL',remitoOrigen:'INV-INICIAL',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector,obs:'Carga masiva inicial'});
+    if(r.ajuste>0){
+      DB.add('ingresos',{fecha,proveedor:'AJUSTE STOCK',remitoOrigen:'AJUSTE-'+fecha,items:[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.ajuste,sector:r.sector}],obs:'Ajuste para igualar stock físico'});
+    }else{
+      DB.add('despachos',{fecha,solicitud:'AJUSTE',items:[{matricula:r.matricula,descripcion:r.descripcion,cantidad:Math.abs(r.ajuste),sector:r.sector}],obs:'Ajuste para igualar stock físico'});
+    }
   });
-  closeModal();toast(`✓ ${rows.length} ingresos registrados`);go('ingresos');
+  closeModal();toast(`✓ ${rows.length} ajustes aplicados — stock igualado al físico`);go('ingresos');
 }
 
 // ─── GENERIC CRUD (supervisores, cuadrillas, sectores, proveedores) ──
@@ -2642,7 +2662,7 @@ SCREENS.ingresos=()=>{
   const cols=editable?9:8;
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">⬇️</div><div><h1>Ingresos de Material</h1><p>Recepción desde Edenor u otras contratistas</p></div></div>
-    <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="addIngreso()">＋ Registrar ingreso</button><button class="btn" onclick="importIngresoMasivo()">📥 Ingreso masivo</button>${canEditMaestro()?'<button class="btn" onclick="importStockMasivo()">📥 Carga inicial de stock</button>':''}</div>
+    <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="addIngreso()">＋ Registrar ingreso</button><button class="btn" onclick="importIngresoMasivo()">📥 Ingreso masivo</button>${canEditMaestro()?'<button class="btn" onclick="importStockMasivo()">📥 Ajuste de stock físico</button>':''}</div>
     <div class="tablewrap"><table>
       <thead><tr><th>ID</th><th>Fecha</th><th>Proveedor</th><th>Remito</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Sector</th>${editable?'<th class="th-acc">Acc.</th>':''}</tr></thead>
       <tbody>${tbody||`<tr><td colspan="${cols}" class="empty">Sin registros</td></tr>`}</tbody>
