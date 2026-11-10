@@ -3695,6 +3695,7 @@ function renderNotifPanel(){
   const mine=myNotifs().slice(0,60);
   const perm=('Notification'in window)&&Notification.permission==='default';
   document.getElementById('notif-panel').innerHTML=`<div class="np-head">🔔 Notificaciones<a onclick="markAllRead()">Marcar todas como leídas</a></div>
+    ${mine.length?`<div style="padding:4px 14px;text-align:right"><a onclick="clearAllNotifs()" style="font-size:11px;color:#b3261e;cursor:pointer;font-weight:600">🗑 Borrar todas</a></div>`:''}
     ${perm?`<div style="padding:8px 14px;font-size:11px;background:#fff8e6;border-bottom:1px solid #f1dfb0">¿Avisos también en el escritorio? <a style="color:var(--edenor);font-weight:700;cursor:pointer" onclick="Notification.requestPermission().then(renderNotifPanel)">Activar</a></div>`:''}
     <div class="np-list">${mine.length?mine.map(n=>`<div class="np-item ${n.leida?'':'unread'}" onclick="openNotif(${n.id})">
       <div class="np-ic">${n.icon}</div><div style="flex:1"><div class="np-txt">${n.texto}</div><div class="np-time">${fmtFechaHora(n.fecha)}</div></div>${n.leida?'':'<div class="np-dot"></div>'}
@@ -3710,6 +3711,14 @@ document.addEventListener('click',()=>{const p=document.getElementById('notif-pa
 function markAllRead(){
   const all=DB.getAll('notificaciones');all.forEach(n=>{if(n.para===currentUser.id)n.leida=true});
   DB.save('notificaciones',all);renderNotifPanel();refreshBell();
+}
+function clearAllNotifs(){
+  if(!confirm('¿Borrar todas las notificaciones? Se libera espacio en memoria.'))return;
+  const all=DB.getAll('notificaciones');
+  const keep=all.filter(n=>n.para!==currentUser.id);
+  DB.save('notificaciones',keep);
+  renderNotifPanel();refreshBell();
+  toast('Notificaciones borradas ✓');
 }
 function openNotif(id){
   const all=DB.getAll('notificaciones');const n=all.find(x=>x.id===id);if(!n)return;
