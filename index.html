@@ -1772,7 +1772,8 @@ const POST_RENDER={
   nuevasol:()=>{renderNsItemsList();nsObraChanged()},
   medingreso:()=>{miItems=[];document.getElementById('mi-serie')?.focus()},
   medsalida:()=>{msItems=[];document.getElementById('ms-serie')?.focus()},
-  meddevol:()=>{mdItems=[];document.getElementById('md-serie')?.focus()}
+  meddevol:()=>{mdItems=[];document.getElementById('md-serie')?.focus()},
+  stockfull:()=>{filtrarStockFull()}
 };
 
 // ─── HOME ────────────────────────────────
@@ -2197,14 +2198,14 @@ SCREENS.obras=()=>{
     <td>${r.pep||'<span class="um">—</span>'}</td><td>${r.pedido||'<span class="um">—</span>'}</td><td>${r.grafo||'<span class="um">—</span>'}</td>
     <td>${r.inspector||'<span class="um">—</span>'}</td>
     <td>${pillEstado(r.estado)}</td>
-    ${canEditMaestro()?`<td class="act-btns"><button onclick="editObra(${r.id})">✏️</button><button onclick="delRecord('obras',${r.id},'obras')">🗑️</button></td>`:''}
+    ${can('obras')?`<td class="act-btns"><button onclick="editObra(${r.id})">✏️</button><button onclick="delRecord('obras',${r.id},'obras')">🗑️</button></td>`:''}
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🏗️</div><div><h1>Maestro de Obras</h1><p>PEP / Pedido / Grafo según el área seleccionada</p></div></div>
-    <div class="toolbar">${canEditMaestro()?'<button class="btn primary" onclick="addObra()">＋ Nueva obra</button>':''}</div>
+    <div class="toolbar">${can('obras')?'<button class="btn primary" onclick="addObra()">＋ Nueva obra</button>':''}</div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Obra</th><th>Área</th><th>Región</th><th>PEP</th><th>Pedido</th><th>Grafo</th><th>Inspector</th><th>Estado</th>${canEditMaestro()?'<th class="th-acc">Acc.</th>':''}</tr></thead>
-      <tbody>${tbody||'<tr><td colspan="'+(canEditMaestro()?10:9)+'" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Obra</th><th>Área</th><th>Región</th><th>PEP</th><th>Pedido</th><th>Grafo</th><th>Inspector</th><th>Estado</th>${can('obras')?'<th class="th-acc">Acc.</th>':''}</tr></thead>
+      <tbody>${tbody||'<tr><td colspan="'+(can('obras')?10:9)+'" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -2234,7 +2235,20 @@ function addObra(){
 function saveObra(editId){
   const d={nombre:document.getElementById('o-nombre').value.trim(),area:document.getElementById('o-area').value,region:document.getElementById('o-region').value,pep:(document.getElementById('o-pep')||{}).value||'',pedido:(document.getElementById('o-pedido')||{}).value||'',grafo:(document.getElementById('o-grafo')||{}).value||'',inspector:(document.getElementById('o-inspector')||{}).value||'',estado:document.getElementById('o-estado').value};
   if(!d.nombre){toast('El nombre es obligatorio','err');return}
-  if(editId)DB.update('obras',editId,d);else DB.add('obras',d);
+  if(editId){
+    const old=DB.get('obras',editId);
+    const oldName=old?old.nombre:'';
+    DB.update('obras',editId,d);
+    if(oldName&&oldName!==d.nombre){
+      // Renombrar obra en todos los movimientos
+      ['despachos','devoluciones','ingresos','traspcontra','solicitudes'].forEach(t=>{
+        const arr=DB.getAll(t);let changed=false;
+        arr.forEach(r=>{if(r.obra===oldName){r.obra=d.nombre;changed=true}});
+        if(changed)DB.save(t,arr);
+      });
+      toast(`Obra renombrada en todos los movimientos`);
+    }
+  }else DB.add('obras',d);
   autoExportMaestros();
   closeModal();toast('Obra guardada');go('obras');
 }
@@ -4731,10 +4745,49 @@ SCREENS.stockfull=()=>{
   mats.forEach(m=>{stock[String(m.matricula)]={mat:m,ing:0,des:0,dev:0,tc:0}});
   ingresos.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(stock[k])stock[k].ing+= +it.cantidad||0}));
   despachos.forEach(d=>{(d.items||[]).forEach(it=>{const k=String(it.matricula);if(stock[k])stock[k].des+= +it.cantidad||0})});
-  devoluciones.forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(stock[k]&&it.estado==='Bueno – reingresa')stock[k].dev+= +it.cantidad||0}));
+  devoluciones.forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(stock[k]&&it.estado==='Bueno – reingresa')stock[k].dev+= +it.cantidad||0})});
   traspContra.forEach(r=>{const k=String(r.matricula);if(stock[k])stock[k].tc+= +r.cantidad||0});
 
-  let tbody=Object.values(stock).map(s=>{
+  const sectores=[...new Set(mats.map(m=>m.sector).filter(Boolean))].sort();
+  window._sfRows=Object.values(stock);
+
+  return `<div class="screen on" style="display:block">
+    <div class="shead"><div class="sicon">📊</div><div><h1>Stock Completo</h1><p>Ingresos − Despachos + Devoluciones − Traspasos contratista</p></div></div>
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <input id="sf-buscar" type="text" placeholder="🔎 Buscar matrícula o descripción…" oninput="filtrarStockFull()" style="flex:1;min-width:200px;padding:7px 12px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">
+      <select id="sf-sector" onchange="filtrarStockFull()" style="padding:7px 12px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">
+        <option value="">Todos los sectores</option>
+        ${sectores.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <select id="sf-estado" onchange="filtrarStockFull()" style="padding:7px 12px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">
+        <option value="">Todos</option>
+        <option value="bajo">Stock bajo</option>
+        <option value="ok">Stock OK</option>
+        <option value="cero">Sin stock (0)</option>
+      </select>
+    </div>
+    <div id="sf-count" style="font-size:11px;color:var(--gray);margin-bottom:6px"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Matrícula</th><th>Descripción</th><th>Unidad</th><th>Sector</th><th>Stock</th><th>Estado</th></tr></thead>
+      <tbody id="sf-tbody"></tbody>
+    </table></div>
+  </div>`;
+}
+function filtrarStockFull(){
+  const q=(document.getElementById('sf-buscar').value||'').toLowerCase();
+  const sec=document.getElementById('sf-sector').value;
+  const est=document.getElementById('sf-estado').value;
+  const rows=(window._sfRows||[]).filter(s=>{
+    const total=s.ing-s.des+s.dev-s.tc;
+    const isLow=total<=s.mat.stockMin;
+    if(q&&!(String(s.mat.matricula).toLowerCase().includes(q)||((s.mat.descripcion||'').toLowerCase().includes(q))))return false;
+    if(sec&&s.mat.sector!==sec)return false;
+    if(est==='bajo'&&!isLow)return false;
+    if(est==='ok'&&isLow)return false;
+    if(est==='cero'&&total!==0)return false;
+    return true;
+  });
+  document.getElementById('sf-tbody').innerHTML=rows.map(s=>{
     const total=s.ing-s.des+s.dev-s.tc;
     const isLow=total<=s.mat.stockMin;
     return `<tr>
@@ -4743,15 +4796,8 @@ SCREENS.stockfull=()=>{
       <td><b>${fmtNum(total)}</b></td>
       <td>${isLow?'<span class="pill r2">Bajo</span>':'<span class="pill ok">OK</span>'}</td>
     </tr>`;
-  }).join('');
-
-  return `<div class="screen on" style="display:block">
-    <div class="shead"><div class="sicon">📊</div><div><h1>Stock Completo</h1><p>Ingresos − Despachos + Devoluciones − Traspasos contratista</p></div></div>
-    <div class="tablewrap"><table>
-      <thead><tr><th>Matrícula</th><th>Descripción</th><th>Unidad</th><th>Sector</th><th>Stock</th><th>Estado</th></tr></thead>
-      <tbody>${tbody}</tbody>
-    </table></div>
-  </div>`;
+  }).join('')||'<tr><td colspan="6" class="empty">Sin resultados</td></tr>';
+  document.getElementById('sf-count').textContent=`Mostrando ${rows.length} de ${(window._sfRows||[]).length} materiales`;
 };
 
 // ─── MOVIMIENTOS POR OBRA ────────────────
