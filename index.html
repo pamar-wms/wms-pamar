@@ -4005,7 +4005,7 @@ function canDeleteSol(){return ['super','gerencial','admin'].includes(currentUse
 function canEditSol(s){
   if(['super','gerencial','admin','jefedep'].includes(currentUser.rol))return true;
   /* Supervisores pueden editar sus propias solicitudes antes de que se preparen */
-  if(currentUser.rol==='sup'&&s&&[EST_APROB,'Pendiente'].includes(s.estado)&&s.supervisor===currentUser.nombre)return true;
+  if(currentUser.rol==='sup'&&s&&[EST_APROB,'Pendiente'].includes(s.estado)&&esMia(s))return true;
   return false;
 }
 function delSolicitud(id){
