@@ -2592,6 +2592,14 @@ function addReserva(){
       <div class="field wide"><label>Observaciones</label><input id="res-obs" placeholder="Opcional"></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn ghost" onclick="toggleResPaste()" id="res-paste-btn" style="font-size:11px">📋 Pegar desde Excel / SAP</button>
+    </div>
+    <div id="res-paste-zone" style="display:none;margin-bottom:10px;border:2px dashed var(--line);border-radius:8px;padding:10px;background:#f7f9fb">
+      <label style="font-size:11px;color:var(--gray);display:block;margin-bottom:4px">Pegá filas copiadas de Excel o SAP (Matrícula + Cantidad por fila, separadas por tab/espacio):</label>
+      <textarea id="res-paste-area" rows="5" placeholder="Ej:&#10;1891&#9;3&#10;503&#9;10&#10;283&#9;50" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:8px;font-family:monospace;font-size:12px;resize:vertical"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center"><button class="btn primary" onclick="resParsePaste()" style="font-size:12px">✔ Procesar pegado</button><span style="font-size:10px;color:var(--gray)">Acepta: Matrícula TAB Cantidad — o — Matrícula TAB Descripción TAB Cantidad</span></div>
+    </div>
     <div style="display:grid;grid-template-columns:110px 1fr 80px;gap:6px;align-items:end;margin-bottom:8px">
       <div><label style="font-size:10px;color:var(--gray)">Matrícula</label><input id="res-mat-inp" placeholder="Matrícula" oninput="resMatAuto()" onkeydown="if(event.key==='Enter'){event.preventDefault();resMatEnter()}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:13px"></div>
       <div><label style="font-size:10px;color:var(--gray)">Descripción</label><input id="res-desc-inp" readonly placeholder="—" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;background:#f0f2f4"></div>
@@ -2612,6 +2620,47 @@ function resObraKey(e){if(e.key==='Escape')document.getElementById('res-obra-lis
 function resObraPick(nombre){
   document.getElementById('res-obra').value=nombre;
   document.getElementById('res-obra-list').style.display='none';
+}
+function toggleResPaste(){
+  const z=document.getElementById('res-paste-zone');
+  z.style.display=z.style.display==='none'?'block':'none';
+  if(z.style.display==='block')document.getElementById('res-paste-area').focus();
+}
+function resParsePaste(){
+  const raw=document.getElementById('res-paste-area').value.trim();
+  if(!raw){toast('Pegá datos primero','err');return}
+  const lines=raw.split(/\n/).map(l=>l.trim()).filter(l=>l);
+  let added=0,errors=[];
+  lines.forEach((line,i)=>{
+    // Separar por tab, punto y coma, o múltiples espacios
+    const parts=line.split(/\t|;/).map(p=>p.trim()).filter(p=>p);
+    let mat='',cant=0;
+    if(parts.length>=3){
+      // Matrícula | Descripción | Cantidad (ignora descripción, busca del maestro)
+      mat=parts[0].replace(/\D/g,'');cant=parseFloat(parts[parts.length-1])||0;
+    } else if(parts.length===2){
+      // Matrícula | Cantidad
+      mat=parts[0].replace(/\D/g,'');cant=parseFloat(parts[1])||0;
+    } else if(parts.length===1){
+      // Intentar separar por espacios: "1891 3"
+      const sp=parts[0].split(/\s+/);
+      if(sp.length>=2){mat=sp[0].replace(/\D/g,'');cant=parseFloat(sp[sp.length-1])||0}
+    }
+    if(!mat){errors.push('Línea '+(i+1)+': sin matrícula');return}
+    if(cant<=0){errors.push('Línea '+(i+1)+' ('+mat+'): sin cantidad');return}
+    const desc=matLookup(mat);
+    if(!desc){errors.push('Línea '+(i+1)+': matrícula '+mat+' no encontrada');return}
+    // Si ya existe la matrícula, sumar cantidad
+    const exist=resItems.find(x=>x.matricula===mat);
+    if(exist){exist.cantidad+=cant}
+    else{resItems.push({matricula:mat,descripcion:desc,cantidad:cant})}
+    added++;
+  });
+  renderResItemsList();
+  document.getElementById('res-paste-area').value='';
+  document.getElementById('res-paste-zone').style.display='none';
+  if(added)toast('✔ '+added+' material(es) agregado(s)');
+  if(errors.length)toast('⚠ '+errors.length+' línea(s) con error:\n'+errors.slice(0,5).join('\n'),'err');
 }
 function resMatAuto(){
   const v=document.getElementById('res-mat-inp').value.trim();
