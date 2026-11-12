@@ -6098,8 +6098,29 @@ function repararDespachosOyD(){
   const sols=DB.getAll('solicitudes');
   const obras=DB.getAll('obras');
   let reparadas=0;
-  // 1) Reparar solicitudes que aún existen en localStorage (OyD + DM)
+  // Helper: resolver nombre de obra actual (el CSV puede tener nombre viejo)
+  function resolverObra(nombreViejo){
+    if(!nombreViejo)return nombreViejo;
+    const exacta=obras.find(x=>x.nombre===nombreViejo);
+    if(exacta)return exacta.nombre;
+    // Buscar por código numérico (ej: "2 · 5765" → buscar obra que contenga "5765")
+    const nums=nombreViejo.match(/\d{4,}/);
+    if(nums){const match=obras.find(x=>x.nombre.includes(nums[0]));if(match)return match.nombre;}
+    return nombreViejo;
+  }
+  // 0) Corregir despachos existentes con nombre de obra viejo
+  const allDesp=DB.getAll('despachos');
+  allDesp.forEach(d=>{
+    const actual=resolverObra(d.obra);
+    if(actual!==d.obra)DB.update('despachos',d.id,{obra:actual});
+  });
+  // También corregir solicitudes con nombre de obra viejo
   sols.forEach(s=>{
+    if(s.obra){const actual=resolverObra(s.obra);if(actual!==s.obra)DB.update('solicitudes',s.id,{obra:actual})}
+  });
+  // 1) Reparar solicitudes que aún existen en localStorage (OyD + DM)
+  const solsRefresh=DB.getAll('solicitudes');
+  solsRefresh.forEach(s=>{
     if(s.estado!=='Entregado')return;
     if(s.despachoId)return;
     const yaExiste=DB.getAll('despachos').find(d=>d.solicitud===s.codigo);
@@ -6167,10 +6188,11 @@ function repararDespachosOyD(){
   const despExist=DB.getAll('despachos');
   historicos.forEach(h=>{
     if(despExist.find(d=>d.solicitud===h.codigo))return; // ya existe
-    const o=obras.find(x=>x.nombre===h.obra)||{};
+    const obraActual=resolverObra(h.obra);
+    const o=obras.find(x=>x.nombre===obraActual)||{};
     const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
     DB.save('config',{...cfg,remitoSeq:seq});
-    DB.add('despachos',{fecha:h.fecha,fechaHora:h.fecha+'T08:00:00',obra:h.obra,area:h.area,region:o.region||'',cuadrilla:h.cuadrilla,supervisor:h.supervisor,remito,items:h.items,solicitud:h.codigo,reparado:true});
+    DB.add('despachos',{fecha:h.fecha,fechaHora:h.fecha+'T08:00:00',obra:obraActual,area:h.area,region:o.region||'',cuadrilla:h.cuadrilla,supervisor:h.supervisor,remito,items:h.items,solicitud:h.codigo,reparado:true});
     reparadas++;
   });
   if(reparadas>0){
