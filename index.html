@@ -4002,7 +4002,12 @@ function solItemsDet(s){
     .sort((a,b)=>a.sector.localeCompare(b.sector,'es',{numeric:true})||String(a.matricula).localeCompare(String(b.matricula),'es',{numeric:true}));
 }
 function canDeleteSol(){return ['super','gerencial','admin'].includes(currentUser.rol)}
-function canEditSol(){return ['super','gerencial','admin','jefedep'].includes(currentUser.rol)}
+function canEditSol(s){
+  if(['super','gerencial','admin','jefedep'].includes(currentUser.rol))return true;
+  /* Supervisores pueden editar sus propias solicitudes antes de que se preparen */
+  if(currentUser.rol==='sup'&&s&&[EST_APROB,'Pendiente'].includes(s.estado)&&s.supervisor===currentUser.nombre)return true;
+  return false;
+}
 function delSolicitud(id){
   if(!confirm('¿Eliminar esta solicitud?'))return;
   const s=DB.get('solicitudes',id);
@@ -4065,7 +4070,7 @@ function guardarEdSol(id){
 function solActionBtns(s,inModal){
   const st=s.estado,stop='event.stopPropagation();',cm=inModal?'closeModal();':'';
   const delBtn=canDeleteSol()?` <button onclick="${stop}${cm}delSolicitud(${s.id})" title="Eliminar" style="background:#c53727;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🗑️</button>`:'';
-  const editBtn=canEditSol()&&[EST_APROB,'Pendiente','En preparación'].includes(st)?` <button onclick="${stop}${cm}editarSolicitud(${s.id})" title="Editar solicitud" style="background:#e8a838;color:#2a1a00;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button>`:'';
+  const editBtn=canEditSol(s)&&[EST_APROB,'Pendiente','En preparación'].includes(st)?` <button onclick="${stop}${cm}editarSolicitud(${s.id})" title="Editar solicitud" style="background:#e8a838;color:#2a1a00;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button>`:'';
   if(st===EST_APROB){const apb=canAprobar(s)?`<button class="pr" onclick="${stop}${cm}aprobarSol(${s.id})">✔ Aprobar</button><button onclick="${stop}${cm}rechazarSol(${s.id})">✕ Rechazar</button>`:'';return apb+editBtn+delBtn}
   if(['Pendiente','En preparación','Listo'].includes(st)&&!can('despachos'))return editBtn+delBtn;
   if(st==='Pendiente')return `<button class="pr" onclick="${stop}imprimirSolicitud(${s.id})">🖨️ Imprimir picking</button>`+editBtn+delBtn;
