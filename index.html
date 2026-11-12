@@ -3096,13 +3096,24 @@ function despCantEnter(){
   const item={matricula:mat,descripcion:desc,cantidad:cant};
   if(bi&&bi.value.trim())item.nBobina=bi.value.trim();
   if(ei&&ei.value.trim())item.nEdenor=ei.value.trim();
-  /* Alerta si material no está en la reserva de la obra */
+  /* Bloqueo por reserva: solo se despacha lo que está reservado */
   const obraInp=document.getElementById('d-obra');
-  if(obraInp&&obraInp.value.trim()){
+  const areaDespSel=document.getElementById('d-area-sel');
+  const areaDespVal=areaDespSel?areaDespSel.value:'Obra y Distribución';
+  const noReqReserva=areaDespVal==='Dime Mide'; // Dime Mide no tiene obra → no aplica reserva
+  if(!noReqReserva&&obraInp&&obraInp.value.trim()){
     const reserva=getReservaObra(obraInp.value.trim());
-    if(reserva){
-      const enReserva=reserva.items.some(ri=>ri.matricula===mat);
-      if(!enReserva){toast('⚠ '+mat+' no está en la reserva de esta obra','err')}
+    if(!reserva){toast('🚫 No hay reserva cargada para esta obra. Cargá una reserva primero.','err');return}
+    const ri=reserva.items.find(r=>String(r.matricula)===String(mat));
+    if(!ri){toast('🚫 Matrícula '+mat+' no está en la reserva de esta obra','err');return}
+    // Sumar lo ya cargado en despItems para esta matrícula
+    const yaCargado=despItems.filter(x=>x.matricula===mat).reduce((s,x)=>s+x.cantidad,0);
+    // Sumar lo ya despachado antes para esta obra+matrícula
+    const yaDesp=DB.getAll('despachos').filter(d=>d.obra===obraInp.value.trim()).reduce((s,d)=>{return s+(d.items||[]).filter(x=>String(x.matricula)===String(mat)).reduce((ss,x)=>ss+x.cantidad,0)},0);
+    const disponible=ri.cantidad-yaDesp-yaCargado;
+    if(cant>disponible){
+      if(disponible<=0){toast('🚫 Matrícula '+mat+': ya se despachó toda la cantidad reservada ('+ri.cantidad+')','err');return}
+      toast('🚫 Matrícula '+mat+': pedís '+cant+' pero solo quedan '+disponible+' en reserva (reservado: '+ri.cantidad+', ya despachado: '+yaDesp+')','err');return;
     }
   }
   despItems.push(item);
@@ -3148,6 +3159,20 @@ function saveDespacho(){
   }
   const validItems=despItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
+  /* Validación final de reserva antes de guardar */
+  if(!isDime&&obraNombre){
+    const reserva=getReservaObra(obraNombre);
+    if(!reserva){toast('🚫 No hay reserva cargada para esta obra. No se puede despachar.','err');return}
+    const despPrevios=DB.getAll('despachos').filter(d=>d.obra===obraNombre);
+    const errores=[];
+    validItems.forEach(it=>{
+      const ri=reserva.items.find(r=>String(r.matricula)===String(it.matricula));
+      if(!ri){errores.push(it.matricula+' no está en la reserva');return}
+      const yaDesp=despPrevios.reduce((s,d)=>s+(d.items||[]).filter(x=>String(x.matricula)===String(it.matricula)).reduce((ss,x)=>ss+x.cantidad,0),0);
+      if(it.cantidad>(ri.cantidad-yaDesp)){errores.push(it.matricula+': excede reserva (reservado '+ri.cantidad+', ya despachado '+yaDesp+', pedido '+it.cantidad+')')}
+    });
+    if(errores.length){toast('🚫 No se puede despachar:\n'+errores.join('\n'),'err');return}
+  }
   const cfg=DB.getAll('config');
   let seq=(cfg.remitoSeq||0)+1;
   const remito='R-'+String(seq).padStart(7,'0');
