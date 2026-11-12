@@ -6071,12 +6071,16 @@ function verificarEntrega(id){
   if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('verif-nroDoc').focus();return}
   if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('verif-nroRes').focus();return}
   const s=DB.get('solicitudes',id);if(!s)return;
-  // Propagar a cada item para que aparezca en consulta personalizada
   const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
-  // Generar despacho y afectar stock en el momento de la verificación
-  const rem=generarRemitoEntrega(s);
-  DB.update('solicitudes',id,{nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal(),remito:rem.remito,despachoId:rem.desp.id});
-  toast('✔ Verificación guardada y stock actualizado — Doc: '+nroDoc+' / Reserva: '+nroRes);
+  const upd={nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()};
+  // Solo generar despacho si la solicitud NO tiene remito previo (evita duplicar stock)
+  if(!s.remito){
+    const rem=generarRemitoEntrega(s);
+    upd.remito=rem.remito;
+    upd.despachoId=rem.desp.id;
+  }
+  DB.update('solicitudes',id,upd);
+  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
   closeModal();go('solicitudes');
 }
 function cerrarSolicitud(id){
