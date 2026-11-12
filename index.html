@@ -484,7 +484,7 @@ const DB={
   save(t,d){localStorage.setItem(this._k(t),JSON.stringify(d));if(SP&&SP.ready)SP.pushTable(t);},
   add(t,r){const d=this.getAll(t);r.id=this.nextId(t);r.creado=new Date().toISOString();d.push(r);this.save(t,d);return r},
   update(t,id,changes){const d=this.getAll(t);const i=d.findIndex(r=>r.id==id);if(i<0)return null;Object.assign(d[i],changes);this.save(t,d);return d[i]},
-  del(t,id){const d=this.getAll(t).filter(r=>r.id!==id);this.save(t,d)},
+  del(t,id){const d=this.getAll(t).filter(r=>r.id!=id);this.save(t,d)},
   get(t,id){return this.getAll(t).find(r=>r.id==id)||null},
   nextId(t){const d=this.getAll(t);if(!d.length)return 1;return Math.max(...d.map(r=>r.id))+1},
   count(t){return this.getAll(t).length}
@@ -2240,12 +2240,16 @@ function saveObra(editId){
     const oldName=old?old.nombre:'';
     DB.update('obras',editId,d);
     if(oldName&&oldName!==d.nombre){
-      // Renombrar obra en todos los movimientos
-      ['despachos','devoluciones','ingresos','traspcontra','solicitudes'].forEach(t=>{
+      // Renombrar obra en todos los movimientos (incluye reservas)
+      ['despachos','devoluciones','ingresos','traspcontra','solicitudes','reservas'].forEach(t=>{
         const arr=DB.getAll(t);let changed=false;
         arr.forEach(r=>{if(r.obra===oldName){r.obra=d.nombre;changed=true}});
         if(changed)DB.save(t,arr);
       });
+      // Traspasos usan obraOrigen / obraDestino
+      {const arr=DB.getAll('traspasos');let changed=false;
+       arr.forEach(r=>{if(r.obraOrigen===oldName){r.obraOrigen=d.nombre;changed=true}if(r.obraDestino===oldName){r.obraDestino=d.nombre;changed=true}});
+       if(changed)DB.save('traspasos',arr);}
       toast(`Obra renombrada en todos los movimientos`);
     }
   }else DB.add('obras',d);
@@ -2700,7 +2704,7 @@ function resMatEnter(){
 function resCantEnter(){
   const mi=document.getElementById('res-mat-inp');
   const ci=document.getElementById('res-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -2783,9 +2787,19 @@ function editReserva(id){
     <div class="modal-foot"><button class="btn ghost" onclick="editingReservaId=null;closeModal()">Cancelar</button><button class="btn primary" onclick="saveReserva()">💾 Guardar cambios</button></div>`);
   renderResItemsList();
 }
-/* Función helper: busca reserva activa para una obra */
+/* Función helper: busca reserva activa para una obra.
+   Si hay varias reservas para la misma obra, fusiona los ítems sumando cantidades por matrícula. */
 function getReservaObra(obraNombre){
-  return DB.getAll('reservas').find(r=>r.obra===obraNombre);
+  const rs=DB.getAll('reservas').filter(r=>r.obra===obraNombre);
+  if(!rs.length)return null;
+  if(rs.length===1)return rs[0];
+  const map={};
+  rs.forEach(r=>(r.items||[]).forEach(it=>{
+    const k=String(it.matricula);
+    if(map[k])map[k].cantidad+=it.cantidad;
+    else map[k]={...it};
+  }));
+  return {obra:obraNombre,items:Object.values(map),fusionada:true};
 }
 
 // ─── INGRESOS ────────────────────────────
@@ -2858,7 +2872,7 @@ function ingMatEnter(){
 function ingCantEnter(){
   const mi=document.getElementById('i-mat-inp');
   const ci=document.getElementById('i-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -3151,7 +3165,7 @@ function despMatEnter(){
 function despCantEnter(){
   const mi=document.getElementById('d-mat-inp');
   const ci=document.getElementById('d-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -3287,11 +3301,13 @@ function saveEditDespacho(id){
   const validItems=despItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const r=DB.get('despachos',id);if(!r){toast('No encontrado','err');return}
-  r.fecha=document.getElementById('d-fecha').value;
-  r.cuadrilla=document.getElementById('d-cuad').value;
-  r.supervisor=document.getElementById('d-sup').value;
-  r.items=validItems;
-  DB.update('despachos',r);
+  const result=DB.update('despachos',id,{
+    fecha:document.getElementById('d-fecha').value,
+    cuadrilla:document.getElementById('d-cuad').value,
+    supervisor:document.getElementById('d-sup').value,
+    items:validItems
+  });
+  if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   closeModal();toast('Despacho actualizado');go('despachos');
 }
 function viewRemito(id,back){
@@ -3465,7 +3481,7 @@ function devMatEnter(){
 function devCantEnter(){
   const mi=document.getElementById('dv-mat-inp');
   const ci=document.getElementById('dv-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -3589,14 +3605,16 @@ function saveEditDevolucion(id){
   const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
-  r.fecha=document.getElementById('dv-fecha').value;
-  r.obra=(document.getElementById('dv-obra')||{}).value||'';
-  r.area=(document.getElementById('dv-area')||{}).value||'';
-  r.cuadrilla=(document.getElementById('dv-cuad')||{}).value||'';
-  r.supervisor=(document.getElementById('dv-sup')||{}).value||'';
-  r.obs=(document.getElementById('dv-obs')||{}).value||'';
-  r.items=validItems;
-  DB.update('devoluciones',r);
+  const result=DB.update('devoluciones',id,{
+    fecha:document.getElementById('dv-fecha').value,
+    obra:(document.getElementById('dv-obra')||{}).value||'',
+    area:(document.getElementById('dv-area')||{}).value||'',
+    cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',
+    supervisor:(document.getElementById('dv-sup')||{}).value||'',
+    obs:(document.getElementById('dv-obs')||{}).value||'',
+    items:validItems
+  });
+  if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   closeModal();toast('Devolución actualizada');go('devoluciones');
 }
 
@@ -3658,7 +3676,7 @@ function trMatEnter(){
 function trCantEnter(){
   const mi=document.getElementById('tr-mat-inp');
   const ci=document.getElementById('tr-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -3711,17 +3729,19 @@ function saveEditTraspaso(id){
   const origen=document.getElementById('tr-ed-origen').value;
   const destino=document.getElementById('tr-ed-destino').value;
   if(origen===destino){toast('Obra origen y destino no pueden ser iguales','err');return}
-  r.fecha=document.getElementById('tr-ed-fecha').value;
-  r.obraOrigen=origen;
-  r.obraDestino=destino;
-  r.autorizadoPor=document.getElementById('tr-ed-aut').value;
-  r.motivo=document.getElementById('tr-ed-motivo').value;
   const mat=document.getElementById('tr-ed-mat').value.trim();
   const desc=matLookup(mat);
-  r.matricula=mat;
-  r.descripcion=desc||r.descripcion||'';
-  r.cantidad=parseFloat(document.getElementById('tr-ed-cant').value)||0;
-  DB.update('traspasos',r);
+  const result=DB.update('traspasos',id,{
+    fecha:document.getElementById('tr-ed-fecha').value,
+    obraOrigen:origen,
+    obraDestino:destino,
+    autorizadoPor:document.getElementById('tr-ed-aut').value,
+    motivo:document.getElementById('tr-ed-motivo').value,
+    matricula:mat,
+    descripcion:desc||r.descripcion||'',
+    cantidad:parseFloat(document.getElementById('tr-ed-cant').value)||0
+  });
+  if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   closeModal();toast('Traspaso actualizado');go('traspasos');
 }
 
@@ -3781,7 +3801,7 @@ function tcMatEnter(){
 function tcCantEnter(){
   const mi=document.getElementById('tc-mat-inp');
   const ci=document.getElementById('tc-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -3827,16 +3847,18 @@ function editTraspContra(id){
 }
 function saveEditTraspContra(id){
   const r=DB.get('traspcontra',id);if(!r){toast('No encontrado','err');return}
-  r.fecha=document.getElementById('tc-ed-fecha').value;
-  r.contratista=document.getElementById('tc-ed-contra').value;
-  r.autorizadoPor=document.getElementById('tc-ed-aut').value;
-  r.obs=document.getElementById('tc-ed-obs').value;
   const mat=document.getElementById('tc-ed-mat').value.trim();
   const desc=matLookup(mat);
-  r.matricula=mat;
-  r.descripcion=desc||r.descripcion||'';
-  r.cantidad=parseFloat(document.getElementById('tc-ed-cant').value)||0;
-  DB.update('traspcontra',r);
+  const result=DB.update('traspcontra',id,{
+    fecha:document.getElementById('tc-ed-fecha').value,
+    contratista:document.getElementById('tc-ed-contra').value,
+    autorizadoPor:document.getElementById('tc-ed-aut').value,
+    obs:document.getElementById('tc-ed-obs').value,
+    matricula:mat,
+    descripcion:desc||r.descripcion||'',
+    cantidad:parseFloat(document.getElementById('tc-ed-cant').value)||0
+  });
+  if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   closeModal();toast('Traspaso contratista actualizado');go('traspcontra');
 }
 
@@ -3992,7 +4014,7 @@ function stockMap(){
   const S={};DB.getAll('materiales').forEach(m=>S[String(m.matricula)]=0);
   DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]+= +it.cantidad||0}));
   DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]-= +it.cantidad||0}));
-  DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(k in S&&it.estado==='Bueno – reingresa')S[k]+= +it.cantidad||0}));
+  DB.getAll('devoluciones').forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(k in S&&it.estado==='Bueno – reingresa')S[k]+= +it.cantidad||0})});
   DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(k in S)S[k]-= +r.cantidad||0});
   return S;
 }
@@ -4020,6 +4042,7 @@ function delSolicitud(id){
 }
 function editarSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(!canEditSol(s)&&!can('editarlisto')){toast('No tenés permiso para editar esta solicitud','err');return}
   const mats=DB.getAll('materiales');
   const itemRows=(s.items||[]).map((it,i)=>{
     const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};
@@ -4065,7 +4088,8 @@ function guardarEdSol(id){
   const result=DB.update('solicitudes',s.id,{items,obs:obsNueva,editadoPor:currentUser.nombre,fechaEdit:nowLocal()});
   if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   if(s.codigo) syncEstadoSheet(s.codigo, s.estado, items);
-  closeModal();toast('Solicitud '+s.codigo+' actualizada');go('solicitudes');
+  closeModal();toast('Solicitud '+s.codigo+' actualizada');
+  go(currentUser.permisos&&currentUser.permisos.includes('solicitudes')?'solicitudes':'missol');
 }
 function solActionBtns(s,inModal){
   const st=s.estado,stop='event.stopPropagation();',cm=inModal?'closeModal();':'';
@@ -4172,6 +4196,7 @@ function imprimirSolicitud(id){
   const o=DB.getAll('obras').find(x=>x.nombre===s.obra)||{};
   const its=solItemsDet(s);const pidio=s.pidioUsuario||s.supervisor;
   const w=window.open('','_blank');
+  if(!w){toast('El navegador bloqueó la ventana de impresión. Permití popups para este sitio.','err');return}
   w.document.write(`<html><head><title>${s.codigo} - Picking</title><style>
     body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#0f1f17;margin:24px}
     h1{font-size:18px;margin:0}.sub{color:#555;margin-bottom:14px}
@@ -4232,7 +4257,7 @@ function marcarListoSol(id){
 function verRemitoSol(remito){const d=DB.getAll('despachos').find(x=>x.remito===remito);if(d)viewRemito(d.id,'solicitudes');else toast('Remito no encontrado','err')}
 function confirmarEntrega(id){
   const s=DB.get('solicitudes',id);if(!s)return;
-  const itemsHtml=(s.items||[]).map(it=>`<tr><td>${it.matricula}</td><td>${it.descripcion}</td><td>${it.cantidad}</td><td>${it.unidad||'u'}</td></tr>`).join('');
+  const itemsHtml=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>`<tr><td>${it.matricula}</td><td>${it.descripcion}</td><td>${fmtNum(it.cantEntregada??it.cantidad)}</td><td>${it.unidad||'u'}</td></tr>`).join('');
   openModal(`<h3>✔ Confirmar entrega — ${s.codigo}</h3>
     <div style="font-size:12px;margin-bottom:12px;color:var(--gray)"><b>Obra:</b> ${s.obra} · <b>Supervisor:</b> ${s.supervisor}${s.remito?' · <b>'+s.remito+'</b>':''}</div>
     <table class="tbl" style="width:100%;font-size:11.5px;margin-bottom:14px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>UM</th></tr></thead><tbody>${itemsHtml}</tbody></table>
@@ -4673,6 +4698,7 @@ SCREENS.missol=()=>{
       <details class="ms-det"><summary>Ver materiales (${(s.items||[]).length})</summary>
         <table><thead><tr><th>Material</th><th style="text-align:right">Pedido</th><th style="text-align:right">A entregar</th></tr></thead><tbody>${its}</tbody></table>
       </details>
+      ${canEditSol(s)&&[EST_APROB,'Pendiente'].includes(s.estado)?`<div style="margin-top:8px"><button onclick="editarSolicitud(${s.id})" style="background:#e8a838;color:#2a1a00;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600">✏️ Modificar materiales</button></div>`:''}
     </div>`;
   }).join('');
   return `<div class="screen on" style="display:block">
@@ -4812,7 +4838,7 @@ function nsMatEnterQ(){
 function nsCantEnterQ(){
   const mi=document.getElementById('ns-mat-inp');
   const ci=document.getElementById('ns-cant-inp');
-  const mat=mi.value.trim(),cant=parseInt(ci.value)||0;
+  const mat=mi.value.trim(),cant=parseFloat(ci.value)||0;
   if(!mat||cant<=0){toast('Matrícula y cantidad requeridas','err');return}
   const desc=matLookup(mat);
   if(!desc){toast('Matrícula no encontrada','err');mi.select();return}
@@ -4968,6 +4994,10 @@ function queryMovObra(){
   moRows=[];
   DB.getAll('despachos').filter(d=>d.obra===obra).forEach(d=>{(d.items||[]).forEach(it=>{moRows.push({tipo:'Despacho',remito:d.remito||'',fecha:d.fecha,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,unidad:it.unidad||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||''})})});
   DB.getAll('devoluciones').filter(d=>d.obra===obra).forEach(d=>{(d.items||[{matricula:d.matricula,descripcion:d.descripcion,cantidad:d.cantidad,estado:d.estado}]).forEach(it=>{moRows.push({tipo:'Devolución',remito:'',fecha:d.fecha,matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,unidad:it.unidad||'',cuadrilla:'',supervisor:'',estado:it.estado||''})})});
+  DB.getAll('traspasos').forEach(t=>{
+    if(t.obraOrigen===obra)moRows.push({tipo:'Traspaso a '+(t.obraDestino||'—'),remito:'',fecha:t.fecha,matricula:t.matricula,descripcion:t.descripcion,cantidad:-(+t.cantidad||0),unidad:'',cuadrilla:'',supervisor:t.autorizadoPor||''});
+    if(t.obraDestino===obra)moRows.push({tipo:'Traspaso de '+(t.obraOrigen||'—'),remito:'',fecha:t.fecha,matricula:t.matricula,descripcion:t.descripcion,cantidad:+t.cantidad||0,unidad:'',cuadrilla:'',supervisor:t.autorizadoPor||''});
+  });
   moRows.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   let html=moRows.map(r=>{
     const neg=r.cantidad<0;
@@ -5212,22 +5242,6 @@ function medRefreshDetalle(){
     <td>${medEstadoPill(r.estado)}</td><td>${r.cuadrilla||'-'}</td>
     <td>${r.fechaIngreso||'-'}</td>
     <td class="act-btns"><button onclick="medHist('${r.serie}')" title="Historial">📜</button><button onclick="medEdit(${r.id})" title="Editar">✏️</button>${r.estado!=='En depósito'?`<button onclick="medRevertir(${r.id})" title="Revertir a depósito" style="color:#c53727">↩</button>`:''}</td>
-  </tr>`).join('');
-}
-
-function medFiltrar(){
-  const q=(document.getElementById('med-buscar').value||'').toLowerCase();
-  const est=document.getElementById('med-filtro-estado').value;
-  const rows=DB.getAll('medidores').filter(r=>{
-    if(est&&r.estado!==est)return false;
-    if(q&&!r.serie.toLowerCase().includes(q)&&!String(r.matricula).toLowerCase().includes(q)&&!(r.descripcion||'').toLowerCase().includes(q))return false;
-    return true;
-  });
-  document.getElementById('med-tbody').innerHTML=rows.map(r=>`<tr>
-    <td class="idcell">${r.id}</td><td class="idcell">${r.serie}</td><td>${r.matricula}</td><td>${r.descripcion||''}</td>
-    <td>${medEstadoPill(r.estado)}</td><td>${r.cuadrilla||'-'}</td>
-    <td>${r.fechaIngreso||'-'}</td><td>${r.fechaSalida||'-'}</td>
-    <td class="act-btns"><button onclick="medHist('${r.serie}')" title="Historial">📜</button><button onclick="medEdit(${r.id})" title="Editar">✏️</button><button onclick="if(confirm('¿Eliminar?'))medDel(${r.id})" title="Eliminar">🗑️</button></td>
   </tr>`).join('');
 }
 
@@ -6153,6 +6167,7 @@ function qlPrint(){
   runConsulta();
   const t=document.getElementById('ql-table');if(!t){toast('Ejecutá la consulta primero','err');return}
   const w=window.open('','_blank');
+  if(!w){toast('El navegador bloqueó la ventana de impresión. Permití popups para este sitio.','err');return}
   w.document.write(`<html><head><title>Consulta</title><style>body{font-family:Segoe UI,sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:4px 6px}th{background:#1A3D27;color:#fff}</style></head><body><h3>Consulta personalizada · ${QL_SRC[qlLast.st.fuente].label} · ${fmtDate(today())}</h3>${t.outerHTML}</body></html>`);
   w.document.close();w.focus();w.print();
 }
@@ -6252,6 +6267,13 @@ function repararDespachosOyD(){
     // Buscar por código numérico (ej: "2 · 5765" → buscar obra que contenga "5765")
     const nums=nombreViejo.match(/\d{4,}/);
     if(nums){const match=obras.find(x=>x.nombre.includes(nums[0]));if(match)return match.nombre;}
+    // Quitar prefijo "N · " y buscar por texto (ej: "5 · Puntuales Tigre" → "Puntuales Tigre")
+    const sinPref=nombreViejo.replace(/^\d+\s*·\s*/,'').trim();
+    if(sinPref&&sinPref!==nombreViejo){
+      const sp=sinPref.toLowerCase();
+      const m2=obras.find(x=>x.nombre.toLowerCase()===sp)||obras.find(x=>x.nombre.toLowerCase().includes(sp)||sp.includes(x.nombre.toLowerCase()));
+      if(m2)return m2.nombre;
+    }
     return nombreViejo;
   }
   // 0) Corregir despachos existentes con nombre de obra viejo
