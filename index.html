@@ -483,9 +483,9 @@ const DB={
   getAll(t){try{return JSON.parse(localStorage.getItem(this._k(t)))||[]}catch(e){return[]}},
   save(t,d){localStorage.setItem(this._k(t),JSON.stringify(d));if(SP&&SP.ready)SP.pushTable(t);},
   add(t,r){const d=this.getAll(t);r.id=this.nextId(t);r.creado=new Date().toISOString();d.push(r);this.save(t,d);return r},
-  update(t,id,changes){const d=this.getAll(t);const i=d.findIndex(r=>r.id===id);if(i<0)return null;Object.assign(d[i],changes);this.save(t,d);return d[i]},
+  update(t,id,changes){const d=this.getAll(t);const i=d.findIndex(r=>r.id==id);if(i<0)return null;Object.assign(d[i],changes);this.save(t,d);return d[i]},
   del(t,id){const d=this.getAll(t).filter(r=>r.id!==id);this.save(t,d)},
-  get(t,id){return this.getAll(t).find(r=>r.id===id)||null},
+  get(t,id){return this.getAll(t).find(r=>r.id==id)||null},
   nextId(t){const d=this.getAll(t);if(!d.length)return 1;return Math.max(...d.map(r=>r.id))+1},
   count(t){return this.getAll(t).length}
 };
@@ -3912,8 +3912,12 @@ function guardarEdSol(id){
   if(!items.length){toast('Debe haber al menos un material con cantidad > 0','err');return}
   const obsEd=(document.getElementById('ed-obs').value||'').trim();
   const s=DB.get('solicitudes',id);
+  if(!s){toast('No se encontró la solicitud','err');return}
   const obsNueva=[s.obs,obsEd?`[Editado por ${currentUser.nombre} ${fmtFechaHora(nowLocal())}] ${obsEd}`:null].filter(Boolean).join(' · ');
-  DB.update('solicitudes',id,{items,obs:obsNueva,editadoPor:currentUser.nombre,fechaEdit:nowLocal()});
+  // Preservar campos de verificación si existían
+  items.forEach((it,i)=>{const orig=(s.items||[]). find(o=>String(o.matricula)===String(it.matricula));if(orig){if(orig.nroDocumento)it.nroDocumento=orig.nroDocumento;if(orig.nroReserva)it.nroReserva=orig.nroReserva;if(orig.cantPedida!==undefined)it.cantPedida=orig.cantPedida;if(orig.nBobina)it.nBobina=orig.nBobina;if(orig.nEdenor)it.nEdenor=orig.nEdenor}});
+  const result=DB.update('solicitudes',s.id,{items,obs:obsNueva,editadoPor:currentUser.nombre,fechaEdit:nowLocal()});
+  if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   if(s.codigo) syncEstadoSheet(s.codigo, s.estado, items);
   closeModal();toast('Solicitud '+s.codigo+' actualizada');go('solicitudes');
 }
