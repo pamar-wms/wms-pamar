@@ -6093,6 +6093,41 @@ function cerrarSolicitud(id){
   toast('📁 Solicitud cerrada');
   closeModal();go('solicitudes');
 }
+/* ── Reparar solicitudes OyD sin despacho ── */
+function repararDespachosOyD(){
+  const sols=DB.getAll('solicitudes');
+  const obras=DB.getAll('obras');
+  let reparadas=0;
+  sols.forEach(s=>{
+    if(s.estado!=='Entregado')return;
+    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(esDM)return; // Dime/Mant no genera despacho en entrega
+    if(s.despachoId)return; // ya tiene despacho vinculado
+    // Verificar que no exista ya un despacho con esta solicitud
+    const yaExiste=DB.getAll('despachos').find(d=>d.solicitud===s.codigo);
+    if(yaExiste){
+      // Vincular el despacho existente a la solicitud
+      DB.update('solicitudes',s.id,{despachoId:yaExiste.id,remito:yaExiste.remito||s.remito});
+      reparadas++;
+      return;
+    }
+    // Generar despacho retroactivo
+    const o=obras.find(x=>x.nombre===s.obra)||{};
+    const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
+    if(!items.length)return;
+    const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
+    DB.save('config',{...cfg,remitoSeq:seq});
+    const desp=DB.add('despachos',{fecha:s.fechaEntrega||s.fecha||today(),fechaHora:s.fechaEntrega||nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo,reparado:true});
+    DB.update('solicitudes',s.id,{despachoId:desp.id,remito:s.remito||remito});
+    reparadas++;
+  });
+  if(reparadas>0){
+    console.log(`✔ Reparadas ${reparadas} solicitudes OyD sin despacho`);
+    toast(`✔ Se repararon ${reparadas} despachos de OyD faltantes`);
+  }
+  return reparadas;
+}
+
 function limpiarEntregadosAyer(){
   const hoy=today();
   const all=DB.getAll('solicitudes');
@@ -6147,6 +6182,8 @@ function loginAs(nombre,rol,permisos){
   }else if(['super','gerencial','admin'].includes(rol)){
     var sbMs=document.getElementById('sb-ms');if(sbMs){sbMs.style.display='';sbMs.textContent='⚠ SharePoint desconectado';}
   }
+  // Reparar solicitudes OyD que no generaron despacho (migración única)
+  repararDespachosOyD();
   // Limpiar solicitudes "Entregado" de días anteriores
   limpiarEntregadosAyer();
   // Iniciar polling global de solicitudes cada 60 seg
