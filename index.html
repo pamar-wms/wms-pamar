@@ -1273,7 +1273,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1289,7 +1289,7 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
   const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
@@ -1558,6 +1558,12 @@ function migratePermisos(){
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v21','1');
   }
+  if(!localStorage.getItem('wms_mig_v22')){
+    const us=DB.getAll('usuarios');
+    us.forEach(u=>{if(['super','gerencial','admin','jefedep'].includes(u.rol)&&u.permisos&&!u.permisos.includes('validardev'))u.permisos.push('validardev')});
+    DB.save('usuarios',us);
+    localStorage.setItem('wms_mig_v22','1');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1581,6 +1587,7 @@ const PERM_MODULES=[
     {id:'ingresos',label:'Ingresos',icon:'⬇️'},
     {id:'despachos',label:'Despachos',icon:'🚚'},
     {id:'devoluciones',label:'Devoluciones',icon:'↩️'},
+    {id:'validardev',label:'Validar devoluciones Dime/Mant',icon:'✔️'},
     {id:'traspasos',label:'Traspasos entre obras',icon:'🔄'},
     {id:'traspcontra',label:'Traspaso a contratista',icon:'🏭'}
   ]},
@@ -1863,6 +1870,7 @@ SCREENS.home=()=>{
       <div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado==='Pendiente').length}</div><div class="sl">Solicitudes pendientes</div></div>
       ${can('aprobardime')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Dime Mide').length}</div><div class="sl">Esperan aprobación Dime</div></div>`:''}
       ${can('aprobarmant')?`<div class="stat"><div class="sv">${DB.getAll('solicitudes').filter(s=>s.estado===EST_APROB&&solGetArea(s)==='Mantenimiento').length}</div><div class="sl">Esperan aprobación Mant.</div></div>`:''}
+      ${can('validardev')?`<div class="stat"><div class="sv" style="color:#d97706">${DB.getAll('devoluciones').filter(r=>r.estadoVal==='Pend. validación').length}</div><div class="sl">Devoluciones pend. validar</div></div>`:''}
     </div>
     <div class="cards">
       <div class="card admin-only" onclick="go('materiales')"><div class="cic">📦</div><h3>Maestros</h3><p>Materiales, cuadrillas, supervisores, obras, sectores, áreas y regiones.</p></div>
@@ -2017,7 +2025,7 @@ function _calcStockActual(){
   mats.forEach(m=>{st[String(m.matricula)]={ing:0,des:0,dev:0,tc:0}});
   DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(st[k])st[k].ing+= +it.cantidad||0}));
   DB.getAll('despachos').forEach(d=>{(d.items||[]).forEach(it=>{const k=String(it.matricula);if(st[k])st[k].des+= +it.cantidad||0})});
-  DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(st[k]&&it.estado==='Bueno – reingresa')st[k].dev+= +it.cantidad||0}));
+  DB.getAll('devoluciones').forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(st[k]&&it.estado==='Bueno – reingresa')st[k].dev+= +it.cantidad||0})});
   DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(st[k])st[k].tc+= +r.cantidad||0});
   const res={};Object.keys(st).forEach(k=>{const s=st[k];res[k]=s.ing-s.des+s.dev-s.tc});
   return res;
@@ -2463,7 +2471,7 @@ function presetPerms(preset){
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
   const mantP=['solicitudes','aprobarmant','stockfull','movobra'];
-  const jefedepP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const jefedepP=['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
   const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='mant'?mantP:preset==='administrativo'?adminP:supP;
@@ -3169,14 +3177,26 @@ function viewRemito(id,back){
 }
 
 // ─── DEVOLUCIONES ────────────────────────
+let devFilter='todas';
 SCREENS.devoluciones=()=>{
   const rows=DB.getAll('devoluciones').sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||b.id-a.id);
   const editable=canEditOps();
-  const cards=rows.map(r=>{
+  const pendCount=rows.filter(r=>r.estadoVal==='Pend. validación').length;
+  const valCount=rows.filter(r=>r.estadoVal==='Validada').length;
+  const rejCount=rows.filter(r=>r.estadoVal==='Rechazada').length;
+  const filtered=devFilter==='todas'?rows:devFilter==='pendientes'?rows.filter(r=>r.estadoVal==='Pend. validación'):devFilter==='validadas'?rows.filter(r=>r.estadoVal==='Validada'):devFilter==='rechazadas'?rows.filter(r=>r.estadoVal==='Rechazada'):rows;
+  const cards=filtered.map(r=>{
     const items=r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}];
     const totalItems=items.length;
     const reingresa=items.filter(it=>it.estado==='Bueno – reingresa').length;
     const danado=totalItems-reingresa;
+    const ev=r.estadoVal||'';
+    const borderColor=ev==='Pend. validación'?'#f59e0b':ev==='Validada'?'#10b981':ev==='Rechazada'?'#ef4444':'#94a3b8';
+    const statusBadge=ev==='Pend. validación'?'<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700">🟡 Pend. validación</span>':ev==='Validada'?'<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700">✅ Validada</span>':ev==='Rechazada'?'<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700">❌ Rechazada</span>':'';
+    const canVal=can('validardev')&&ev==='Pend. validación';
+    const valBtns=canVal?`<div style="display:flex;gap:6px;padding:8px 14px;border-top:1px solid var(--line);background:#fafbfc"><button onclick="event.stopPropagation();validarDevolucion(${r.id})" style="background:#00843d;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">✔ Validar</button><button onclick="event.stopPropagation();rechazarDevolucion(${r.id})" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">✕ Rechazar</button></div>`:'';
+    const valInfo=ev==='Validada'?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;margin:4px 14px 10px;font-size:11px">✅ <b>Validó: ${r.validadoPor||''}</b> · ${r.validadoFecha?fmtDate(r.validadoFecha):''}<br>📄 Documento: <b>${r.nroDocumento||'—'}</b> · Reserva: <b>${r.nroReserva||'—'}</b></div>`:'';
+    const rejInfo=ev==='Rechazada'?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 10px;margin:4px 14px 10px;font-size:11px">❌ <b>Rechazó: ${r.rechazadoPor||''}</b> · ${r.rechazadoFecha?fmtDate(r.rechazadoFecha):''}<br>Motivo: <b>${r.motivoRechazo||'—'}</b></div>`:'';
     const itemRows=items.map(it=>`<tr>
       <td style="font-family:Consolas,monospace;font-weight:600;color:var(--edenor);white-space:nowrap">${it.matricula}</td>
       <td style="white-space:normal">${it.descripcion||'—'}</td>
@@ -3184,12 +3204,14 @@ SCREENS.devoluciones=()=>{
       <td>${it.estado==='Bueno – reingresa'?'<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Reingresa</span>':'<span style="background:#fef2f2;color:#c53727;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Dañado</span>'}</td>
     </tr>`).join('');
     return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+      <div style="display:flex"><div style="width:5px;background:${borderColor}"></div><div style="flex:1">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f7f9fb;border-bottom:1px solid var(--line)">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-family:Consolas,monospace;font-weight:700;color:var(--edenor);font-size:13px">#${r.id}</span>
           <span style="font-size:12px;color:var(--gray)">📅 ${fmtDate(r.fecha)}</span>
           ${r.obra?`<span style="font-size:12px">🏗️ ${r.obra}</span>`:''}
           ${r.area?`<span style="font-size:10px;background:#eef1f4;padding:2px 8px;border-radius:8px;color:var(--steel);font-weight:600">${r.area}</span>`:''}
+          ${statusBadge}
         </div>
         ${editable?`<div style="display:flex;gap:4px">
           <button onclick="editDevolucion(${r.id})" title="Editar" style="background:#fff4d6;border:1px solid #e8a838;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✏️</button>
@@ -3202,6 +3224,7 @@ SCREENS.devoluciones=()=>{
         <span>📦 ${totalItems} material${totalItems>1?'es':''}</span>
         ${reingresa?`<span style="color:#2e7d32">✅ ${reingresa} reingresa${reingresa>1?'n':''}</span>`:''}
         ${danado?`<span style="color:#c53727">⚠ ${danado} dañado${danado>1?'s':''}</span>`:''}
+        ${r.registroPor?`<span>📝 ${r.registroPor}</span>`:''}
       </div>
       <div style="padding:6px 12px 12px">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -3215,11 +3238,22 @@ SCREENS.devoluciones=()=>{
         </table>
       </div>
       ${r.obs?`<div style="padding:0 16px 10px;font-size:11px;color:var(--gray)">💬 ${r.obs}</div>`:''}
+      ${valInfo}${rejInfo}
+      ${valBtns}
+      </div></div>
     </div>`;
   }).join('');
+  const tabStyle=(f,active)=>`onclick="devFilter='${f}';go('devoluciones')" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid ${active?'var(--edenor)':'var(--line)'};background:${active?'var(--edenor)':'#fff'};color:${active?'#fff':'var(--gray)'};cursor:pointer"`;
+  const badge=(n,bg,fg)=>n?`<span style="display:inline-block;background:${bg};color:${fg};padding:0 6px;border-radius:10px;font-size:10px;margin-left:4px">${n}</span>`:'';
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">↩️</div><div><h1>Devoluciones</h1><p>Material que retorna al depósito</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addDevolucion()">＋ Registrar devolución</button></div>
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+      <button ${tabStyle('todas',devFilter==='todas')}>Todas</button>
+      <button ${tabStyle('pendientes',devFilter==='pendientes')}>🟡 Pendientes${badge(pendCount,'#fef3c7','#92400e')}</button>
+      <button ${tabStyle('validadas',devFilter==='validadas')}>✅ Validadas${badge(valCount,'#d1fae5','#065f46')}</button>
+      <button ${tabStyle('rechazadas',devFilter==='rechazadas')}>❌ Rechazadas${badge(rejCount,'#fee2e2','#991b1b')}</button>
+    </div>
     <div style="display:flex;flex-direction:column;gap:12px">${cards||'<div class="empty" style="padding:40px;background:#fff;border-radius:10px;border:1px solid var(--line);text-align:center">Sin registros de devoluciones</div>'}</div>
   </div>`;
 };
@@ -3306,7 +3340,8 @@ function saveDevolucion(){
   if(!isDime&&!obra){toast('Seleccioná una obra','err');return}
   const validItems=devItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
-  const devRec={fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||''};
+  const needsValidation=(area==='Mantenimiento'||area==='Dime Mide');
+  const devRec={fecha:document.getElementById('dv-fecha').value,obra:obra,area:area,cuadrilla:(document.getElementById('dv-cuad')||{}).value||'',supervisor:(document.getElementById('dv-sup')||{}).value||'',items:validItems,obs:(document.getElementById('dv-obs')||{}).value||'',estadoVal:needsValidation?'Pend. validación':'',registroPor:currentUser.nombre,registroFecha:nowLocal()};
   DB.add('devoluciones',devRec);
   /* Notificar devolución a TODOS los usuarios activos (incluyendo al que registra) */
   const _devMats=validItems.map(it=>it.matricula).join(', ');
@@ -3320,6 +3355,54 @@ function saveDevolucion(){
   _nAll.push({id:_nid,para:currentUser.id,icon:'📦',texto:_devTexto,solId:null,screen:'devoluciones',fecha:nowLocal(),leida:false});
   DB.save('notificaciones',_nAll);refreshBell(true);
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
+}
+function validarDevolucion(id){
+  const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
+  const items=r.items||[];
+  const mats=items.map(it=>`${it.matricula} (${it.cantidad})`).join(', ');
+  openModal(`<h3>✔ Validar devolución #${id}</h3>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:8px">${r.area||''} · ${r.cuadrilla||''} · ${items.length} material${items.length>1?'es':''}</div>
+    <div style="font-size:11px;background:#f7f9fb;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:10px;max-height:80px;overflow-y:auto">${mats}</div>
+    <div class="fgrid">
+      <div class="field"><label>Nro. de Documento *</label><input id="vd-doc" placeholder="Ej: REM-2026-1850"></div>
+      <div class="field"><label>Nro. de Reserva *</label><input id="vd-res" placeholder="Ej: RSV-40060"></div>
+      <div class="field wide"><label>Observaciones (opcional)</label><input id="vd-obs" placeholder="Notas adicionales..."></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="confirmarValidarDev(${id})">✅ Confirmar validación</button></div>`);
+}
+function confirmarValidarDev(id){
+  const doc=document.getElementById('vd-doc').value.trim();
+  const res=document.getElementById('vd-res').value.trim();
+  if(!doc||!res){toast('Documento y reserva son obligatorios','err');return}
+  const obs=document.getElementById('vd-obs').value.trim();
+  DB.update('devoluciones',id,{estadoVal:'Validada',nroDocumento:doc,nroReserva:res,validadoPor:currentUser.nombre,validadoFecha:nowLocal(),obsValidacion:obs});
+  /* Notificar que fue validada */
+  const r=DB.get('devoluciones',id);
+  const mats=(r.items||[]).map(it=>it.matricula).join(', ');
+  const txt=`Devolución #${id} validada por ${currentUser.nombre} — Doc: ${doc} · Reserva: ${res} — ${mats}`;
+  const allIds=DB.getAll('usuarios').filter(u=>u.activo).map(u=>u.id);
+  notify(allIds,'✅',txt,null,'devoluciones');
+  closeModal();toast('Devolución #'+id+' validada ✓');go('devoluciones');
+}
+function rechazarDevolucion(id){
+  const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
+  openModal(`<h3>✕ Rechazar devolución #${id}</h3>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:8px">${r.area||''} · ${r.cuadrilla||''} · ${(r.items||[]).length} materiales</div>
+    <div class="fgrid">
+      <div class="field wide"><label>Motivo del rechazo *</label><input id="vd-motivo" placeholder="Ej: No coincide cantidad con remito de obra"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca" onclick="confirmarRechazarDev(${id})">❌ Confirmar rechazo</button></div>`);
+}
+function confirmarRechazarDev(id){
+  const motivo=document.getElementById('vd-motivo').value.trim();
+  if(!motivo){toast('Indicá el motivo del rechazo','err');return}
+  DB.update('devoluciones',id,{estadoVal:'Rechazada',rechazadoPor:currentUser.nombre,rechazadoFecha:nowLocal(),motivoRechazo:motivo});
+  const r=DB.get('devoluciones',id);
+  const mats=(r.items||[]).map(it=>it.matricula).join(', ');
+  const txt=`Devolución #${id} rechazada por ${currentUser.nombre} — Motivo: ${motivo} — ${mats}`;
+  const allIds=DB.getAll('usuarios').filter(u=>u.activo).map(u=>u.id);
+  notify(allIds,'❌',txt,null,'devoluciones');
+  closeModal();toast('Devolución #'+id+' rechazada');go('devoluciones');
 }
 function editDevolucion(id){
   const r=DB.get('devoluciones',id);if(!r){toast('No encontrado','err');return}
@@ -5614,7 +5697,7 @@ const QL_SRC={
       {k:'fecha',l:'Fecha',t:'date',d:1},{k:'tipo',l:'Tipo',d:1},{k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},
       {k:'unidad',l:'Unidad'},{k:'sector',l:'Sector'},{k:'cantidad',l:'Cantidad',n:1,d:1},{k:'entra',l:'Entrada',n:1},{k:'sale',l:'Salida',n:1},{k:'neto',l:'Neto stock',n:1},
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'inspector',l:'Inspector'},{k:'cuadrilla',l:'Cuadrilla'},{k:'supervisor',l:'Supervisor'},
-      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},{k:'mes',l:'Mes'}
+      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado material'},{k:'estadoVal',l:'Validación devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
       {k:'tipo',l:'Tipo de movimiento',type:'multi',opts:['Ingreso','Despacho','Devolución','Traspaso obra','Traspaso contratista']},
@@ -5637,11 +5720,11 @@ const QL_SRC={
     ],
     rows:()=>{
       const R=[];
-      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',entra:0,sale:0,neto:0},extra)};
+      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',estadoVal:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',entra:0,sale:0,neto:0},extra)};
       DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}]).forEach(it=>R.push(base(r,{tipo:'Ingreso',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,entra:it.cantidad,neto:it.cantidad,contraparte:r.proveedor||'',ref:r.remitoOrigen||'',sector:it.sector||''}))));
       const _solCache={};const _getSol=c=>{if(!c)return{};if(!_solCache[c]){const all=DB.getAll('solicitudes');_solCache[c]=all.find(s=>s.codigo===c)||{}}return _solCache[c]};
       DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:sol.nroDocumento||'',nroReserva:sol.nroReserva||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''})))});
-      DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado}))}));
+      DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado,estadoVal:r.estadoVal||'(directa)',nroDocumento:r.nroDocumento||'',nroReserva:r.nroReserva||''}))}));
       DB.getAll('traspasos').forEach(r=>R.push(base(r,{tipo:'Traspaso obra',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,obra:r.obraOrigen,contraparte:r.obraDestino,autorizado:r.autorizadoPor||''})));
       DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||''})));
       return R;
@@ -5667,7 +5750,7 @@ const QL_SRC={
       const S={};DB.getAll('materiales').forEach(m=>S[String(m.matricula)]={matricula:m.matricula,descripcion:m.descripcion,unidad:m.unidad==='Metro'?'m':'u',sector:m.sector||'',stockMin:+m.stockMin||0,ing:0,des:0,dev:0,tc:0});
       DB.getAll('ingresos').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(S[k])S[k].ing+= +it.cantidad||0}));
       DB.getAll('despachos').filter(ok).forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(S[k])S[k].des+= +it.cantidad||0}));
-      DB.getAll('devoluciones').filter(ok).forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(S[k]&&it.estado==='Bueno – reingresa')S[k].dev+= +it.cantidad||0}));
+      DB.getAll('devoluciones').filter(ok).forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(S[k]&&it.estado==='Bueno – reingresa')S[k].dev+= +it.cantidad||0})});
       DB.getAll('traspcontra').filter(ok).forEach(r=>{const k=String(r.matricula);if(S[k])S[k].tc+= +r.cantidad||0});
       return Object.values(S).map(s=>{s.stock=s.ing-s.des+s.dev-s.tc;s.faltante=Math.max(0,s.stockMin-s.stock);s.estado=s.stock<0?'Negativo':s.stock===0?'Sin stock':s.stock<=s.stockMin?'Bajo mínimo':'OK';return s});
     }
@@ -5982,7 +6065,7 @@ function loginAs(nombre,rol,permisos){
     const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
     const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra'];
     const supP=['nuevasol','missol'];
-    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
+    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','validardev','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
