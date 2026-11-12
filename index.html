@@ -6093,25 +6093,23 @@ function cerrarSolicitud(id){
   toast('📁 Solicitud cerrada');
   closeModal();go('solicitudes');
 }
-/* ── Reparar solicitudes OyD sin despacho ── */
+/* ── Reparar solicitudes OyD y Mantenimiento sin despacho ── */
 function repararDespachosOyD(){
   const sols=DB.getAll('solicitudes');
   const obras=DB.getAll('obras');
   let reparadas=0;
+  // 1) Reparar solicitudes que aún existen en localStorage (OyD + DM)
   sols.forEach(s=>{
     if(s.estado!=='Entregado')return;
-    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(esDM)return; // Dime/Mant no genera despacho en entrega
-    if(s.despachoId)return; // ya tiene despacho vinculado
-    // Verificar que no exista ya un despacho con esta solicitud
+    if(s.despachoId)return;
     const yaExiste=DB.getAll('despachos').find(d=>d.solicitud===s.codigo);
     if(yaExiste){
-      // Vincular el despacho existente a la solicitud
       DB.update('solicitudes',s.id,{despachoId:yaExiste.id,remito:yaExiste.remito||s.remito});
       reparadas++;
       return;
     }
-    // Generar despacho retroactivo
+    // Solo reparar si tiene obra (Dime Mide sin obra no genera despacho)
+    if(!s.obra)return;
     const o=obras.find(x=>x.nombre===s.obra)||{};
     const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
     if(!items.length)return;
@@ -6121,9 +6119,63 @@ function repararDespachosOyD(){
     DB.update('solicitudes',s.id,{despachoId:desp.id,remito:s.remito||remito});
     reparadas++;
   });
+  // 2) Migrar despachos históricos del Sheet (OyD + Mantenimiento, solicitudes ya purgadas)
+  const historicos=[
+    // ── Mantenimiento 5/Nov ──
+    {codigo:'SOL-20261105-246',fecha:'2026-11-05',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'Ivan Emanuel ROMANO',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'1891',descripcion:'SECCIONADOR FUS APR UNIP 630 A  500 V BT',cantidad:3,unidad:'u'}]},
+    {codigo:'SOL-20261105-825',fecha:'2026-11-05',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'Rosana Sabrina INSAURRALDE',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'24765',descripcion:'CAJA MAT SINT P/TBL BARRIO CAREN S/INTER',cantidad:2,unidad:'u'},{matricula:'21849',descripcion:'CAJA C/TAPA CIEG MDD MON DCH/IZQ S/LLAVE',cantidad:1,unidad:'u'},{matricula:'24107',descripcion:'ARMADO CAÑO/ACCESOR P/ARMAR PILAR MD T1*',cantidad:1,unidad:'u'},{matricula:'21602',descripcion:'INTERRUPTOR AUTOM DIFERCIAL MONO 63A 220',cantidad:3,unidad:'u'},{matricula:'20862',descripcion:'LLAVE TERMICA BIPOL 32A P/TABLERO CLIENT',cantidad:3,unidad:'u'},{matricula:'1948',descripcion:'INTERRUPTOR TERMOM UNIP 63A CURVA"C">4KA',cantidad:1,unidad:'u'},{matricula:'2507',descripcion:'CABLE CU BT UNIP 1x4MM2 PVC - NEGRO',cantidad:60,unidad:'u'},{matricula:'24660',descripcion:'POSTE MD PRESERVAD 5M L Ø CIMA 100/120MM',cantidad:1,unidad:'u'}]},
+    {codigo:'SOL-20261105-357',fecha:'2026-11-05',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'Ivan Emanuel ROMANO',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'3294',descripcion:'ABRAZADERA 1/2 ANLL AO F24 CNCD Ø 140 MM',cantidad:2,unidad:'u'},{matricula:'503',descripcion:'BULON CBZ TRC CDR AO CNCD W Ø 12,7x203 L',cantidad:4,unidad:'u'},{matricula:'1892',descripcion:'SECCIONADOR FUS APR UNIP 160 A  500 V BT',cantidad:6,unidad:'u'},{matricula:'25833',descripcion:'CINTA DE SILICONA AUTO-SOLDABLE',cantidad:2,unidad:'u'},{matricula:'13448',descripcion:'PROTECCION MEC P/PUESTA TIERRA CHAP FINA',cantidad:2,unidad:'u'},{matricula:'589',descripcion:'CHAPA CDR AO CNCD 50MM L 3 ESP AGUJ Ø 20',cantidad:8,unidad:'u'},{matricula:'3273',descripcion:'CRUCETA D MADERA P/L.A.BT 76x76x1060MM L',cantidad:1,unidad:'u'},{matricula:'23867',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-15',cantidad:1,unidad:'u'},{matricula:'10194',descripcion:'COBERTURA AISL VENTIL BT P/CONECT 4 Y 10',cantidad:1,unidad:'u'},{matricula:'10193',descripcion:'COBERTURA AISL VENTIL P/CONECT 1A3 5A6',cantidad:3,unidad:'u'},{matricula:'10466',descripcion:'TERMINAL RT BIMETAL PREAI 95MM2 T4',cantidad:6,unidad:'u'},{matricula:'10467',descripcion:'TERMINAL RT BIMETAL PREAI 150MM2 T5',cantidad:6,unidad:'u'},{matricula:'550',descripcion:'TIRAFONDO CBZ CDR AO CNCD W Ø 9,5x50MM L',cantidad:4,unidad:'u'},{matricula:'283',descripcion:'HEBILLA D UNION P/FLJ AO INOX 20 x 0,7MM',cantidad:5,unidad:'u'},{matricula:'24166',descripcion:'PROTECCION D CHAPA P/CBL SUBT POSTE H.A.',cantidad:1,unidad:'u'}]},
+    // ── Mantenimiento 6/Nov ──
+    {codigo:'SOL-20261106-940',fecha:'2026-11-06',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'10219',descripcion:'CONECTOR AISL DIENTE 25/95 - 4/10 T/2 BT',cantidad:20,unidad:'u'},{matricula:'24927',descripcion:'CONECTOR AISL DIENTE 50/70 - 4/10 T/4 BT',cantidad:10,unidad:'u'}]},
+    {codigo:'SOL-20261106-297',fecha:'2026-11-06',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'1891',descripcion:'SECCIONADOR FUS APR UNIP 630 A  500 V BT',cantidad:3,unidad:'u'},{matricula:'2033',descripcion:'CARTUCHO CRTCRC FUS NH T2 400A',cantidad:3,unidad:'u'},{matricula:'283',descripcion:'HEBILLA D UNION P/FLJ AO INOX 20 x 0,7MM',cantidad:10,unidad:'u'}]},
+    {codigo:'SOL-20261106-841',fecha:'2026-11-06',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'3115',descripcion:'POSTE MD PRESERVADA 7,50M L 14/16CM CIMA',cantidad:3,unidad:'u'}]},
+    {codigo:'SOL-20261106-791',fecha:'2026-11-06',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'3407',descripcion:'RETENCION PREFOR AISL P/CONCEN.4+4MM2 BT',cantidad:10,unidad:'u'}]},
+    // ── OyD 10/Nov ──
+    {codigo:'SOL-20261110-935',fecha:'2026-11-10',obra:'1 · 5744',area:'Obra y Distribución',cuadrilla:'Alberto Ezequiel MIRANDA',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'17231',descripcion:'CONDUCTOR AC RECUBIERTO CU 35MM2 XLPE',cantidad:35,unidad:'u'},{matricula:'13448',descripcion:'PROTECCION MEC P/PUESTA TIERRA CHAP FINA',cantidad:5,unidad:'u'},{matricula:'3458',descripcion:'BLOQUETE P/PUAT C/ESPARRAG BCE 12,7x50 L',cantidad:6,unidad:'u'},{matricula:'23869',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-17',cantidad:12,unidad:'u'},{matricula:'10193',descripcion:'COBERTURA AISL VENTIL P/CONECT 1A3 5A6',cantidad:12,unidad:'u'},{matricula:'10219',descripcion:'CONECTOR AISL DIENTE 25/95 - 4/10 T/2 BT',cantidad:50,unidad:'u'},{matricula:'21210',descripcion:'CONECTOR D UNION PAT CNCT CBL 35MM2 JABA',cantidad:5,unidad:'u'}]},
+    {codigo:'SOL-20261110-824',fecha:'2026-11-10',obra:'1 · 5744',area:'Obra y Distribución',cuadrilla:'Alberto Ezequiel MIRANDA',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'10193',descripcion:'COBERTURA AISL VENTIL P/CONECT 1A3 5A6',cantidad:24,unidad:'u'},{matricula:'10219',descripcion:'CONECTOR AISL DIENTE 25/95 - 4/10 T/2 BT',cantidad:50,unidad:'u'},{matricula:'23868',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-16',cantidad:12,unidad:'u'},{matricula:'23869',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-17',cantidad:12,unidad:'u'},{matricula:'212',descripcion:'FLEJE AO INOX P/SUJ MECA 20MM ACH 0,7ESP',cantidad:30,unidad:'u'}]},
+    {codigo:'SOL-20261110-362',fecha:'2026-11-10',obra:'2 · 5765',area:'Obra y Distribución',cuadrilla:'Brenda Estefania ALFONSO',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'283',descripcion:'HEBILLA D UNION P/FLJ AO INOX 20 x 0,7MM',cantidad:30,unidad:'u'},{matricula:'3638',descripcion:'GRILLETE P/RTN BASE PL AO CNCD 38x6MM BT',cantidad:10,unidad:'u'},{matricula:'212',descripcion:'FLEJE AO INOX P/SUJ MECA 20MM ACH 0,7ESP',cantidad:30,unidad:'u'}]},
+    // ── Mantenimiento 10/Nov ──
+    {codigo:'SOL-20261110-839',fecha:'2026-11-10',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'INSAURRALDE Rosana Sabrina',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'10219',descripcion:'CONECTOR AISL DIENTE 25/95 - 4/10 T/2 BT',cantidad:10,unidad:'u'},{matricula:'24927',descripcion:'CONECTOR AISL DIENTE 50/70 - 4/10 T/4 BT',cantidad:10,unidad:'u'},{matricula:'3115',descripcion:'POSTE MD PRESERVADA 7,50M L 14/16CM CIMA',cantidad:5,unidad:'u'}]},
+    {codigo:'SOL-20261110-512',fecha:'2026-11-10',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'24107',descripcion:'ARMADO CAÑO/ACCESOR P/ARMAR PILAR MD T1*',cantidad:2,unidad:'u'},{matricula:'2507',descripcion:'CABLE CU BT UNIP 1x4MM2 PVC - NEGRO',cantidad:50,unidad:'u'},{matricula:'20862',descripcion:'LLAVE TERMICA BIPOL 32A P/TABLERO CLIENT',cantidad:2,unidad:'u'},{matricula:'21602',descripcion:'INTERRUPTOR AUTOM DIFERCIAL MONO 63A 220',cantidad:2,unidad:'u'},{matricula:'1800',descripcion:'CINTA AISL PVC NEGRO 19x0,18MM x 10 M LA',cantidad:1,unidad:'u'},{matricula:'1797',descripcion:'1797',cantidad:1,unidad:'u'},{matricula:'1795',descripcion:'1795',cantidad:1,unidad:'u'},{matricula:'24660',descripcion:'POSTE MD PRESERVAD 5M L Ø CIMA 100/120MM',cantidad:1,unidad:'u'},{matricula:'3115',descripcion:'POSTE MD PRESERVADA 7,50M L 14/16CM CIMA',cantidad:3,unidad:'u'}]},
+    {codigo:'SOL-20261110-242',fecha:'2026-11-10',obra:'7 · Santa Elena 2',area:'Mantenimiento',cuadrilla:'ROMERO Sergio Gustavo',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'212',descripcion:'FLEJE AO INOX P/SUJ MECA 20MM ACH 0,7ESP',cantidad:30,unidad:'u'},{matricula:'283',descripcion:'HEBILLA D UNION P/FLJ AO INOX 20 x 0,7MM',cantidad:50,unidad:'u'},{matricula:'3118',descripcion:'POSTE MD PRESERVADA 11 M L 16/18 CM CIMA',cantidad:21,unidad:'u'},{matricula:'3323',descripcion:'ABRAZADERA P/PUNTAL AO CNCD Ø 180 MM "A"',cantidad:1,unidad:'u'},{matricula:'3635',descripcion:'MENSULA D SUSPENSION P/LIN AER BT PREENS',cantidad:20,unidad:'u'},{matricula:'3638',descripcion:'GRILLETE P/RTN BASE PL AO CNCD 38x6MM BT',cantidad:12,unidad:'u'},{matricula:'3643',descripcion:'CONJUNTO D SUSPENSION P/LIN AER PREENSAM',cantidad:20,unidad:'u'}]},
+    {codigo:'SOL-20261110-807',fecha:'2026-11-10',obra:'7 · Santa Elena 2',area:'Mantenimiento',cuadrilla:'ROMERO Sergio Gustavo',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'2540',descripcion:'CABLE AL BT PREEN TETRA 3x50/50 MM2 XLPE',cantidad:500,unidad:'u'},{matricula:'2538',descripcion:'CABLE AL BT PREEN TETRA 3x95/50 MM2 XLPE',cantidad:102,unidad:'u'}]},
+    // ── OyD 12/Nov ──
+    {codigo:'SOL-20261112-957',fecha:'2026-11-12',obra:'2 · 5765',area:'Obra y Distribución',cuadrilla:'Brenda Estefania ALFONSO',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'3262',descripcion:'JABALINA CLDR AO-CU Ø16,2MM 2MT L S/CNDC',cantidad:16,unidad:'u'},{matricula:'3458',descripcion:'BLOQUETE P/PUAT C/ESPARRAG BCE 12,7x50 L',cantidad:22,unidad:'u'},{matricula:'2459',descripcion:'CONDUCTOR DESN CU ESTÑ 35MM2 7 ALAM 2,55',cantidad:28,unidad:'u'},{matricula:'17229',descripcion:'CONDUCTOR AC RECUBIERTO CU 35MM2 DESNUDO',cantidad:33,unidad:'u'},{matricula:'18542',descripcion:'TERMINAL CU ESTÑ P/INDNT P/DESCARG 35MM',cantidad:22,unidad:'u'},{matricula:'21210',descripcion:'CONECTOR D UNION PAT CNCT CBL 35MM2 JABA',cantidad:17,unidad:'u'},{matricula:'21211',descripcion:'CONECTOR UNION PAT ENTRE CBL 35MM2 CU/AO',cantidad:11,unidad:'u'},{matricula:'10193',descripcion:'COBERTURA AISL VENTIL P/CONECT 1A3 5A6',cantidad:16,unidad:'u'},{matricula:'23869',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-17',cantidad:16,unidad:'u'},{matricula:'3411',descripcion:'CONECTOR A PEINE D LATON ESTÑ CND 25-35*',cantidad:16,unidad:'u'},{matricula:'1800',descripcion:'CINTA AISL PVC NEGRO 19x0,18MM x 10 M LA',cantidad:2,unidad:'u'},{matricula:'13448',descripcion:'PROTECCION MEC P/PUESTA TIERRA CHAP FINA',cantidad:16,unidad:'u'}]},
+    {codigo:'SOL-20261112-199',fecha:'2026-11-12',obra:'1 · 5744',area:'Obra y Distribución',cuadrilla:'Alberto Ezequiel MIRANDA',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'23867',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-15',cantidad:6,unidad:'u'},{matricula:'23869',descripcion:'CONECTOR A PRESION T/CUÑA ELASTIC TMÑ-17',cantidad:10,unidad:'u'},{matricula:'10193',descripcion:'COBERTURA AISL VENTIL P/CONECT 1A3 5A6',cantidad:10,unidad:'u'},{matricula:'10194',descripcion:'COBERTURA AISL VENTIL BT P/CONECT 4 Y 10',cantidad:6,unidad:'u'},{matricula:'10219',descripcion:'CONECTOR AISL DIENTE 25/95 - 4/10 T/2 BT',cantidad:50,unidad:'u'}]},
+    // ── Mantenimiento 12/Nov ──
+    {codigo:'SOL-20261112-211',fecha:'2026-11-12',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMANO Ivan Emanuel',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'3115',descripcion:'POSTE MD PRESERVADA 7,50M L 14/16CM CIMA',cantidad:3,unidad:'u'}]},
+    {codigo:'SOL-20261112-721',fecha:'2026-11-12',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'ROMERO Sergio Gustavo',supervisor:'CESAR NUÑEZ',
+     items:[{matricula:'503',descripcion:'BULON CBZ TRC CDR AO CNCD W Ø 12,7x203 L',cantidad:10,unidad:'u'}]}
+  ];
+  const despExist=DB.getAll('despachos');
+  historicos.forEach(h=>{
+    if(despExist.find(d=>d.solicitud===h.codigo))return; // ya existe
+    const o=obras.find(x=>x.nombre===h.obra)||{};
+    const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
+    DB.save('config',{...cfg,remitoSeq:seq});
+    DB.add('despachos',{fecha:h.fecha,fechaHora:h.fecha+'T08:00:00',obra:h.obra,area:h.area,region:o.region||'',cuadrilla:h.cuadrilla,supervisor:h.supervisor,remito,items:h.items,solicitud:h.codigo,reparado:true});
+    reparadas++;
+  });
   if(reparadas>0){
-    console.log(`✔ Reparadas ${reparadas} solicitudes OyD sin despacho`);
-    toast(`✔ Se repararon ${reparadas} despachos de OyD faltantes`);
+    console.log(`✔ Reparadas ${reparadas} solicitudes sin despacho (OyD+Mant)`);
+    toast(`✔ Se repararon ${reparadas} despachos faltantes (OyD+Mant)`);
   }
   return reparadas;
 }
