@@ -3955,7 +3955,7 @@ function checkStockBajo(itemsDespachados){
     let ing=0,des=0,dev=0,tc=0;
     ingresos.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)ing+=+it.cantidad||0}));
     despachos.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)des+=+it.cantidad||0}));
-    devoluciones.forEach(r=>(r.items||[]).forEach(it=>{if(String(it.matricula)===mk)dev+=+it.cantidad||0}));
+    devoluciones.forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[]).forEach(it=>{if(String(it.matricula)===mk&&it.estado==='Bueno – reingresa')dev+=+it.cantidad||0})});
     traspContra.forEach(r=>{if(String(r.matricula)===mk)tc+=+r.cantidad||0});
     const stock=ing-des+dev-tc;
     if(stock<=m.stockMin){
@@ -4407,8 +4407,17 @@ function validarReservaSolicitud(s){
   return null;
 }
 function generarRemitoEntrega(s){
-  const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
-  DB.save('config',{...cfg,remitoSeq:seq});
+  /* Re-leer config fresco para evitar race condition entre tabs/llamadas simultáneas */
+  const cfgRaw=localStorage.getItem('wms_config');
+  const cfg=cfgRaw?JSON.parse(cfgRaw):{remitoSeq:0,solSeq:0};
+  let seq=(cfg.remitoSeq||0)+1;
+  let remito='R-'+String(seq).padStart(7,'0');
+  /* Verificar que no exista otro despacho con este remito (anti-duplicado) */
+  const despAll=DB.getAll('despachos');
+  let intentos=0;
+  while(despAll.find(d=>d.remito===remito)&&intentos<10){seq++;remito='R-'+String(seq).padStart(7,'0');intentos++}
+  cfg.remitoSeq=seq;
+  localStorage.setItem('wms_config',JSON.stringify(cfg));
   const o=DB.getAll('obras').find(x=>x.nombre===s.obra)||{};
   const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
   const desp=DB.add('despachos',{fecha:today(),fechaHora:nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo});
@@ -6350,7 +6359,7 @@ function repararDespachosOyD(){
   const solsRefresh=DB.getAll('solicitudes');
   solsRefresh.forEach(s=>{
     if(s.estado!=='Entregado')return;
-    if(s.despachoId)return;
+    if(s.despachoId||s._reparada)return;
     const yaExiste=DB.getAll('despachos').find(d=>d.solicitud===s.codigo);
     if(yaExiste){
       DB.update('solicitudes',s.id,{despachoId:yaExiste.id,remito:yaExiste.remito||s.remito});
@@ -6362,13 +6371,19 @@ function repararDespachosOyD(){
     const o=obras.find(x=>x.nombre===s.obra)||{};
     const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
     if(!items.length)return;
-    const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
-    DB.save('config',{...cfg,remitoSeq:seq});
-    const desp=DB.add('despachos',{fecha:s.fechaEntrega||s.fecha||today(),fechaHora:s.fechaEntrega||nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito,items,solicitud:s.codigo,reparado:true});
-    DB.update('solicitudes',s.id,{despachoId:desp.id,remito:s.remito||remito});
+    /* Usar localStorage directo para evitar race condition en loop */
+    const cfgR=JSON.parse(localStorage.getItem('wms_config')||'{}');
+    let seqR=(cfgR.remitoSeq||0)+1;let remitoR='R-'+String(seqR).padStart(7,'0');
+    const despAllR=DB.getAll('despachos');let inR=0;
+    while(despAllR.find(d=>d.remito===remitoR)&&inR<10){seqR++;remitoR='R-'+String(seqR).padStart(7,'0');inR++}
+    cfgR.remitoSeq=seqR;localStorage.setItem('wms_config',JSON.stringify(cfgR));
+    const desp=DB.add('despachos',{fecha:s.fechaEntrega||s.fecha||today(),fechaHora:s.fechaEntrega||nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito:remitoR,items,solicitud:s.codigo,reparado:true});
+    DB.update('solicitudes',s.id,{despachoId:desp.id,remito:s.remito||remitoR,_reparada:true});
     reparadas++;
   });
   // 2) Migrar despachos históricos del Sheet (OyD + Mantenimiento, solicitudes ya purgadas)
+  // Solo ejecutar una vez — flag en localStorage
+  if(localStorage.getItem('wms_mig_historicos_v3')){return reparadas}
   const historicos=[
     // ── Mantenimiento 5/Nov ──
     {codigo:'SOL-20261105-246',fecha:'2026-11-05',obra:'5 · Puntuales Tigre',area:'Mantenimiento',cuadrilla:'Ivan Emanuel ROMANO',supervisor:'CESAR NUÑEZ',
@@ -6418,11 +6433,14 @@ function repararDespachosOyD(){
     if(despExist.find(d=>d.solicitud===h.codigo))return; // ya existe
     const obraActual=resolverObra(h.obra);
     const o=obras.find(x=>x.nombre===obraActual)||{};
-    const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
-    DB.save('config',{...cfg,remitoSeq:seq});
-    DB.add('despachos',{fecha:h.fecha,fechaHora:h.fecha+'T08:00:00',obra:obraActual,area:h.area,region:o.region||'',cuadrilla:h.cuadrilla,supervisor:h.supervisor,remito,items:h.items,solicitud:h.codigo,reparado:true});
+    const cfgH=JSON.parse(localStorage.getItem('wms_config')||'{}');
+    let seqH=(cfgH.remitoSeq||0)+1;let remitoH='R-'+String(seqH).padStart(7,'0');
+    let inH=0;while(despExist.find(d=>d.remito===remitoH)&&inH<10){seqH++;remitoH='R-'+String(seqH).padStart(7,'0');inH++}
+    cfgH.remitoSeq=seqH;localStorage.setItem('wms_config',JSON.stringify(cfgH));
+    DB.add('despachos',{fecha:h.fecha,fechaHora:h.fecha+'T08:00:00',obra:obraActual,area:h.area,region:o.region||'',cuadrilla:h.cuadrilla,supervisor:h.supervisor,remito:remitoH,items:h.items,solicitud:h.codigo,reparado:true});
     reparadas++;
   });
+  localStorage.setItem('wms_mig_historicos_v3','1');
   if(reparadas>0){
     console.log(`✔ Reparadas ${reparadas} solicitudes sin despacho (OyD+Mant)`);
     toast(`✔ Se repararon ${reparadas} despachos faltantes (OyD+Mant)`);
@@ -6440,10 +6458,12 @@ function limpiarEntregadosAyer(){
     const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
     if(esDM&&!s.cerrada)return;
     if(esDM&&s.cerrada){const fc=(s.fechaCierre||'').slice(0,10);if(!fc||fc>=hoy)return;DB.del('solicitudes',s.id);borrados++;return}
-    // Usar fechaEntrega si existe, sino fecha general
-    const f=s.fechaEntrega||s.fecha||'';
-    const dia=f.slice(0,10);
+    // OyD: solo borrar si tiene fechaEntrega (no usar fecha de pedido como fallback)
+    // y solo si ya tiene despacho generado (para no perder entregas sin descontar stock)
+    if(!s.fechaEntrega)return;
+    const dia=s.fechaEntrega.slice(0,10);
     if(dia&&dia<hoy){
+      if(!s.despachoId&&!s.remito)return; // no borrar sin despacho → stock no se descontaría
       DB.del('solicitudes',s.id);
       borrados++;
     }
