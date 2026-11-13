@@ -636,7 +636,19 @@ const SP={
       for(const it of(d.value||[])){
         const nm=it.fields.Title,td=it.fields.TableData;
         if(nm&&td){
-          try{JSON.parse(td);localStorage.setItem('wms_'+nm,td);this._itemCache[nm]=it.id;loaded++}catch(e){}
+          try{
+            const spData=JSON.parse(td);
+            const localRaw=localStorage.getItem('wms_'+nm);
+            const localData=localRaw?JSON.parse(localRaw):[];
+            /* Protección: no pisar datos locales si SharePoint tiene menos registros
+               (indica datos desactualizados o descarga parcial por caída) */
+            if(Array.isArray(spData)&&Array.isArray(localData)&&localData.length>0&&spData.length<localData.length*0.7){
+              console.warn('[SP pull] Tabla '+nm+': SharePoint tiene '+spData.length+' registros vs '+localData.length+' locales — NO se pisa (posible dato desactualizado)');
+              this._itemCache[nm]=it.id;
+              continue;
+            }
+            localStorage.setItem('wms_'+nm,td);this._itemCache[nm]=it.id;loaded++;
+          }catch(e){}
         }
       }
       url=d['@odata.nextLink']?d['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0',''):null;
