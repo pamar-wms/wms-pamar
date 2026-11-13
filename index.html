@@ -475,17 +475,20 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ── Utilidad anti-XSS ── */
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 /* ══════════════════════════════════════════════════════════
    DATA LAYER — localStorage (ready for SharePoint swap)
    ══════════════════════════════════════════════════════════ */
 const DB={
   _k(t){return 'wms_'+t},
   getAll(t){try{return JSON.parse(localStorage.getItem(this._k(t)))||[]}catch(e){return[]}},
-  save(t,d){localStorage.setItem(this._k(t),JSON.stringify(d));if(SP&&SP.ready)SP.pushTable(t);},
+  _pushTimers:{},
+  save(t,d){localStorage.setItem(this._k(t),JSON.stringify(d));if(SP&&SP.ready){clearTimeout(this._pushTimers[t]);this._pushTimers[t]=setTimeout(()=>SP.pushTable(t),200)}},
   add(t,r){const d=this.getAll(t);r.id=this.nextId(t);r.creado=new Date().toISOString();d.push(r);this.save(t,d);return r},
-  update(t,id,changes){const d=this.getAll(t);const i=d.findIndex(r=>r.id==id);if(i<0)return null;Object.assign(d[i],changes);this.save(t,d);return d[i]},
-  del(t,id){const d=this.getAll(t).filter(r=>r.id!=id);this.save(t,d)},
-  get(t,id){return this.getAll(t).find(r=>r.id==id)||null},
+  update(t,id,changes){const d=this.getAll(t);const sid=String(id);const i=d.findIndex(r=>String(r.id)===sid);if(i<0)return null;Object.assign(d[i],changes);this.save(t,d);return d[i]},
+  del(t,id){const sid=String(id);const d=this.getAll(t).filter(r=>String(r.id)!==sid);this.save(t,d)},
+  get(t,id){const sid=String(id);return this.getAll(t).find(r=>String(r.id)===sid)||null},
   nextId(t){const d=this.getAll(t);if(!d.length)return 1;return Math.max(...d.map(r=>r.id))+1},
   count(t){return this.getAll(t).length}
 };
@@ -642,7 +645,7 @@ const SP={
             const localData=localRaw?JSON.parse(localRaw):[];
             /* Protección: no pisar datos locales si SharePoint tiene menos registros
                (indica datos desactualizados o descarga parcial por caída) */
-            if(Array.isArray(spData)&&Array.isArray(localData)&&localData.length>0&&spData.length<localData.length*0.7){
+            if(Array.isArray(spData)&&Array.isArray(localData)&&localData.length>10&&spData.length<localData.length*0.7){
               console.warn('[SP pull] Tabla '+nm+': SharePoint tiene '+spData.length+' registros vs '+localData.length+' locales — NO se pisa (posible dato desactualizado)');
               this._itemCache[nm]=it.id;
               continue;
@@ -670,8 +673,11 @@ const SP={
         const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
         this._itemCache[t]=ni.id;
       }
-    }catch(e){console.error('SP push '+t+':',e)}
-    finally{
+    }catch(e){
+      console.error('SP push '+t+':',e);
+      /* Retry una vez después de 2s en caso de error transitorio */
+      setTimeout(()=>{if(this.ready)this._queue.add(t);},2000);
+    }finally{
       this._syncing=false;
       if(this._queue.size){const nx=[...this._queue][0];this._queue.delete(nx);this.pushTable(nx)}
     }
@@ -804,23 +810,28 @@ const GSCRIPT_URL='https://script.google.com/macros/s/AKfycbws6NWSXWTblDQ-vFy0YJ
 
 // ── SYNC ESTADO SOLICITUD A GOOGLE SHEETS ──
 // Envía el cambio de estado al Sheets central para que todas las PCs lo vean
-function syncEstadoSheet(codigo, nuevoEstado, items){
-  if(!codigo) return;
-  const payload={action:'update_estado', codigo, estado:nuevoEstado};
-  if(items) payload.materiales=JSON.stringify(items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'u'})));
+/* Cola de sincronización al Sheet — evita ráfagas de POSTs simultáneos */
+const _sheetQueue=[];let _sheetBusy=false;
+function _sheetFlush(){
+  if(_sheetBusy||!_sheetQueue.length)return;
+  _sheetBusy=true;
+  const payload=_sheetQueue.shift();
   fetch(GSCRIPT_URL,{
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(payload)
-  }).catch(e=>console.log('syncEstado error:',e));
+  }).catch(e=>console.log('syncSheet error:',e))
+   .finally(()=>{_sheetBusy=false;if(_sheetQueue.length)setTimeout(_sheetFlush,300)});
+}
+function syncEstadoSheet(codigo, nuevoEstado, items){
+  if(!codigo) return;
+  const payload={action:'update_estado', codigo, estado:nuevoEstado};
+  if(items) payload.materiales=JSON.stringify(items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'u'})));
+  _sheetQueue.push(payload);_sheetFlush();
 }
 function syncEliminarSheet(codigo){
   if(!codigo) return;
-  fetch(GSCRIPT_URL,{
-    method:'POST', mode:'no-cors',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'eliminar_solicitud', codigo})
-  }).catch(e=>console.log('syncEliminar error:',e));
+  _sheetQueue.push({action:'eliminar_solicitud', codigo});_sheetFlush();
 }
 
 // ── EXPORTAR DATOS MAESTROS PARA FORMULARIO CUADRILLAS (Google Sheets) ──
@@ -865,7 +876,7 @@ function autoExportMaestros(){
 
 // ── AUTO-IMPORTAR SOLICITUDES DESDE GOOGLE SHEETS ──
 let _solPollTimer=null;
-let _solImporting=false;
+let _solImporting=false,_solBackoff=30000;
 
 async function btnActualizar(){
   toast('🔄 Actualizando…');
@@ -885,13 +896,18 @@ function btnRecargaTotal(){
   location.reload(true);
 }
 
+let _syncEstadosTimer=null;
 function solStartPolling(){
   solStopPolling();
   solImportarNuevas(); // una vez ahora
   _solPollTimer=setInterval(solImportarNuevas, 30000); // cada 30 seg
+  // Sync estados en intervalo separado (45s) para no duplicar requests
+  syncEstadosDesdeSheet();
+  _syncEstadosTimer=setInterval(syncEstadosDesdeSheet, 45000);
 }
 function solStopPolling(){
   if(_solPollTimer){clearInterval(_solPollTimer);_solPollTimer=null;}
+  if(_syncEstadosTimer){clearInterval(_syncEstadosTimer);_syncEstadosTimer=null;}
 }
 
 async function solImportarNuevas(){
@@ -916,7 +932,7 @@ async function solImportarNuevas(){
       const esDime=sol.esDime==='Si'||sol.esDime===true;
       const esMant=sol.esMant==='Si'||sol.esMant===true||(sol.areaSolicitud==='Mantenimiento');
       const nueva={
-        id:Date.now()+Math.floor(Math.random()*1000),
+        id:DB.nextId('solicitudes'),
         codigo:sol.codigo,
         estado:(esDime||(esMant&&!esDime))?EST_APROB:'Pendiente',
         urgencia:sol.urgencia||'Normal',
@@ -948,6 +964,8 @@ async function solImportarNuevas(){
       }
     }
 
+    /* Reset backoff al tener éxito */
+    if(_solBackoff>30000&&_solPollTimer){_solBackoff=30000;clearInterval(_solPollTimer);_solPollTimer=setInterval(solImportarNuevas,30000)}
     if(nuevas>0){
       DB.save('solicitudes',existentes);
       toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
@@ -958,10 +976,16 @@ async function solImportarNuevas(){
     // No marcamos como importadas — así todos los usuarios reciben las mismas solicitudes
   }catch(e){
     console.log('Poll solicitudes error:',e);
+    /* Backoff: si falla, esperar más antes del próximo intento */
+    if(_solPollTimer){
+      clearInterval(_solPollTimer);
+      const backoff=Math.min((_solBackoff||30000)*2,300000); // max 5 min
+      _solBackoff=backoff;
+      _solPollTimer=setInterval(solImportarNuevas,backoff);
+      console.log('[WMS] Polling backoff:',backoff/1000,'s');
+    }
   }
   _solImporting=false;
-  // Después de importar nuevas, sincronizar estados desde Google Sheets
-  syncEstadosDesdeSheet();
 }
 
 // ── SYNC ESTADOS: trae todos los estados del Sheet y actualiza la DB local ──
@@ -1045,7 +1069,7 @@ async function syncEstadosDesdeSheet(){
       const esDime=solSheet.esDime==='Si'||solSheet.esDime===true;
       const esMant=solSheet.areaSolicitud==='Mantenimiento';
       locales.push({
-        id:Date.now()+Math.floor(Math.random()*10000),
+        id:DB.nextId('solicitudes'),
         codigo:solSheet.codigo,
         estado:solSheet.estado||'Pendiente',
         urgencia:solSheet.urgencia||'Normal',
@@ -1307,7 +1331,9 @@ function seed(){
   DB.save('reservas',[]);
   DB.save('medidores',[]);
   DB.save('movmedidores',[]);
-  DB.save('config',{remitoSeq:0,solSeq:0});
+  /* No resetear config si ya tiene datos (proteger secuencia de remitos) */
+  const cfgExist=JSON.parse(localStorage.getItem('wms_config')||'null');
+  if(!cfgExist||(!cfgExist.remitoSeq&&!cfgExist.solSeq))DB.save('config',{remitoSeq:0,solSeq:0});
   DB.save('notificaciones',[]);
   DB.save('consultas',[]);
   localStorage.setItem('wms_seeded','1');
@@ -3548,9 +3574,8 @@ function saveDevolucion(){
   const _allUserIds=DB.getAll('usuarios').filter(u=>u.activo).map(u=>u.id);
   notify(_allUserIds,'📦',_devTexto,null,'devoluciones');
   /* notify excluye al usuario actual, lo agregamos manualmente */
-  const _nAll=DB.getAll('notificaciones');const _nid=_nAll.reduce((m,x)=>Math.max(m,x.id||0),0)+1;
-  _nAll.push({id:_nid,para:currentUser.id,icon:'📦',texto:_devTexto,solId:null,screen:'devoluciones',fecha:nowLocal(),leida:false});
-  DB.save('notificaciones',_nAll);refreshBell(true);
+  DB.add('notificaciones',{para:currentUser.id,icon:'📦',texto:_devTexto,solId:null,screen:'devoluciones',fecha:nowLocal(),leida:false});
+  refreshBell(true);
   closeModal();toast('Devolución registrada — '+validItems.length+' ítem(s)');go('devoluciones');
 }
 function validarDevolucion(id){
@@ -3901,7 +3926,7 @@ function usersForPerson(nombre){
 function notify(ids,icon,texto,solId,screen){
   const set=[...new Set(ids)].filter(id=>id!==currentUser.id);
   if(!set.length)return;
-  const all=DB.getAll('notificaciones');let nid=all.reduce((m,x)=>Math.max(m,x.id||0),0);
+  const all=DB.getAll('notificaciones');let nid=DB.nextId('notificaciones')-1;
   const f=nowLocal();
   set.forEach(uid=>all.push({id:++nid,para:uid,icon,texto,solId:solId||null,screen:screen||null,fecha:f,leida:false}));
   DB.save('notificaciones',all.slice(-1500));
@@ -4037,12 +4062,8 @@ function supOpts(){
 function nowLocal(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19)}
 function fmtFechaHora(iso){if(!iso)return'—';const d=iso.slice(0,10),t=iso.length>10?iso.slice(11,16):'';return fmtDate(d)+(t?' · '+t+' hs':'')}
 function stockMap(){
-  const S={};DB.getAll('materiales').forEach(m=>S[String(m.matricula)]=0);
-  DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,cantidad:r.cantidad}]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]+= +it.cantidad||0}));
-  DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(k in S)S[k]-= +it.cantidad||0}));
-  DB.getAll('devoluciones').forEach(r=>{const ev=r.estadoVal||'';if(ev==='Pend. validación'||ev==='Rechazada')return;(r.items||[{matricula:r.matricula,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const k=String(it.matricula);if(k in S&&it.estado==='Bueno – reingresa')S[k]+= +it.cantidad||0})});
-  DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(k in S)S[k]-= +r.cantidad||0});
-  return S;
+  /* Usa _calcStockActual para evitar duplicar lógica de stock */
+  return _calcStockActual();
 }
 function solItemsDet(s){
   const mats=DB.getAll('materiales');const st=stockMap();
@@ -4166,7 +4187,7 @@ function verSolicitud(id){
       ${s.aprobadoPor?`<div><span>Aprobó (${solGetArea(s)==='Mantenimiento'?'Mant.':'Dime Mide'})</span><b>${s.aprobadoPor}</b></div>`:''}
       ${s.remito?`<div><span>Remito</span><b>${s.remito}</b></div>`:''}
     </div>
-    ${s.obs||s.obsAprob?`<div style="font-size:12px;background:#fff8e6;border:1px solid #f1dfb0;border-radius:6px;padding:8px 10px;margin-bottom:10px">💬 ${[s.obs,s.obsAprob&&('Aprobador: '+s.obsAprob)].filter(Boolean).join('<br>')}</div>`:''}
+    ${s.obs||s.obsAprob?`<div style="font-size:12px;background:#fff8e6;border:1px solid #f1dfb0;border-radius:6px;padding:8px 10px;margin-bottom:10px">💬 ${[esc(s.obs),s.obsAprob&&('Aprobador: '+esc(s.obsAprob))].filter(Boolean).join('<br>')}</div>`:''}
     <div class="tablewrap" style="margin-bottom:8px"><table>
       <thead><tr><th>Sector</th><th>Matrícula</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock disp.</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5" class="empty">Sin materiales</td></tr>'}</tbody>
@@ -4246,7 +4267,7 @@ function imprimirSolicitud(id){
       ${s.solicitanteDime?`<div><span>Solicitante Dime Mide</span><b>${s.solicitanteDime}</b></div>`:''}${s.usuarioEdenor?`<div><span>Usuario Edenor</span><b>${s.usuarioEdenor}</b></div>`:''}
       ${s.aprobadoPor?`<div><span>Aprobó ${solGetArea(s)==='Mantenimiento'?'Mant.':'Dime Mide'}</span><b>${s.aprobadoPor}</b></div>`:''}
     </div>
-    ${s.obs?`<p><b>Observaciones:</b> ${s.obs}</p>`:''}
+    ${s.obs?`<p><b>Observaciones:</b> ${esc(s.obs)}</p>`:''}
     <table><thead><tr><th>Sector</th><th>Matrícula</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th>UM</th><th style="text-align:center">✓</th></tr></thead>
     <tbody>${its.map(it=>`<tr><td class="sec">${it.sector}</td><td>${it.matricula}</td><td>${it.descripcion}</td><td class="n">${fmtNum(it.cantidad)}</td><td>${it.unidad}</td><td style="text-align:center"><span class="chk"></span></td></tr>`).join('')}</tbody></table>
   </body></html>`);
@@ -4451,7 +4472,7 @@ function solBuildCard(s,st){
       <div>🕒 ${fmtFechaHora(s.fecha)}${s.remito?` · <b>${s.remito}</b>`:''}</div>
     </div>
     ${itemsText?`<div class="sc-items">📦 ${itemsText}</div>`:''}
-    ${s.aprobadoPor?`<div class="sc-ok">✔ Aprobó: ${s.aprobadoPor}${s.aprobModificada?' · <span style="color:#b07a00">cantidades modificadas</span>':''}</div>${s.obsAprob?`<div class="sc-ok" style="color:var(--gray);font-weight:400">💬 ${s.obsAprob}</div>`:''}`:''}
+    ${s.aprobadoPor?`<div class="sc-ok">✔ Aprobó: ${esc(s.aprobadoPor)}${s.aprobModificada?' · <span style="color:#b07a00">cantidades modificadas</span>':''}</div>${s.obsAprob?`<div class="sc-ok" style="color:var(--gray);font-weight:400">💬 ${esc(s.obsAprob)}</div>`:''}`:''}
     ${verifTag}
     ${actions}
   </div>`;
@@ -4763,7 +4784,7 @@ SCREENS.missol=()=>{
       <div class="ms-steps">${steps}</div>
       ${s.estado==='Listo'?`<div class="ms-alert">✅ <b>Tu material está listo para retirar</b>${s.remito?' · Remito '+s.remito:''}</div>`:''}
       ${rech?`<div class="ms-alert bad">✕ Rechazada por ${s.rechazadoPor||'—'}: ${s.motivoRechazo||'sin motivo'}</div>`:''}
-      ${s.obsAprob?`<div style="font-size:11.5px;color:var(--gray);margin:6px 0">💬 Aprobador: ${s.obsAprob}</div>`:''}
+      ${s.obsAprob?`<div style="font-size:11.5px;color:var(--gray);margin:6px 0">💬 Aprobador: ${esc(s.obsAprob)}</div>`:''}
       <details class="ms-det"><summary>Ver materiales (${(s.items||[]).length})</summary>
         <table><thead><tr><th>Material</th><th style="text-align:right">Pedido</th><th style="text-align:right">A entregar</th></tr></thead><tbody>${its}</tbody></table>
       </details>
@@ -6305,10 +6326,13 @@ function verificarEntrega(id){
   if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('verif-nroDoc').focus();return}
   if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('verif-nroRes').focus();return}
   const s=DB.get('solicitudes',id);if(!s)return;
+  const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
   const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
   const upd={nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()};
   // Solo generar despacho si la solicitud NO tiene remito previo (evita duplicar stock)
   if(!s.remito){
+    /* Si no es Dime/Mant, validar reserva antes de generar despacho */
+    if(!esDM&&s.obra){const bloqRes=validarReservaSolicitud(s);if(bloqRes){toast(bloqRes,'err');return}}
     const rem=generarRemitoEntrega(s);
     upd.remito=rem.remito;
     upd.despachoId=rem.desp.id;
@@ -6469,6 +6493,8 @@ function limpiarEntregadosAyer(){
     }
   });
   if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s) (Dime/Mant excluidas)');
+  /* Purgar wms_sol_deleted: mantener máximo 200 entradas más recientes */
+  try{const del=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');if(del.length>200){localStorage.setItem('wms_sol_deleted',JSON.stringify(del.slice(-200)))}}catch(e){}
 }
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
