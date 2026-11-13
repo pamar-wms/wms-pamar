@@ -965,6 +965,13 @@ async function syncEstadosDesdeSheet(){
     data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s;});
     const locales=DB.getAll('solicitudes');
     const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+    /* Reparar: quitar de la lista de borradas los códigos que en el Sheet NO están Eliminada */
+    let deletedFixed=false;
+    deleted.forEach(cod=>{
+      const inSheet=sheetMap[cod];
+      if(inSheet&&inSheet.estado!=='Eliminada'){deleted.delete(cod);deletedFixed=true;}
+    });
+    if(deletedFixed){localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));}
     let cambios=0;
     locales.forEach(s=>{
       if(!s.codigo) return;
@@ -974,10 +981,12 @@ async function syncEstadosDesdeSheet(){
         const nombre=solSheet.cuadrilla||solSheet.solicitanteDime||'';
         if(nombre){s.pidioUsuario=nombre;cambios++;}
       }
-      // Si fue eliminada en el Sheet, eliminarla localmente
+      // Si no existe en el Sheet, solo eliminar si no fue trabajada localmente
       if(!(s.codigo in sheetMap)){
-        // La solicitud no existe en el Sheet — fue eliminada o borrada por otro usuario
         if(s.origen==='google_sheets'){
+          // No borrar si el pañol ya la tocó (preparó, entregó, ajustó cantidades)
+          const trabajada=s.preparadoPor||s.entregadoPor||s.fechaPrep||s.remito||s.despachoId||(s.items||[]).some(it=>it.cantEntregada!=null);
+          if(trabajada){return} // proteger solicitudes ya trabajadas
           if(!deleted.has(s.codigo)){deleted.add(s.codigo);}
           s._eliminar=true;
           cambios++;
@@ -998,15 +1007,20 @@ async function syncEstadosDesdeSheet(){
         cambios++;
       } else if(nivelSheet>nivelLocal){
         // El Sheet tiene un estado más avanzado — otro usuario lo cambió
+        // SOLO actualizar estado, NUNCA pisar items locales que el pañolero ya modificó
+        const localTocada=s.preparadoPor||s.entregadoPor||s.fechaPrep||(s.items||[]).some(it=>it.cantEntregada!=null);
         s.estado=estadoSheet;
-        // Sincronizar items actualizados desde el Sheet (ej: cantidades ajustadas por pañol)
-        if(solSheet.materiales){
+        // Solo importar items del Sheet si la solicitud local no fue tocada por el pañol
+        if(!localTocada&&solSheet.materiales){
           try{
             const sheetItems=JSON.parse(solSheet.materiales);
-            if(sheetItems.length) s.items=sheetItems.map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u',cantEntregada:+(it.cantEntregada||it.cantidad)||0}));
+            if(sheetItems.length) s.items=sheetItems.map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u'}));
           }catch(e){}
         }
         cambios++;
+      } else if(nivelSheet<nivelLocal){
+        // El local está más avanzado — sincronizar el Sheet para que refleje el estado real
+        if(s.codigo)syncEstadoSheet(s.codigo,s.estado,s.items);
       }
     });
     /* Importar solicitudes del Sheet que no existen localmente (creadas en otra PC) */
