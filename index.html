@@ -4193,6 +4193,12 @@ function volverPreparacion(id){
 }
 function imprimirSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
+  /* Bloqueo de reserva al imprimir picking (OyD solamente) */
+  const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+  if(!esDM&&s.obra){
+    const bloqRes=validarReservaSolicitud(s);
+    if(bloqRes){toast(bloqRes,'err');return}
+  }
   const o=DB.getAll('obras').find(x=>x.nombre===s.obra)||{};
   const its=solItemsDet(s);const pidio=s.pidioUsuario||s.supervisor;
   const w=window.open('','_blank');
@@ -4320,7 +4326,9 @@ function confirmarConFirma(id){
     syncEstadoSheet(s.codigo,'Entregado');
     closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️ (stock pendiente de verificación)');go('solicitudes');
   } else {
-    // OyD: genera remito y descuenta stock inmediatamente
+    // OyD: valida contra reserva antes de entregar
+    const bloqRes=validarReservaSolicitud(s);
+    if(bloqRes){closeModal();toast(bloqRes,'err');return}
     const rem=generarRemitoEntrega(s);
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
     syncEstadoSheet(s.codigo,'Entregado');
@@ -4338,13 +4346,39 @@ function confirmarSinFirma(id){
     syncEstadoSheet(s.codigo,'Entregado');
     closeModal();toast(s.codigo+' entregada (stock pendiente de verificación)');go('solicitudes');
   } else {
-    // OyD: genera remito y descuenta stock inmediatamente
+    // OyD: valida contra reserva antes de entregar
+    const bloqRes=validarReservaSolicitud(s);
+    if(bloqRes){toast(bloqRes,'err');return}
     const rem=generarRemitoEntrega(s);
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
     syncEstadoSheet(s.codigo,'Entregado');
     closeModal();toast(s.codigo+' entregada');
     viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
   }
+}
+/* Valida items de una solicitud contra la reserva de su obra.
+   Retorna null si OK, o un string de error si hay bloqueo. */
+function validarReservaSolicitud(s){
+  if(!s.obra)return null; // sin obra no aplica
+  const reserva=getReservaObra(s.obra);
+  if(!reserva)return '🚫 No hay reserva cargada para la obra "'+s.obra+'". No se puede entregar sin reserva.';
+  const itemsAEntregar=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0);
+  if(!itemsAEntregar.length)return null;
+  const despPrevios=DB.getAll('despachos').filter(d=>d.obra===s.obra);
+  const errores=[];
+  itemsAEntregar.forEach(it=>{
+    const cant=it.cantEntregada??it.cantidad;
+    const ri=reserva.items.find(r=>String(r.matricula)===String(it.matricula));
+    if(!ri){errores.push(it.matricula+' ('+it.descripcion+') no está en la reserva');return}
+    const yaDesp=despPrevios.reduce((sum,d)=>sum+(d.items||[]).filter(x=>String(x.matricula)===String(it.matricula)).reduce((ss,x)=>ss+x.cantidad,0),0);
+    const disponible=ri.cantidad-yaDesp;
+    if(cant>disponible){
+      if(disponible<=0)errores.push(it.matricula+': ya se despachó toda la reserva ('+ri.cantidad+')');
+      else errores.push(it.matricula+': pedís '+cant+' pero solo quedan '+disponible+' en reserva (reservado: '+ri.cantidad+', ya despachado: '+yaDesp+')');
+    }
+  });
+  if(errores.length)return '🚫 Bloqueo de reserva:\n'+errores.join('\n');
+  return null;
 }
 function generarRemitoEntrega(s){
   const cfg=DB.getAll('config');const seq=(cfg.remitoSeq||0)+1;const remito='R-'+String(seq).padStart(7,'0');
