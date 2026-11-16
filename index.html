@@ -1164,6 +1164,7 @@ async function syncEstadosDesdeSheet(){
     });
     /* Importar solicitudes del Sheet que no existen localmente (creadas en otra PC) */
     const codigosLocales=new Set(locales.map(s=>s.codigo));
+    let _nextSolId=Math.max(0,...locales.map(s=>s.id||0))+1;
     Object.values(sheetMap).forEach(solSheet=>{
       if(!solSheet.codigo||codigosLocales.has(solSheet.codigo)||deleted.has(solSheet.codigo)) return;
       if(solSheet.estado==='Eliminada') return;
@@ -1172,7 +1173,7 @@ async function syncEstadosDesdeSheet(){
       const esDime=solSheet.esDime==='Si'||solSheet.esDime===true;
       const esMant=solSheet.areaSolicitud==='Mantenimiento';
       locales.push({
-        id:DB.nextId('solicitudes'),
+        id:_nextSolId++,
         codigo:solSheet.codigo,
         estado:solSheet.estado||'Pendiente',
         urgencia:solSheet.urgencia||'Normal',
@@ -4319,7 +4320,7 @@ function supOpts(){
   if(!def&&!sups.includes(me)&&currentUser.rol==='sup')sups.unshift(me),def=me;
   return sups.map(n=>`<option${n===def?' selected':''}>${n}</option>`).join('');
 }
-function nowLocal(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19)}
+function nowLocal(){const d=new Date();const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())}
 function fmtFechaHora(iso){if(!iso)return'—';const d=iso.slice(0,10),t=iso.length>10?iso.slice(11,16):'';return fmtDate(d)+(t?' · '+t+' hs':'')}
 function stockMap(){
   /* Usa _calcStockActual para evitar duplicar lógica de stock */
@@ -6673,6 +6674,25 @@ function unificarReservasDuplicadas(){
   });
   if(mergeados)console.log('[Reservas] Unificadas '+mergeados+' reservas duplicadas');
 }
+/* ── Reparar IDs duplicados en solicitudes (bug de importación Sheet) ── */
+function repararIdsDuplicados(){
+  const sols=DB.getAll('solicitudes');
+  const vistos=new Set();let reparadas=0;
+  sols.forEach(s=>{
+    if(vistos.has(s.id)){
+      /* ID duplicado — asignar nuevo ID único */
+      const maxId=Math.max(...sols.map(x=>x.id||0));
+      s.id=maxId+1+reparadas;
+      reparadas++;
+    }
+    vistos.add(s.id);
+  });
+  if(reparadas){
+    DB.save('solicitudes',sols);
+    console.log('[Reparación] '+reparadas+' solicitud(es) con ID duplicado reparadas');
+    diagLog('repair','Reparados '+reparadas+' IDs duplicados en solicitudes');
+  }
+}
 /* ── Reparar solicitudes OyD y Mantenimiento sin despacho ── */
 function repararDespachosOyD(){
   const sols=DB.getAll('solicitudes');
@@ -6835,6 +6855,7 @@ function loginAs(nombre,rol,permisos){
   _diagCounters.started=new Date().toISOString();
   autoCerrarEntregadasViejas();
   unificarReservasDuplicadas();
+  repararIdsDuplicados();
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
