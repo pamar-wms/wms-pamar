@@ -677,27 +677,57 @@ const SP={
     diagLog('sp-pull','Pull iniciado');
     this._itemCache={};
     let loaded=0,url='/sites/'+this.siteId+'/lists/'+this.listId+'/items?$expand=fields&$top=250';
+    /* Recopilar TODOS los items para detectar duplicados */
+    const allItems=[];
     while(url){
       const d=await this.gGet(url);
-      for(const it of(d.value||[])){
-        const nm=it.fields.Title,td=it.fields.TableData;
-        if(nm&&td){
-          try{
-            const spData=JSON.parse(td);
-            const localRaw=localStorage.getItem('wms_'+nm);
-            const localData=localRaw?JSON.parse(localRaw):[];
-            /* Protección: no pisar datos locales si SharePoint tiene menos registros
-               (indica datos desactualizados o descarga parcial por caída) */
-            if(Array.isArray(spData)&&Array.isArray(localData)&&localData.length>10&&spData.length<localData.length*0.7){
-              console.warn('[SP pull] Tabla '+nm+': SharePoint tiene '+spData.length+' registros vs '+localData.length+' locales — NO se pisa (posible dato desactualizado)');
-              this._itemCache[nm]=it.id;
-              continue;
-            }
-            localStorage.setItem('wms_'+nm,td);this._itemCache[nm]=it.id;loaded++;
-          }catch(e){}
+      for(const it of(d.value||[])){allItems.push(it)}
+      url=d['@odata.nextLink']?d['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0',''):null;
+    }
+    /* Agrupar por Title — quedarse con el que tiene más datos (mayor length del JSON) */
+    const byTitle={};const duplicateIds=[];
+    for(const it of allItems){
+      const nm=it.fields.Title,td=it.fields.TableData;
+      if(!nm)continue;
+      if(!byTitle[nm]){
+        byTitle[nm]={item:it,dataLen:(td||'').length};
+      }else{
+        /* Hay duplicado — quedarse con el que tiene más datos */
+        if((td||'').length>byTitle[nm].dataLen){
+          duplicateIds.push(byTitle[nm].item.id);
+          byTitle[nm]={item:it,dataLen:(td||'').length};
+        }else{
+          duplicateIds.push(it.id);
         }
       }
-      url=d['@odata.nextLink']?d['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0',''):null;
+    }
+    /* Cargar datos del ganador de cada tabla */
+    const base='/sites/'+this.siteId+'/lists/'+this.listId;
+    for(const nm in byTitle){
+      const it=byTitle[nm].item;
+      const td=it.fields.TableData;
+      if(td){
+        try{
+          const spData=JSON.parse(td);
+          const localRaw=localStorage.getItem('wms_'+nm);
+          const localData=localRaw?JSON.parse(localRaw):[];
+          if(Array.isArray(spData)&&Array.isArray(localData)&&localData.length>10&&spData.length<localData.length*0.7){
+            console.warn('[SP pull] Tabla '+nm+': SharePoint tiene '+spData.length+' registros vs '+localData.length+' locales — NO se pisa');
+            this._itemCache[nm]=it.id;
+            continue;
+          }
+          localStorage.setItem('wms_'+nm,td);this._itemCache[nm]=it.id;loaded++;
+        }catch(e){}
+      }else{this._itemCache[nm]=it.id;}
+    }
+    /* Limpiar duplicados en background */
+    if(duplicateIds.length>0){
+      diagLog('sp-pull','Limpiando '+duplicateIds.length+' filas duplicadas en SharePoint');
+      console.warn('[SP pull] Eliminando '+duplicateIds.length+' items duplicados');
+      for(const dupId of duplicateIds){
+        try{await this._fetch('DELETE',base+'/items/'+dupId)}catch(e){console.warn('No se pudo borrar duplicado '+dupId,e)}
+      }
+      diagLog('sp-pull-ok','Duplicados limpiados: '+duplicateIds.length);
     }
     return loaded;
   },
@@ -714,8 +744,22 @@ const SP={
       if(this._itemCache[t]){
         await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
       }else{
-        const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
-        this._itemCache[t]=ni.id;
+        /* Buscar item existente por Title antes de crear uno nuevo */
+        try{
+          const search=await this.gGet(base+'/items?$filter=fields/Title eq \''+t+'\'&$expand=fields&$top=1');
+          if(search.value&&search.value.length>0){
+            this._itemCache[t]=search.value[0].id;
+            await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
+            diagLog('sp-push','Cache miss recuperado para '+t+' (id:'+this._itemCache[t]+')');
+          }else{
+            const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
+            this._itemCache[t]=ni.id;
+          }
+        }catch(searchErr){
+          console.warn('SP search fallback para '+t+':',searchErr);
+          const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
+          this._itemCache[t]=ni.id;
+        }
       }
       this._pushRetries[t]=0;
       diagLog('sp-push-ok','Push '+t+' OK');
