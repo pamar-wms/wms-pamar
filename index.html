@@ -494,6 +494,28 @@ const DB={
 };
 
 /* ══════════════════════════════════════════════════════════
+   DIAGNOSTIC LOG — buffer circular de eventos de sync
+   ══════════════════════════════════════════════════════════ */
+const _diagLog=[];const _DIAG_MAX=200;
+const _diagCounters={spPush:0,spPushOk:0,spPushErr:0,spPull:0,sheetPost:0,sheetPostErr:0,pollOk:0,pollErr:0,syncEstados:0,last429:null,lastError:null,started:null};
+function diagLog(type,msg,detail){
+  const entry={ts:new Date().toISOString(),type,msg,detail:detail||''};
+  _diagLog.push(entry);
+  if(_diagLog.length>_DIAG_MAX)_diagLog.shift();
+  /* Actualizar contadores */
+  if(type==='sp-push')_diagCounters.spPush++;
+  if(type==='sp-push-ok')_diagCounters.spPushOk++;
+  if(type==='sp-push-err'){_diagCounters.spPushErr++;_diagCounters.lastError=entry.ts+': '+msg}
+  if(type==='sp-pull')_diagCounters.spPull++;
+  if(type==='sheet-post')_diagCounters.sheetPost++;
+  if(type==='sheet-err'){_diagCounters.sheetPostErr++;_diagCounters.lastError=entry.ts+': '+msg}
+  if(type==='poll-ok')_diagCounters.pollOk++;
+  if(type==='poll-err'){_diagCounters.pollErr++;_diagCounters.lastError=entry.ts+': '+msg}
+  if(type==='sync-estados')_diagCounters.syncEstados++;
+  if(type==='graph-429')_diagCounters.last429=entry.ts;
+}
+
+/* ══════════════════════════════════════════════════════════
    SHAREPOINT SYNC — Microsoft Graph API + MSAL
    ══════════════════════════════════════════════════════════ */
 const SP={
@@ -567,12 +589,16 @@ const SP={
     if(!this.account)return null;
     try{
       const resp=await this.msalApp.acquireTokenSilent({scopes:['Sites.ReadWrite.All'],account:this.account});
-      console.log('Token scopes:',resp.scopes);
       return resp.accessToken;
     }catch(e){
-      console.warn('Silent token failed, redirecting...',e);
-      try{await this.msalApp.acquireTokenRedirect({scopes:['Sites.ReadWrite.All'],account:this.account});return null;}
-      catch(e2){console.error('Token redirect:',e2);return null}
+      console.warn('Silent token failed, trying popup...',e);
+      /* Intentar popup primero para no perder el estado de la página */
+      try{const pr=await this.msalApp.acquireTokenPopup({scopes:['Sites.ReadWrite.All'],account:this.account});return pr.accessToken;}
+      catch(e2){
+        console.warn('Popup token failed, redirecting...',e2);
+        try{await this.msalApp.acquireTokenRedirect({scopes:['Sites.ReadWrite.All'],account:this.account});return null;}
+        catch(e3){console.error('Token redirect:',e3);return null}
+      }
     }
   },
 
@@ -584,13 +610,29 @@ const SP={
     location.reload();
   },
 
-  async _fetch(method,url,body){
+  _retryCount:0,
+  async _fetch(method,url,body,_attempt){
+    _attempt=_attempt||1;
     const tk=await this.getToken();
     if(!tk)throw new Error('Sin token de acceso');
     const opts={method,headers:{'Authorization':'Bearer '+tk}};
     if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
     const r=await fetch('https://graph.microsoft.com/v1.0'+url,opts);
     if(method==='DELETE'&&r.status===204)return{};
+    /* 429 Too Many Requests — esperar Retry-After y reintentar */
+    if(r.status===429&&_attempt<=3){
+      const ra=parseInt(r.headers.get('Retry-After'))||5;
+      console.warn('Graph 429 — retry en '+ra+'s (intento '+_attempt+')');
+      diagLog('graph-429','429 en '+url+' — retry '+_attempt);
+      await new Promise(ok=>setTimeout(ok,ra*1000));
+      return this._fetch(method,url,body,_attempt+1);
+    }
+    /* 5xx — un reintento después de 2s */
+    if(r.status>=500&&_attempt<=2){
+      console.warn('Graph '+r.status+' — retry en 2s');
+      await new Promise(ok=>setTimeout(ok,2000));
+      return this._fetch(method,url,body,_attempt+1);
+    }
     if(!r.ok){const t=await r.text();throw new Error('Graph '+r.status+': '+t)}
     return r.json();
   },
@@ -632,6 +674,7 @@ const SP={
 
   async pullAll(){
     if(!this.ready)return 0;
+    diagLog('sp-pull','Pull iniciado');
     this._itemCache={};
     let loaded=0,url='/sites/'+this.siteId+'/lists/'+this.listId+'/items?$expand=fields&$top=250';
     while(url){
@@ -659,24 +702,33 @@ const SP={
     return loaded;
   },
 
+  _pushRetries:{}, // tableName → contador de reintentos
   async pushTable(t){
     if(!this.ready)return;
     if(this._syncing){this._queue.add(t);return}
     this._syncing=true;
+    diagLog('sp-push','Push '+t);
     try{
       const data=localStorage.getItem('wms_'+t)||'[]';
       const base='/sites/'+this.siteId+'/lists/'+this.listId;
       if(this._itemCache[t]){
         await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
       }else{
-        // No cached id — create new item (pullAll populates cache on next load)
         const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
         this._itemCache[t]=ni.id;
       }
+      this._pushRetries[t]=0;
+      diagLog('sp-push-ok','Push '+t+' OK');
     }catch(e){
       console.error('SP push '+t+':',e);
-      /* Retry una vez después de 2s en caso de error transitorio */
-      setTimeout(()=>{if(this.ready)this._queue.add(t);},2000);
+      diagLog('sp-push-err','Push '+t+' falló: '+e.message);
+      const retries=(this._pushRetries[t]||0)+1;
+      this._pushRetries[t]=retries;
+      /* Máximo 3 reintentos con backoff creciente */
+      if(retries<=3){
+        const delay=retries*2000;
+        setTimeout(()=>{if(this.ready)this._queue.add(t);},delay);
+      }else{console.warn('SP push '+t+': abandonado después de 3 reintentos')}
     }finally{
       this._syncing=false;
       if(this._queue.size){const nx=[...this._queue][0];this._queue.delete(nx);this.pushTable(nx)}
@@ -820,7 +872,8 @@ function _sheetFlush(){
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(payload)
-  }).catch(e=>console.log('syncSheet error:',e))
+  }).then(()=>{diagLog('sheet-post','POST Sheet OK: '+(payload.action||'solicitud'))})
+   .catch(e=>{console.log('syncSheet error:',e);diagLog('sheet-err','POST Sheet falló: '+e.message)})
    .finally(()=>{_sheetBusy=false;if(_sheetQueue.length)setTimeout(_sheetFlush,300)});
 }
 function syncEstadoSheet(codigo, nuevoEstado, items){
@@ -965,6 +1018,7 @@ async function solImportarNuevas(){
     }
 
     /* Reset backoff al tener éxito */
+    diagLog('poll-ok','Poll OK — '+nuevas+' nuevas');
     if(_solBackoff>30000&&_solPollTimer){_solBackoff=30000;clearInterval(_solPollTimer);_solPollTimer=setInterval(solImportarNuevas,30000)}
     if(nuevas>0){
       DB.save('solicitudes',existentes);
@@ -976,6 +1030,7 @@ async function solImportarNuevas(){
     // No marcamos como importadas — así todos los usuarios reciben las mismas solicitudes
   }catch(e){
     console.log('Poll solicitudes error:',e);
+    diagLog('poll-err','Poll falló: '+e.message);
     /* Backoff: si falla, esperar más antes del próximo intento */
     if(_solPollTimer){
       clearInterval(_solPollTimer);
@@ -1096,8 +1151,10 @@ async function syncEstadosDesdeSheet(){
       // Refrescar pantalla si estamos en solicitudes
       if(document.querySelector('.sol-tabs')) go('solicitudes');
     }
+    diagLog('sync-estados','Sync estados OK — '+cambios+' cambios');
   }catch(e){
     console.log('Sync estados error:',e);
+    diagLog('poll-err','Sync estados falló: '+e.message);
   }
   _syncingEstados=false;
 }
@@ -1670,7 +1727,8 @@ const PERM_MODULES=[
     {id:'editarops',label:'Editar/eliminar operaciones',icon:'✏️'}
   ]},
   {group:'Admin',items:[
-    {id:'usuarios',label:'Gestión de usuarios',icon:'👤'}
+    {id:'usuarios',label:'Gestión de usuarios',icon:'👤'},
+    {id:'diagnostico',label:'Monitor diagnóstico',icon:'🩺'}
   ]}
 ];
 
@@ -1722,7 +1780,8 @@ const NAV_ITEMS=[
     {id:'missol',icon:'📍',label:'Mis solicitudes'}
   ]},
   {group:'Administración',items:[
-    {id:'usuarios',icon:'👤',label:'Gestión de Usuarios'}
+    {id:'usuarios',icon:'👤',label:'Gestión de Usuarios'},
+    {id:'diagnostico',icon:'🩺',label:'Monitor diagnóstico'}
   ]},
   {group:'Medidores',items:[
     {id:'medidores',icon:'⚡',label:'Inventario medidores'},
@@ -1885,6 +1944,106 @@ SCREENS.stormon=()=>{
     </div>
   </div>`;
 };
+/* ══════════════════════════════════════════════════════════
+   PANTALLA: Monitor de Diagnóstico
+   ══════════════════════════════════════════════════════════ */
+SCREENS.diagnostico=()=>{
+  const c=_diagCounters;
+  const now=new Date();
+  const uptime=c.started?Math.round((now-new Date(c.started))/60000):0;
+  const fmtTs=ts=>{if(!ts)return'—';const d=new Date(ts);return d.toLocaleTimeString('es-AR')};
+  const pill=(val,ok,warn)=>val===0?`<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700">${val}</span>`
+    :val<=warn?`<span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700">${val}</span>`
+    :`<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700">${val}</span>`;
+
+  /* Estado de conexiones */
+  const spStatus=SP.ready?'🟢 Conectado':'🔴 Desconectado';
+  const spUser=SP.isLoggedIn()?SP.getName():'No logueado';
+  const pollStatus=_solPollTimer?'🟢 Activo (cada '+(_solBackoff/1000)+'s)':'🔴 Inactivo';
+  const sheetQueueLen=_sheetQueue.length;
+  const spQueueLen=SP._queue?SP._queue.size:0;
+
+  /* Datos de esta PC */
+  const tablasCounts=SP.TABLES.map(t=>{const d=DB.getAll(t);return{nombre:t,count:d.length}}).filter(t=>t.count>0);
+  tablasCounts.sort((a,b)=>b.count-a.count);
+
+  /* Log reciente */
+  const logReciente=_diagLog.slice(-30).reverse();
+  const logRows=logReciente.map(e=>{
+    const color=e.type.includes('err')||e.type.includes('429')?'#fee2e2':e.type.includes('ok')?'#dcfce7':'#f0f4f8';
+    const icon=e.type.includes('err')?'❌':e.type.includes('ok')?'✅':e.type.includes('429')?'⚠️':'🔄';
+    return `<tr style="background:${color}"><td style="font-size:10px;white-space:nowrap;color:var(--gray)">${fmtTs(e.ts)}</td><td>${icon}</td><td style="font-size:11px">${esc(e.msg)}</td></tr>`;
+  }).join('');
+
+  return `<div class="screen on" style="display:block">
+    <div class="shead"><div class="sicon">🩺</div><div><h1>Monitor de Diagnóstico</h1><p>Estado de sincronización en tiempo real — ${currentUser.nombre} · ${now.toLocaleString('es-AR')}</p></div></div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:800;color:#166534">${c.spPushOk}</div>
+        <div style="font-size:10px;color:#166534;font-weight:600">SP Push OK</div>
+      </div>
+      <div style="background:${c.spPushErr?'#fef2f2':'#f0fdf4'};border:1px solid ${c.spPushErr?'#fca5a5':'#bbf7d0'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:800;color:${c.spPushErr?'#991b1b':'#166534'}">${c.spPushErr}</div>
+        <div style="font-size:10px;color:${c.spPushErr?'#991b1b':'#166534'};font-weight:600">SP Push Errores</div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:800;color:#166534">${c.pollOk}</div>
+        <div style="font-size:10px;color:#166534;font-weight:600">Poll Sheet OK</div>
+      </div>
+      <div style="background:${c.pollErr?'#fef2f2':'#f0fdf4'};border:1px solid ${c.pollErr?'#fca5a5':'#bbf7d0'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:800;color:${c.pollErr?'#991b1b':'#166534'}">${c.pollErr}</div>
+        <div style="font-size:10px;color:${c.pollErr?'#991b1b':'#166534'};font-weight:600">Poll Errores</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
+        <h3 style="font-size:13px;margin:0 0 10px;color:var(--steel)">📡 Estado de Conexiones</h3>
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <tr><td style="padding:4px 0;color:var(--gray)">SharePoint</td><td style="text-align:right;font-weight:600">${spStatus}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Usuario MS</td><td style="text-align:right">${esc(spUser)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Polling Sheet</td><td style="text-align:right;font-weight:600">${pollStatus}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Cola Sheet</td><td style="text-align:right">${sheetQueueLen} pendientes</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Cola SP Push</td><td style="text-align:right">${spQueueLen} pendientes</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Sesión</td><td style="text-align:right">${uptime} min</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Último 429</td><td style="text-align:right;font-size:10px">${c.last429?fmtTs(c.last429):'Ninguno ✅'}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--gray)">Último error</td><td style="text-align:right;font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.lastError||'')}">${c.lastError?esc(c.lastError.slice(11)):'Ninguno ✅'}</td></tr>
+        </table>
+      </div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
+        <h3 style="font-size:13px;margin:0 0 10px;color:var(--steel)">📊 Registros por Tabla</h3>
+        <div style="max-height:220px;overflow-y:auto">
+        <table style="width:100%;font-size:11px;border-collapse:collapse">
+          ${tablasCounts.map(t=>`<tr><td style="padding:2px 0">${t.nombre}</td><td style="text-align:right;font-weight:600">${t.count}</td></tr>`).join('')}
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="font-size:13px;margin:0;color:var(--steel)">📋 Log de Eventos (últimos 30)</h3>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="_diagLog.length=0;_diagCounters.spPush=0;_diagCounters.spPushOk=0;_diagCounters.spPushErr=0;_diagCounters.spPull=0;_diagCounters.sheetPost=0;_diagCounters.sheetPostErr=0;_diagCounters.pollOk=0;_diagCounters.pollErr=0;_diagCounters.syncEstados=0;_diagCounters.last429=null;_diagCounters.lastError=null;go('diagnostico')">🗑️ Limpiar log</button>
+      </div>
+      <div style="max-height:300px;overflow-y:auto">
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr style="background:#f8fafc"><th style="text-align:left;padding:4px">Hora</th><th style="width:24px"></th><th style="text-align:left;padding:4px">Evento</th></tr></thead>
+        <tbody>${logRows||'<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--gray)">Sin eventos todavía — esperá unos segundos</td></tr>'}</tbody>
+      </table>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn primary" onclick="go('diagnostico')" style="font-size:12px">🔄 Refrescar</button>
+      <button class="btn" onclick="SP.pushAll().then(()=>{diagLog('sp-push-ok','Push ALL manual');go('diagnostico')})" style="font-size:12px">📤 Forzar Push SP</button>
+      <button class="btn" onclick="solImportarNuevas().then(()=>go('diagnostico'))" style="font-size:12px">📥 Forzar Poll Sheet</button>
+      <button class="btn" onclick="syncEstadosDesdeSheet().then(()=>go('diagnostico'))" style="font-size:12px">🔄 Forzar Sync Estados</button>
+      <button class="btn" onclick="navigator.clipboard.writeText(JSON.stringify({counters:_diagCounters,log:_diagLog,tablas:SP.TABLES.map(t=>({t,n:DB.getAll(t).length}))},null,2));toast('Diagnóstico copiado al portapapeles')" style="font-size:12px">📋 Copiar diagnóstico</button>
+    </div>
+  </div>`;
+};
+
 SCREENS.home=()=>{
   const oCount=DB.count('obras');
   const despCount=DB.count('despachos');
@@ -2503,7 +2662,7 @@ SCREENS.usuarios=()=>{
     <td class="idcell">${r.id}</td>
     <td>${r.nombre}</td><td>${r.email||'—'}</td><td><code>${r.usuario}</code></td>
     <td>${rolLabel(r.rol)}</td><td>${(r.vistaApp||'app')==='web'?'🖥️ Web':'📱 App'}</td><td>${actLabel(r.activo)}</td>
-    <td class="act-btns"><button onclick="editUsuario(${r.id})">✏️</button><button onclick="toggleUsuario(${r.id})">🔒</button><button onclick="delRecord('usuarios',${r.id},'usuarios')">🗑️</button></td>
+    <td class="act-btns"><button onclick="editUsuario(${r.id})">✏️</button><button onclick="toggleUsuario(${r.id})">🔒</button><button onclick="toggleDiag(${r.id})" title="${(r.permisos||[]).includes('diagnostico')?'Desactivar diagnóstico':'Activar diagnóstico'}" style="opacity:${(r.permisos||[]).includes('diagnostico')?'1':'0.4'}">${(r.permisos||[]).includes('diagnostico')?'🩺':'🩺'}</button><button onclick="delRecord('usuarios',${r.id},'usuarios')">🗑️</button></td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">👤</div><div><h1>Gestión de Usuarios</h1><p>Crear y administrar cuentas de acceso al sistema</p></div></div>
@@ -2607,6 +2766,15 @@ function toggleUsuario(id){
   const r=DB.get('usuarios',id);if(!r)return;
   DB.update('usuarios',id,{activo:!r.activo});
   toast(r.activo?'Usuario desactivado':'Usuario activado');go('usuarios');
+}
+function toggleDiag(id){
+  const r=DB.get('usuarios',id);if(!r)return;
+  const perms=r.permisos||[];
+  const has=perms.includes('diagnostico');
+  const newPerms=has?perms.filter(p=>p!=='diagnostico'):[...perms,'diagnostico'];
+  DB.update('usuarios',id,{permisos:newPerms});
+  toast(has?'Diagnóstico desactivado para '+r.nombre:'Diagnóstico activado para '+r.nombre);
+  go('usuarios');
 }
 function resetPassUsuario(id){
   const newPass=prompt('Nueva contraseña (mín. 6 caracteres):');
@@ -6506,6 +6674,7 @@ function loginAs(nombre,rol,permisos){
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
+  _diagCounters.started=new Date().toISOString();
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
