@@ -1112,6 +1112,8 @@ async function syncEstadosDesdeSheet(){
     let cambios=0;
     locales.forEach(s=>{
       if(!s.codigo) return;
+      /* Solicitudes cerradas o verificadas: no tocar NUNCA desde el Sheet */
+      if(s.cerrada||s.nroDocumento||s.verificadoPor) return;
       // Corregir pidioUsuario si quedó como genérico
       const solSheet=sheetMap[s.codigo];
       if(solSheet && s.pidioUsuario==='Cuadrilla (formulario)'){
@@ -4816,7 +4818,22 @@ SCREENS.solicitudes=()=>{
     let cols='';
     states.forEach((st,i)=>{
       if(!showAprob&&st===EST_APROB)return;
-      const items=sols.filter(s=>s.estado===st);
+      const items=sols.filter(s=>{
+        if(s.estado!==st)return false;
+        if(st==='Entregado'){
+          /* Ocultar: cerradas, verificadas, y Dime/Mant viejas sin verificar */
+          if(s.cerrada)return false;
+          if(s.nroDocumento&&s.nroReserva)return false;
+          const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+          if(esDM){
+            /* Solo mostrar Dime/Mant entregadas de hoy para verificar */
+            const hoy=today();
+            const fEntrega=(s.fechaEntrega||s.fecha||'').slice(0,10);
+            if(fEntrega&&fEntrega<hoy)return false;
+          }
+        }
+        return true;
+      });
       let cards=items.map(s=>solBuildCard(s,st)).join('');
       cols+=`<div class="solcol">
         <div class="solcol-h ${cls[i]}">${icons[i]} ${labels[i]}<span class="cnt">${items.length}</span></div>
@@ -6591,6 +6608,23 @@ function cerrarSolicitud(id){
   toast('📁 Solicitud cerrada');
   closeModal();go('solicitudes');
 }
+/* Auto-cerrar solicitudes Dime/Mant entregadas viejas sin verificar */
+function autoCerrarEntregadasViejas(){
+  const hoy=today();
+  const sols=DB.getAll('solicitudes');
+  let cerradas=0;
+  sols.forEach(s=>{
+    if(s.estado!=='Entregado'||s.cerrada)return;
+    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(!esDM)return;
+    const fEntrega=(s.fechaEntrega||s.fecha||'').slice(0,10);
+    if(fEntrega&&fEntrega<hoy&&!s.nroDocumento){
+      DB.update('solicitudes',s.id,{cerrada:true,cerradaPor:'Sistema (auto)',fechaCierre:nowLocal()});
+      cerradas++;
+    }
+  });
+  if(cerradas)console.log('[Auto-cierre] '+cerradas+' solicitudes Dime/Mant entregadas viejas cerradas automáticamente');
+}
 /* ── Reparar solicitudes OyD y Mantenimiento sin despacho ── */
 function repararDespachosOyD(){
   const sols=DB.getAll('solicitudes');
@@ -6751,6 +6785,7 @@ function loginAs(nombre,rol,permisos){
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
   _diagCounters.started=new Date().toISOString();
+  autoCerrarEntregadasViejas();
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
