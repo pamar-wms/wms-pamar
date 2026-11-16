@@ -4676,12 +4676,13 @@ function validarReservaSolicitud(s){
   itemsAEntregar.forEach(it=>{
     const cant=it.cantEntregada??it.cantidad;
     const ri=reserva.items.find(r=>String(r.matricula)===String(it.matricula));
-    if(!ri){errores.push(it.matricula+' ('+it.descripcion+') no está en la reserva');return}
+    if(!ri){errores.push(it.matricula+' ('+it.descripcion+') no está en la reserva → agregar '+cant+' a la reserva');return}
     const yaDesp=despPrevios.reduce((sum,d)=>sum+(d.items||[]).filter(x=>String(x.matricula)===String(it.matricula)).reduce((ss,x)=>ss+x.cantidad,0),0);
     const disponible=ri.cantidad-yaDesp;
     if(cant>disponible){
-      if(disponible<=0)errores.push(it.matricula+': ya se despachó toda la reserva ('+ri.cantidad+')');
-      else errores.push(it.matricula+': pedís '+cant+' pero solo quedan '+disponible+' en reserva (reservado: '+ri.cantidad+', ya despachado: '+yaDesp+')');
+      const falta=cant-disponible;
+      if(disponible<=0)errores.push(it.matricula+': ya se despachó toda la reserva ('+ri.cantidad+') → agregar '+falta+' más a la reserva');
+      else errores.push(it.matricula+': pedís '+cant+' pero quedan '+disponible+' (reservado: '+ri.cantidad+', despachado: '+yaDesp+') → agregar '+falta+' más a la reserva');
     }
   });
   if(errores.length)return '🚫 Bloqueo de reserva:\n'+errores.join('\n');
