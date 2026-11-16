@@ -3033,8 +3033,22 @@ function saveReserva(){
     editingReservaId=null;
     closeModal();toast('✔ Reserva actualizada — '+validItems.length+' ítem(s)');
   } else {
-    DB.add('reservas',data);
-    closeModal();toast('✔ Reserva registrada — '+validItems.length+' ítem(s)');
+    /* Buscar si ya existe una reserva con misma obra + nroReserva para unificar */
+    const existente=data.nroReserva?DB.getAll('reservas').find(r=>r.obra===data.obra&&r.nroReserva===data.nroReserva):null;
+    if(existente){
+      /* Merge: sumar cantidades de matrículas que ya existen, agregar las nuevas */
+      const merged=[...(existente.items||[])];
+      validItems.forEach(ni=>{
+        const ya=merged.find(m=>String(m.matricula)===String(ni.matricula));
+        if(ya){ya.cantidad+=ni.cantidad}
+        else{merged.push({...ni})}
+      });
+      DB.update('reservas',existente.id,{items:merged,obs:data.obs||existente.obs});
+      closeModal();toast('✔ Materiales unificados a reserva #'+existente.id+' — ahora '+merged.length+' ítem(s)');
+    } else {
+      DB.add('reservas',data);
+      closeModal();toast('✔ Reserva registrada — '+validItems.length+' ítem(s)');
+    }
   }
   go('reservas');
 }
@@ -6625,6 +6639,39 @@ function autoCerrarEntregadasViejas(){
   });
   if(cerradas)console.log('[Auto-cierre] '+cerradas+' solicitudes Dime/Mant entregadas viejas cerradas automáticamente');
 }
+/* ── Unificar reservas duplicadas (misma obra+nroReserva) ── */
+function unificarReservasDuplicadas(){
+  const all=DB.getAll('reservas');
+  const grupos={};
+  all.forEach(r=>{
+    const key=r.obra+'|||'+(r.nroReserva||'');
+    if(!grupos[key])grupos[key]=[];
+    grupos[key].push(r);
+  });
+  let mergeados=0;
+  Object.values(grupos).forEach(arr=>{
+    if(arr.length<2)return;
+    /* Mantener la primera reserva, mergear el resto */
+    const base=arr[0];
+    const merged=[...(base.items||[])];
+    for(let i=1;i<arr.length;i++){
+      const dup=arr[i];
+      (dup.items||[]).forEach(ni=>{
+        const ya=merged.find(m=>String(m.matricula)===String(ni.matricula));
+        if(ya){ya.cantidad+=ni.cantidad}
+        else{merged.push({...ni})}
+      });
+      /* Combinar observaciones si tiene */
+      if(dup.obs&&dup.obs!==base.obs){
+        base.obs=(base.obs||'')+(base.obs?' | ':'')+dup.obs;
+      }
+      DB.del('reservas',dup.id);
+      mergeados++;
+    }
+    DB.update('reservas',base.id,{items:merged,obs:base.obs||''});
+  });
+  if(mergeados)console.log('[Reservas] Unificadas '+mergeados+' reservas duplicadas');
+}
 /* ── Reparar solicitudes OyD y Mantenimiento sin despacho ── */
 function repararDespachosOyD(){
   const sols=DB.getAll('solicitudes');
@@ -6786,6 +6833,7 @@ function loginAs(nombre,rol,permisos){
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
   _diagCounters.started=new Date().toISOString();
   autoCerrarEntregadasViejas();
+  unificarReservasDuplicadas();
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
