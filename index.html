@@ -1039,7 +1039,19 @@ async function solImportarNuevas(){
     let nuevas=0;
 
     for(const sol of data.solicitudes){
-      if(codigos.has(sol.codigo)||deleted.has(sol.codigo)) continue; // ya existe o fue eliminada
+      if(deleted.has(sol.codigo)) continue; // fue eliminada
+      /* Detectar colisión: mismo código pero solicitud diferente (otra área/obra) */
+      if(codigos.has(sol.codigo)){
+        const existente=existentes.find(s=>s.codigo===sol.codigo);
+        if(existente&&(existente.areaSolicitud!==sol.areaSolicitud||existente.obra!==(sol.obra||''))){
+          /* Colisión real: agregar sufijo al código para importar como nueva */
+          sol.codigo=sol.codigo+'-B';
+          if(codigos.has(sol.codigo)) continue; // ya importada con sufijo
+          console.log('[WMS] Colisión detectada: '+existente.codigo+' ya es '+existente.areaSolicitud+', importando nueva como '+sol.codigo+' ('+sol.areaSolicitud+')');
+        }else{
+          continue; // misma solicitud, ya existe
+        }
+      }
       // Parsear materiales
       let items=[];
       try{items=JSON.parse(sol.materiales||'[]');}catch(e){}
@@ -1195,8 +1207,19 @@ async function syncEstadosDesdeSheet(){
     let _nextSolId=Math.max(0,...locales.map(s=>s.id||0))+1;
     let _importados=0;
     Object.values(sheetMap).forEach(solSheet=>{
-      if(!solSheet.codigo||codigosLocales.has(solSheet.codigo)) return;
+      if(!solSheet.codigo) return;
       if(solSheet.estado==='Eliminada') return;
+      /* Detectar colisión: código existe pero es otra solicitud (área/obra distintas) */
+      if(codigosLocales.has(solSheet.codigo)){
+        const existente=locales.find(s=>s.codigo===solSheet.codigo);
+        if(existente&&(existente.areaSolicitud!==(solSheet.areaSolicitud||'')||existente.obra!==(solSheet.obra||''))){
+          solSheet.codigo=solSheet.codigo+'-B';
+          if(codigosLocales.has(solSheet.codigo)) return;
+          console.log('[Sync] Colisión: importando como '+solSheet.codigo+' ('+solSheet.areaSolicitud+')');
+        }else{
+          return;
+        }
+      }
       /* Calcular antigüedad desde el código */
       const mFecha=solSheet.codigo.match(/SOL-(\d{4})(\d{2})(\d{2})/);
       const dias=mFecha?Math.floor((new Date()-new Date(mFecha[1]+'-'+mFecha[2]+'-'+mFecha[3]))/(86400000)):999;
