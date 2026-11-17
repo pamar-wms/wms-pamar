@@ -1012,12 +1012,13 @@ function btnRecargaTotal(){
 }
 
 let _syncEstadosTimer=null;
+let _solSyncLock=false; // lock compartido: evita que ambos syncs corran en paralelo
 function solStartPolling(){
   solStopPolling();
   solImportarNuevas(); // una vez ahora
   _solPollTimer=setInterval(solImportarNuevas, 30000); // cada 30 seg
   // Sync estados en intervalo separado (45s) para no duplicar requests
-  syncEstadosDesdeSheet();
+  setTimeout(()=>syncEstadosDesdeSheet(), 15000); // arrancar desfasado 15s
   _syncEstadosTimer=setInterval(syncEstadosDesdeSheet, 45000);
 }
 function solStopPolling(){
@@ -1026,8 +1027,8 @@ function solStopPolling(){
 }
 
 async function solImportarNuevas(){
-  if(_solImporting) return;
-  _solImporting=true;
+  if(_solImporting||_solSyncLock) return;
+  _solImporting=true;_solSyncLock=true;
   try{
     const resp=await fetch(GSCRIPT_URL+'?action=solicitudes');
     const data=await resp.json();
@@ -1083,6 +1084,7 @@ async function solImportarNuevas(){
         origen:'google_sheets'
       };
       existentes.push(nueva);
+      codigos.add(nueva.codigo); // ← evitar doble-import en el mismo ciclo
       nuevas++;
       // Si es Dime o Mant, actualizar el Sheet a "Pend. aprobación"
       // para que todas las PCs vean el estado correcto
@@ -1114,14 +1116,14 @@ async function solImportarNuevas(){
       console.log('[WMS] Polling backoff:',backoff/1000,'s');
     }
   }
-  _solImporting=false;
+  _solImporting=false;_solSyncLock=false;
 }
 
 // ── SYNC ESTADOS: trae todos los estados del Sheet y actualiza la DB local ──
 let _syncingEstados=false;
 async function syncEstadosDesdeSheet(){
-  if(_syncingEstados) return;
-  _syncingEstados=true;
+  if(_syncingEstados||_solSyncLock) return;
+  _syncingEstados=true;_solSyncLock=true;
   try{
     const ctrl=new AbortController();
     const tmout=setTimeout(()=>ctrl.abort(),15000);
@@ -1258,6 +1260,7 @@ async function syncEstadosDesdeSheet(){
         usuarioEdenor:solSheet.usuarioEdenor||'',
         origen:'google_sheets'
       });
+      codigosLocales.add(solSheet.codigo); // ← evitar doble-import
       _importados++;
       cambios++;
     });
@@ -1274,7 +1277,7 @@ async function syncEstadosDesdeSheet(){
     console.log('Sync estados error:',e);
     diagLog('poll-err','Sync estados falló: '+e.message);
   }
-  _syncingEstados=false;
+  _syncingEstados=false;_solSyncLock=false;
 }
 
 /* Microsoft login flow (from login screen) */
