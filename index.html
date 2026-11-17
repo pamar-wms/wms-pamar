@@ -1116,11 +1116,17 @@ async function syncEstadosDesdeSheet(){
     const resp=await fetch(GSCRIPT_URL+'?action=mis_solicitudes',{signal:ctrl.signal});
     clearTimeout(tmout);
     const data=await resp.json();
-    if(!data.solicitudes||!data.solicitudes.length){_syncingEstados=false;return;}
+    if(!data.solicitudes||!data.solicitudes.length){console.log('[Sync] Sheet devolvió 0 solicitudes');_syncingEstados=false;return;}
+    console.log('[Sync] Sheet devolvió '+data.solicitudes.length+' solicitudes');
     const sheetMap={};
     data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s;});
+    /* Log: cuántas Dime Mide hay en el Sheet */
+    const _dimeEnSheet=data.solicitudes.filter(s=>s.areaSolicitud==='Dime Mide'&&s.estado!=='Eliminada');
+    if(_dimeEnSheet.length) console.log('[Sync] Dime Mide activas en Sheet: '+_dimeEnSheet.length+' → '+_dimeEnSheet.map(s=>s.codigo+'('+s.estado+')').join(', '));
     const locales=DB.getAll('solicitudes');
     const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+    const _dimeLocal=locales.filter(s=>(s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))&&s.estado==='Entregado');
+    console.log('[Sync] Estado: '+locales.length+' sols locales, '+deleted.size+' en borradas, '+_dimeLocal.length+' Dime/Mant Entregado locales');
     /* Reparar: quitar de la lista de borradas los códigos que en el Sheet NO están Eliminada */
     let deletedFixed=false;
     deleted.forEach(cod=>{
@@ -1181,28 +1187,32 @@ async function syncEstadosDesdeSheet(){
         if(s.codigo)syncEstadoSheet(s.codigo,s.estado,s.items);
       }
     });
-    /* Importar solicitudes del Sheet que no existen localmente (creadas en otra PC) */
-    const codigosLocales=new Set(locales.map(s=>s.codigo));
+    /* Importar solicitudes del Sheet que no existen localmente (creadas en otra PC o perdidas) */
+    const codigosLocales=new Set(locales.map(s=>s.codigo).filter(Boolean));
     let _nextSolId=Math.max(0,...locales.map(s=>s.id||0))+1;
+    let _importados=0;
     Object.values(sheetMap).forEach(solSheet=>{
       if(!solSheet.codigo||codigosLocales.has(solSheet.codigo)) return;
       if(solSheet.estado==='Eliminada') return;
-      /* Si está en la lista de borradas... */
+      /* Calcular antigüedad desde el código */
+      const mFecha=solSheet.codigo.match(/SOL-(\d{4})(\d{2})(\d{2})/);
+      const dias=mFecha?Math.floor((new Date()-new Date(mFecha[1]+'-'+mFecha[2]+'-'+mFecha[3]))/(86400000)):999;
+      /* Si está en wms_sol_deleted, re-importar si es reciente (<30 días) y tiene estado activo */
       if(deleted.has(solSheet.codigo)){
-        /* Solicitud Entregado reciente (< 7 días): re-importar siempre — puede faltar verificar o generar despacho */
-        const mFecha=solSheet.codigo.match(/SOL-(\d{4})(\d{2})(\d{2})/);
-        if(mFecha){
-          const dias=Math.floor((new Date()-new Date(mFecha[1]+'-'+mFecha[2]+'-'+mFecha[3]))/(86400000));
-          if(dias<7&&solSheet.estado==='Entregado'){
-            deleted.delete(solSheet.codigo);
-            console.log('[Sync] Re-importando '+solSheet.codigo+' (Entregado reciente, estaba en borradas)');
-          }else{return} /* vieja o no entregado → respetar borrada */
-        }else{return}
+        const estadoActivo=['Pendiente','Pend. aprobación','En preparación','Listo','Entregado'].includes(solSheet.estado);
+        if(dias<=30&&estadoActivo){
+          deleted.delete(solSheet.codigo);
+          console.log('[Sync] Re-importando '+solSheet.codigo+' ('+solSheet.estado+', '+dias+' días, estaba en borradas)');
+        }else{
+          console.log('[Sync] Saltando '+solSheet.codigo+' ('+solSheet.estado+', '+dias+' días, en borradas)');
+          return;
+        }
       }
       let items=[];
       try{items=JSON.parse(solSheet.materiales||'[]').map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u'}));}catch(e){}
       const esDime=solSheet.esDime==='Si'||solSheet.esDime===true;
       const esMant=solSheet.areaSolicitud==='Mantenimiento';
+      console.log('[Sync] Importando '+solSheet.codigo+' ('+solSheet.estado+', area:'+solSheet.areaSolicitud+', '+dias+'d)');
       locales.push({
         id:_nextSolId++,
         codigo:solSheet.codigo,
@@ -1222,6 +1232,7 @@ async function syncEstadosDesdeSheet(){
         usuarioEdenor:solSheet.usuarioEdenor||'',
         origen:'google_sheets'
       });
+      _importados++;
       cambios++;
     });
     if(cambios>0){
@@ -1231,7 +1242,8 @@ async function syncEstadosDesdeSheet(){
       // Refrescar pantalla si estamos en solicitudes
       if(document.querySelector('.sol-tabs')) go('solicitudes');
     }
-    diagLog('sync-estados','Sync estados OK — '+cambios+' cambios');
+    if(_importados>0) console.log('[Sync] TOTAL importados del Sheet: '+_importados+' solicitudes');
+    diagLog('sync-estados','Sync estados OK — '+cambios+' cambios, '+_importados+' importados del Sheet');
   }catch(e){
     console.log('Sync estados error:',e);
     diagLog('poll-err','Sync estados falló: '+e.message);
