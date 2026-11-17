@@ -4770,7 +4770,15 @@ function generarRemitoEntrega(s){
 }
 let _solTabArea='Todas';
 function solSetTab(area){_solTabArea=area;go('solicitudes')}
-function solGetArea(s){return s.areaSolicitud||obraArea(s.obra)||'Sin área'}
+function solGetArea(s){
+  if(s.areaSolicitud)return s.areaSolicitud;
+  if(s.esDime)return 'Dime Mide';
+  if(s.esMant)return 'Mantenimiento';
+  const oa=obraArea(s.obra);
+  if(oa)return oa;
+  /* Sin area ni obra válida → default OyD */
+  return 'Obra y Distribución';
+}
 function solBuildCard(s,st){
   const urgCls=s.urgencia==='Urgente'?'alta':s.urgencia==='Normal'?'med':'baja';
   const cut=t=>(t||'').length>24?(t||'').slice(0,23)+'…':(t||'');
