@@ -744,7 +744,23 @@ const SP={
       const data=localStorage.getItem('wms_'+t)||'[]';
       const base='/sites/'+this.siteId+'/lists/'+this.listId;
       if(this._itemCache[t]){
-        await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
+        try{
+          await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
+        }catch(patchErr){
+          /* Si el item fue borrado (404), limpiar cache y buscar por Title */
+          if(patchErr.message&&patchErr.message.includes('404')){
+            diagLog('sp-push','Item '+this._itemCache[t]+' no existe, rebuscando '+t);
+            delete this._itemCache[t];
+            const search2=await this.gGet(base+'/items?$filter=fields/Title eq \''+t+'\'&$expand=fields&$top=1');
+            if(search2.value&&search2.value.length>0){
+              this._itemCache[t]=search2.value[0].id;
+              await this.gPatch(base+'/items/'+this._itemCache[t]+'/fields',{TableData:data});
+            }else{
+              const ni=await this.gPost(base+'/items',{fields:{Title:t,TableData:data}});
+              this._itemCache[t]=ni.id;
+            }
+          }else{throw patchErr}
+        }
       }else{
         /* Buscar item existente por Title antes de crear uno nuevo */
         try{
@@ -4841,9 +4857,12 @@ SCREENS.solicitudes=()=>{
     if(s.estado==='Rechazada')return false;
     if(s.estado==='Entregado'){
       if(s.cerrada)return false;
-      if(s.nroDocumento&&s.nroReserva)return false;
-      const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-      if(esDM){const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);if(fE&&fE<hoy)return false}
+      /* Verificada (tiene doc+reserva) y de día anterior → ocultar */
+      if(s.nroDocumento&&s.nroReserva){
+        const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
+        if(fE&&fE<hoy)return false;
+      }
+      /* NO verificada → mantener visible hasta que se verifique o se auto-cierre (7 días) */
     }
     return true;
   };
@@ -6743,12 +6762,38 @@ function autoCerrarEntregadasViejas(){
     const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
     if(!esDM)return;
     const fEntrega=(s.fechaEntrega||s.fecha||'').slice(0,10);
-    if(fEntrega&&fEntrega<hoy&&!s.nroDocumento){
+    if(!fEntrega||fEntrega>=hoy)return;
+    /* Si ya fue verificada (tiene nroDocumento Y nroReserva) → cerrar */
+    if(s.nroDocumento&&s.nroReserva){
       DB.update('solicitudes',s.id,{cerrada:true,cerradaPor:'Sistema (auto)',fechaCierre:nowLocal()});
+      cerradas++;
+      return;
+    }
+    /* Si NO fue verificada, darle 7 días antes de auto-cerrar */
+    const diasPasados=Math.floor((new Date(hoy)-new Date(fEntrega))/(86400000));
+    if(diasPasados>=7){
+      DB.update('solicitudes',s.id,{cerrada:true,cerradaPor:'Sistema (auto-7d)',fechaCierre:nowLocal()});
       cerradas++;
     }
   });
   if(cerradas)console.log('[Auto-cierre] '+cerradas+' solicitudes Dime/Mant entregadas viejas cerradas automáticamente');
+  /* Reparar: reabrir las que fueron cerradas por el sistema sin verificar (menos de 7 días) */
+  let reabiertas=0;
+  DB.getAll('solicitudes').forEach(s=>{
+    if(s.estado!=='Entregado'||!s.cerrada)return;
+    if(s.cerradaPor!=='Sistema (auto)')return;
+    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(!esDM)return;
+    if(s.nroDocumento&&s.nroReserva)return; /* ya verificada, está bien cerrada */
+    const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
+    if(!fE)return;
+    const dias=Math.floor((new Date(hoy)-new Date(fE))/(86400000));
+    if(dias<7){
+      DB.update('solicitudes',s.id,{cerrada:false,cerradaPor:'',fechaCierre:''});
+      reabiertas++;
+    }
+  });
+  if(reabiertas)console.log('[Reparación] '+reabiertas+' solicitud(es) Dime/Mant reabierta(s) — faltaba verificar');
 }
 /* ── Unificar reservas duplicadas (misma obra+nroReserva) ── */
 function unificarReservasDuplicadas(){
