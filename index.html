@@ -1125,8 +1125,9 @@ async function syncEstadosDesdeSheet(){
     if(_dimeEnSheet.length) console.log('[Sync] Dime Mide activas en Sheet: '+_dimeEnSheet.length+' → '+_dimeEnSheet.map(s=>s.codigo+'('+s.estado+')').join(', '));
     const locales=DB.getAll('solicitudes');
     const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
-    const _dimeLocal=locales.filter(s=>(s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))&&s.estado==='Entregado');
-    console.log('[Sync] Estado: '+locales.length+' sols locales, '+deleted.size+' en borradas, '+_dimeLocal.length+' Dime/Mant Entregado locales');
+    const _dimeLocal=locales.filter(s=>s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud));
+    console.log('[Sync] Estado: '+locales.length+' sols locales, '+deleted.size+' en borradas, '+_dimeLocal.length+' Dime/Mant locales TOTAL');
+    if(_dimeLocal.length) console.log('[Sync] Dime/Mant en LOCAL: '+_dimeLocal.map(s=>s.codigo+'('+s.estado+(s.cerrada?',CERRADA':'')+')').join(', '));
     /* Reparar: quitar de la lista de borradas los códigos que en el Sheet NO están Eliminada */
     let deletedFixed=false;
     deleted.forEach(cod=>{
