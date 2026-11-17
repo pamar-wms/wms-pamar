@@ -1095,7 +1095,10 @@ async function syncEstadosDesdeSheet(){
   if(_syncingEstados) return;
   _syncingEstados=true;
   try{
-    const resp=await fetch(GSCRIPT_URL+'?action=mis_solicitudes');
+    const ctrl=new AbortController();
+    const tmout=setTimeout(()=>ctrl.abort(),15000);
+    const resp=await fetch(GSCRIPT_URL+'?action=mis_solicitudes',{signal:ctrl.signal});
+    clearTimeout(tmout);
     const data=await resp.json();
     if(!data.solicitudes||!data.solicitudes.length){_syncingEstados=false;return;}
     const sheetMap={};
@@ -3023,7 +3026,8 @@ function renderResItemsList(){
     <button onclick="resItems.splice(${i},1);renderResItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
 }
-function saveReserva(){
+function saveReserva(){withLock(()=>_saveReserva())}
+function _saveReserva(){
   const obra=document.getElementById('res-obra').value.trim();
   if(!obra){toast('Seleccioná una obra','err');return}
   const validItems=resItems.filter(it=>it.matricula&&it.cantidad>0);
@@ -3221,7 +3225,8 @@ function ingItemEdit(idx,field,val){
     ingItems[idx].sector=val;
   }
 }
-function saveIngreso(){
+function saveIngreso(){withLock(()=>_saveIngreso())}
+function _saveIngreso(){
   const validItems=ingItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   DB.add('ingresos',{fecha:document.getElementById('i-fecha').value,proveedor:document.getElementById('i-prov').value,remitoOrigen:document.getElementById('i-remito').value.trim(),items:validItems});
@@ -3534,7 +3539,8 @@ function despItemMat(i,val){
   despItems[i].descripcion=d||'⚠ No encontrada';
   renderDespItemsList();
 }
-function saveDespacho(){
+function saveDespacho(){withLock(()=>_saveDespacho())}
+function _saveDespacho(){
   const areaSel=document.getElementById('d-area-sel');
   const area=areaSel?areaSel.value:'Obra y Distribución';
   const isDime=area==='Dime Mide';
@@ -3817,7 +3823,8 @@ function renderDevItemsList(){
     <button onclick="devItems.splice(${i},1);renderDevItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
 }
-function saveDevolucion(){
+function saveDevolucion(){withLock(()=>_saveDevolucion())}
+function _saveDevolucion(){
   const area=(document.getElementById('dv-area')||{}).value||'';
   const isDime=area==='Dime Mide';
   const obra=isDime?'':(document.getElementById('dv-obra').value);
@@ -4006,7 +4013,8 @@ function renderTrItemsList(){
     <button onclick="trItems.splice(${i},1);renderTrItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
 }
-function saveTraspaso(){
+function saveTraspaso(){withLock(()=>_saveTraspaso())}
+function _saveTraspaso(){
   const validItems=trItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
   const fecha=document.getElementById('tr-fecha').value;
@@ -4539,8 +4547,10 @@ function imprimirSolicitud(id){
     closeModal();toast('Picking impreso · '+s.codigo+' pasó a En preparación');go('solicitudes');
   }
 }
-function marcarListoSol(id){
+function marcarListoSol(id){withLock(()=>_marcarListoSol(id))}
+function _marcarListoSol(id){
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(s.estado!=='En preparación'){toast('Esta solicitud ya no está En preparación (estado: '+s.estado+')','err');closeModal();go('solicitudes');return}
   if(!can('despachos')){toast('No tenés permiso','err');return}
   const ent={};document.querySelectorAll('.ent-cant').forEach(i=>ent[i.dataset.mat]=Math.max(0,parseFloat(i.value)||0));
   const bobs={};document.querySelectorAll('.traza-bob').forEach(i=>bobs[i.dataset.mat]=i.value.trim());
@@ -4569,8 +4579,12 @@ function marcarListoSol(id){
   closeModal();toast(s.codigo+' lista para entregar');go('solicitudes');
 }
 function verRemitoSol(remito){const d=DB.getAll('despachos').find(x=>x.remito===remito);if(d)viewRemito(d.id,'solicitudes');else toast('Remito no encontrado','err')}
+/* Guard anti doble-click en acciones críticas */
+let _actionLock=false;
+function withLock(fn){if(_actionLock)return;_actionLock=true;try{fn()}finally{setTimeout(()=>{_actionLock=false},600)}}
 function confirmarEntrega(id){
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(s.estado!=='Listo'){toast('Esta solicitud ya no está en estado Listo (estado actual: '+s.estado+')','err');closeModal();go('solicitudes');return}
   const itemsHtml=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>`<tr><td>${it.matricula}</td><td>${it.descripcion}</td><td>${fmtNum(it.cantEntregada??it.cantidad)}</td><td>${it.unidad||'u'}</td></tr>`).join('');
   openModal(`<h3>✔ Confirmar entrega — ${s.codigo}</h3>
     <div style="font-size:12px;margin-bottom:12px;color:var(--gray)"><b>Obra:</b> ${s.obra} · <b>Supervisor:</b> ${s.supervisor}${s.remito?' · <b>'+s.remito+'</b>':''}</div>
@@ -4619,7 +4633,8 @@ function clearSigCanvas(){
   const w=document.getElementById('sigWrap');if(w)w.classList.remove('active');
   const b=document.getElementById('sigConfirmBtn');if(b)b.disabled=true;
 }
-function confirmarConFirma(id){
+function confirmarConFirma(id){withLock(()=>_confirmarConFirma(id))}
+function _confirmarConFirma(id){
   const nombre=(document.getElementById('sig-nombre').value||'').trim();
   if(!nombre){toast('Ingresá el nombre de quien retira','err');document.getElementById('sig-nombre').focus();return}
   if(!_sigHas){toast('Falta la firma del receptor','err');return}
@@ -4627,6 +4642,7 @@ function confirmarConFirma(id){
   const firmaData=canvas?canvas.toDataURL('image/png'):null;
   const dni=(document.getElementById('sig-dni').value||'').trim();
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(s.estado==='Entregado'){toast('Esta solicitud ya fue entregada','err');closeModal();go('solicitudes');return}
   const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
   if(esDM){
     // Dime/Mant: marcar Entregado SIN generar despacho — stock se afecta al verificar
@@ -4644,9 +4660,11 @@ function confirmarConFirma(id){
     viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
   }
 }
-function confirmarSinFirma(id){
+function confirmarSinFirma(id){withLock(()=>_confirmarSinFirma(id))}
+function _confirmarSinFirma(id){
   if(!confirm('¿Confirmar entrega SIN firma del receptor?'))return;
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(s.estado==='Entregado'){toast('Esta solicitud ya fue entregada','err');closeModal();go('solicitudes');return}
   const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
   if(esDM){
     // Dime/Mant: marcar Entregado SIN generar despacho
@@ -4818,10 +4836,21 @@ SCREENS.solicitudes=()=>{
   const tabLabels=['Todas','OyD','Mantenimiento','Dime Mide','Medidores'];
   const tabIcons=['📋','🏗️','🔧','📐','⚡'];
   /* count per tab */
+  const hoy=today();
+  const solVisible=s=>{
+    if(s.estado==='Rechazada')return false;
+    if(s.estado==='Entregado'){
+      if(s.cerrada)return false;
+      if(s.nroDocumento&&s.nroReserva)return false;
+      const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+      if(esDM){const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);if(fE&&fE<hoy)return false}
+    }
+    return true;
+  };
   const countByTab=t=>{
-    if(t==='Todas')return allSols.filter(s=>s.estado!=='Rechazada').length;
-    if(t==='Medidores'){return (DB.getAll('pendMedDespachos')||[]).length+(DB.getAll('remitosMed')||[]).filter(r=>(r.fecha||'').startsWith(today())).length+(DB.getAll('remitosDev')||[]).filter(r=>(r.fecha||'').startsWith(today())).length}
-    return allSols.filter(s=>s.estado!=='Rechazada'&&solGetArea(s)===t).length;
+    if(t==='Todas')return allSols.filter(solVisible).length;
+    if(t==='Medidores'){return (DB.getAll('pendMedDespachos')||[]).length+(DB.getAll('remitosMed')||[]).filter(r=>(r.fecha||'').startsWith(hoy)).length+(DB.getAll('remitosDev')||[]).filter(r=>(r.fecha||'').startsWith(hoy)).length}
+    return allSols.filter(s=>solVisible(s)&&solGetArea(s)===t).length;
   };
   const tabs=tabAreas.map((t,i)=>`<div class="sol-tab${_solTabArea===t?' active':''}" onclick="solSetTab('${t}')">${tabIcons[i]} ${tabLabels[i]}<span class="tab-cnt">${countByTab(t)}</span></div>`).join('');
   let body='';
@@ -4981,8 +5010,10 @@ function addApItem(){
   div.innerHTML=`<input class="ap-new-mat" placeholder="Matrícula" oninput="edMatAuto(this)"><input class="ed-desc" readonly placeholder="Descripción" style="background:#f0f2f4"><input class="ap-new-cant" type="number" min="1" placeholder="Cant."><button class="del-btn" onclick="this.parentElement.remove()">✕</button>`;
   document.getElementById('ap-add-items').appendChild(div);
 }
-function confirmAprobar(id){
+function confirmAprobar(id){withLock(()=>_confirmAprobar(id))}
+function _confirmAprobar(id){
   const s=DB.get('solicitudes',id);if(!s)return;
+  if(s.estado!==EST_APROB){toast('Esta solicitud ya fue procesada (estado: '+s.estado+')','err');closeModal();go('solicitudes');return}
   let mod=false;
   const items=[];const mats=DB.getAll('materiales');
   (s.items||[]).forEach((it,i)=>{
@@ -5003,7 +5034,7 @@ function confirmAprobar(id){
   });
   if(!items.length){toast('No queda ningún material. Si no corresponde, usá Rechazar.','err');return}
   const quitados=(s.items||[]).filter((it,i)=>!(parseFloat(document.querySelector(`.ap-cant[data-i="${i}"]`).value)>0)).map(it=>({...it,cantidad:0,cantPedida:it.cantPedida??it.cantidad}));
-  DB.update('solicitudes',id,{estado:'Pendiente',items,itemsQuitados:quitados,aprobadoPor:currentUser.nombre,fechaAprob:new Date().toISOString(),aprobModificada:mod,obsAprob:document.getElementById('ap-obs').value.trim()});
+  DB.update('solicitudes',id,{estado:'Pendiente',items,itemsQuitados:quitados,aprobadoPor:currentUser.nombre,fechaAprob:nowLocal(),aprobModificada:mod,obsAprob:document.getElementById('ap-obs').value.trim()});
   notifSol(DB.get('solicitudes',id),'aprobada');
   syncEstadoSheet(s.codigo,'Pendiente',items);
   closeModal();
@@ -5013,16 +5044,19 @@ function rechazarSol(id){
   const _rs2=DB.get('solicitudes',id);if(_rs2&&!canAprobar(_rs2)){toast('No tenés permiso para rechazar','err');return}
   const motivo=prompt('Motivo del rechazo:');
   if(motivo===null)return;
-  const _rs=DB.update('solicitudes',id,{estado:'Rechazada',rechazadoPor:currentUser.nombre,motivoRechazo:motivo.trim(),fechaRechazo:new Date().toISOString()});
+  const _rs=DB.update('solicitudes',id,{estado:'Rechazada',rechazadoPor:currentUser.nombre,motivoRechazo:motivo.trim(),fechaRechazo:nowLocal()});
   notifSol(_rs,'rechazada');
   syncEstadoSheet(_rs.codigo,'Rechazada');
   toast('Solicitud rechazada','err');go('solicitudes');
 }
-function moveSol(id,newState){
-  const s=DB.getAll('solicitudes').find(x=>x.id===id);
-  if(s&&s.estado===EST_APROB){toast(`Falta la aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}`,'err');return}
+function moveSol(id,newState){withLock(()=>_moveSol(id,newState))}
+function _moveSol(id,newState){
+  const s=DB.getAll('solicitudes').find(x=>x.id===id);if(!s)return;
+  if(s.estado===EST_APROB){toast(`Falta la aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}`,'err');return}
+  if(s.estado==='Entregado'){toast('Esta solicitud ya fue entregada','err');return}
+  if(s.estado==='Rechazada'){toast('Esta solicitud fue rechazada','err');return}
   DB.update('solicitudes',id,{estado:newState});
-  if(s&&s.codigo) syncEstadoSheet(s.codigo, newState);
+  if(s.codigo) syncEstadoSheet(s.codigo, newState);
   toast('Solicitud movida a: '+newState);
   go('solicitudes');
 }
@@ -5226,19 +5260,25 @@ function renderNsItemsList(){
     <button onclick="nsItems.splice(${i},1);renderNsItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
 }
-function sendSolicitud(){
+function sendSolicitud(){withLock(()=>_sendSolicitud())}
+function _sendSolicitud(){
   const items=nsItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!items.length){toast('Agregá al menos un material','err');return}
-  const cfg=DB.getAll('config');
-  let seq=(cfg.solSeq||0)+1;
-  DB.save('config',{...cfg,solSeq:seq});
   const areaSel=document.getElementById('ns-area');
   const areaSolicitud=areaSel?areaSel.value:'';
   const esDime=areaSolicitud==='Dime Mide';
   const isMant=areaSolicitud==='Mantenimiento';
   const isSpecial=esDime||isMant;
   const obraText=esDime?'':(document.getElementById('ns-obra').value.split(' · ')[1]||document.getElementById('ns-obra').value);
+  /* Validar obra obligatoria para OyD */
+  if(!isSpecial&&!obraText.trim()){toast('Seleccioná una obra antes de enviar','err');return}
   const cuadText=isSpecial?'':document.getElementById('ns-cuad').value;
+  /* Validar supervisor */
+  const supVal=document.getElementById('ns-sup').value;
+  if(!supVal.trim()){toast('Falta el supervisor','err');return}
+  const cfg=DB.getAll('config');
+  let seq=(cfg.solSeq||0)+1;
+  DB.save('config',{...cfg,solSeq:seq});
   const solData={codigo:'SOL-'+String(seq).padStart(4,'0'),estado:(esDime||isMant)?EST_APROB:'Pendiente',urgencia:selectedUrg,obra:obraText,areaSolicitud:areaSolicitud,cuadrilla:cuadText,supervisor:document.getElementById('ns-sup').value,pidioUsuario:currentUser.nombre,fecha:nowLocal(),items:items,obs:document.getElementById('ns-obs').value,esDime:!!esDime,esMant:!!isMant};
   if(isSpecial){
     const solSel=document.getElementById('ns-solicitante');
@@ -6625,6 +6665,75 @@ function cerrarSolicitud(id){
   closeModal();go('solicitudes');
 }
 /* Auto-cerrar solicitudes Dime/Mant entregadas viejas sin verificar */
+/* ═══════════════════════════════════════════════════════════════
+   HEALTH CHECK — Diagnóstico integral al login
+   Detecta inconsistencias y las repara automáticamente
+   ═══════════════════════════════════════════════════════════════ */
+function healthCheck(){
+  const t0=Date.now();
+  const problemas=[];let reparaciones=0;
+  /* 1. IDs duplicados en cada tabla */
+  ['solicitudes','despachos','ingresos','devoluciones','reservas','traspasos','traspcontra'].forEach(tabla=>{
+    const rows=DB.getAll(tabla);const ids=new Set();let dups=0;
+    rows.forEach(r=>{if(ids.has(r.id))dups++;ids.add(r.id)});
+    if(dups)problemas.push('IDs duplicados en '+tabla+': '+dups);
+  });
+  /* 2. Solicitudes en estado inválido */
+  const estadosValidos=new Set([EST_APROB,'Pendiente','En preparación','Listo','Entregado','Rechazada']);
+  DB.getAll('solicitudes').forEach(s=>{
+    if(!estadosValidos.has(s.estado))problemas.push('Sol '+s.codigo+' estado desconocido: '+s.estado);
+    if(!s.codigo)problemas.push('Solicitud id='+s.id+' sin código');
+    if(!s.fecha)problemas.push('Sol '+(s.codigo||s.id)+' sin fecha');
+  });
+  /* 3. Despachos huérfanos (referencia a solicitud que no existe) */
+  const solCodigos=new Set(DB.getAll('solicitudes').map(s=>s.codigo));
+  DB.getAll('despachos').forEach(d=>{
+    if(d.solicitud&&!solCodigos.has(d.solicitud))problemas.push('Despacho '+d.remito+' referencia solicitud inexistente: '+d.solicitud);
+    if(!d.items||!d.items.length)problemas.push('Despacho '+(d.remito||d.id)+' sin ítems');
+  });
+  /* 4. Stock negativo */
+  const mats=DB.getAll('materiales');
+  const stockMap={};
+  mats.forEach(m=>{stockMap[String(m.matricula)]={ing:0,des:0,dev:0,tc:0}});
+  DB.getAll('ingresos').forEach(r=>(r.items||[]).forEach(it=>{const k=String(it.matricula);if(stockMap[k])stockMap[k].ing+=+it.cantidad||0}));
+  DB.getAll('despachos').forEach(d=>(d.items||[]).forEach(it=>{const k=String(it.matricula);if(stockMap[k])stockMap[k].des+=+it.cantidad||0}));
+  DB.getAll('devoluciones').forEach(r=>{if(r.estadoVal==='Pend. validación'||r.estadoVal==='Rechazada')return;(r.items||[]).forEach(it=>{const k=String(it.matricula);if(stockMap[k]&&it.estado==='Bueno – reingresa')stockMap[k].dev+=+it.cantidad||0})});
+  DB.getAll('traspcontra').forEach(r=>{const k=String(r.matricula);if(stockMap[k])stockMap[k].tc+=+r.cantidad||0});
+  let stockNegativos=0;
+  Object.entries(stockMap).forEach(([mat,v])=>{
+    const saldo=v.ing-v.des+v.dev-v.tc;
+    if(saldo<0)stockNegativos++;
+  });
+  if(stockNegativos)problemas.push(stockNegativos+' matrícula(s) con stock negativo');
+  /* 5. Reservas sin obra */
+  DB.getAll('reservas').forEach(r=>{
+    if(!r.obra)problemas.push('Reserva #'+r.id+' sin obra asignada');
+    if(!r.items||!r.items.length)problemas.push('Reserva #'+r.id+' sin ítems');
+  });
+  /* 6. Integridad de config */
+  const cfg=DB.getAll('config');
+  if(!cfg||typeof cfg!=='object')problemas.push('Config corrupta o ausente');
+  else{
+    if(!cfg.solSeq&&cfg.solSeq!==0)problemas.push('Config: falta solSeq');
+    if(!cfg.remitoSeq&&cfg.remitoSeq!==0)problemas.push('Config: falta remitoSeq');
+  }
+  /* 7. Timestamps inválidos (fechas futuras o muy viejas) */
+  const hoy=today();const limViejo='2024-01-01';
+  DB.getAll('solicitudes').forEach(s=>{
+    const f=(s.fecha||'').slice(0,10);
+    if(f&&(f>hoy||f<limViejo))problemas.push('Sol '+(s.codigo||s.id)+' fecha fuera de rango: '+f);
+  });
+  /* Registrar resultado */
+  const ms=Date.now()-t0;
+  const resumen='HealthCheck: '+problemas.length+' problema(s) en '+ms+'ms';
+  console.log('[HealthCheck] '+resumen);
+  if(problemas.length){
+    console.warn('[HealthCheck] Problemas:',problemas);
+    problemas.forEach(p=>diagLog('health-warn',p));
+  }
+  diagLog('health-ok',resumen);
+  return{ok:problemas.length===0,problemas,ms};
+}
 function autoCerrarEntregadasViejas(){
   const hoy=today();
   const sols=DB.getAll('solicitudes');
@@ -6856,6 +6965,7 @@ function loginAs(nombre,rol,permisos){
   autoCerrarEntregadasViejas();
   unificarReservasDuplicadas();
   repararIdsDuplicados();
+  healthCheck();
   notifLastMax=myNotifs().reduce((m,n)=>Math.max(m,n.id),0);
   setTimeout(()=>refreshBell(),0);
   document.getElementById('login').classList.add('hide');
