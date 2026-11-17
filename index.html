@@ -6981,7 +6981,16 @@ function limpiarEntregadosAyer(){
     // Dime/Mant: solo borrar si están cerradas (grises) y de un día anterior
     const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
     if(esDM&&!s.cerrada)return;
-    if(esDM&&s.cerrada){const fc=(s.fechaCierre||'').slice(0,10);if(!fc||fc>=hoy)return;DB.del('solicitudes',s.id);borrados++;return}
+    if(esDM&&s.cerrada){
+      /* Solo borrar si fue verificada O si lleva más de 7 días cerrada */
+      if(!s.nroDocumento&&!s.nroReserva){
+        const fc=(s.fechaCierre||'').slice(0,10);
+        const diasCerrada=fc?Math.floor((new Date(hoy)-new Date(fc))/(86400000)):0;
+        if(diasCerrada<7)return; /* mantener para que la verifiquen */
+      }
+      const fc=(s.fechaCierre||'').slice(0,10);if(!fc||fc>=hoy)return;
+      DB.del('solicitudes',s.id);borrados++;return;
+    }
     // OyD: solo borrar si tiene fechaEntrega (no usar fecha de pedido como fallback)
     // y solo si ya tiene despacho generado (para no perder entregas sin descontar stock)
     if(!s.fechaEntrega)return;
@@ -6992,9 +7001,30 @@ function limpiarEntregadosAyer(){
       borrados++;
     }
   });
-  if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s) (Dime/Mant excluidas)');
-  /* Purgar wms_sol_deleted: mantener máximo 200 entradas más recientes */
-  try{const del=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');if(del.length>200){localStorage.setItem('wms_sol_deleted',JSON.stringify(del.slice(-200)))}}catch(e){}
+  if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s)');
+  /* Asegurar que las Dime/Mant no verificadas no estén en la lista de borradas, para que el sync las re-importe */
+  try{
+    const del=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');
+    const locCods=new Set(DB.getAll('solicitudes').map(s=>s.codigo));
+    /* Quitar de la lista de borradas cualquier código que no exista localmente Y no sea viejo (menos de 7 días) */
+    const ahora=new Date();
+    const filtrado=del.filter(cod=>{
+      if(locCods.has(cod))return true; /* existe localmente, mantener en lista */
+      /* Extraer fecha del código: SOL-YYYYMMDD-NNN */
+      const m=cod.match(/SOL-(\d{4})(\d{2})(\d{2})/);
+      if(!m)return true;
+      const fCod=new Date(m[1]+'-'+m[2]+'-'+m[3]);
+      const dias=Math.floor((ahora-fCod)/(86400000));
+      if(dias<7)return false; /* reciente y no existe local → sacar de borradas para que se re-importe */
+      return true;
+    });
+    if(filtrado.length!==del.length){
+      localStorage.setItem('wms_sol_deleted',JSON.stringify(filtrado.slice(-200)));
+      console.log('[Reparación] '+(del.length-filtrado.length)+' código(s) sacados de lista borradas para re-importar');
+    }else if(del.length>200){
+      localStorage.setItem('wms_sol_deleted',JSON.stringify(del.slice(-200)));
+    }
+  }catch(e){}
 }
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
