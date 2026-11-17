@@ -6917,9 +6917,10 @@ function repararDespachosOyD(){
       reparadas++;
       return;
     }
-    // Solo reparar si tiene obra (Dime Mide sin obra no genera despacho)
-    if(!s.obra)return;
-    const o=obras.find(x=>x.nombre===s.obra)||{};
+    // Dime/Mant sin obra → igual generar despacho (obra queda vacía pero el movimiento se registra)
+    const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(!s.obra&&!_esDM)return; // OyD sin obra sí salta
+    const o=s.obra?(obras.find(x=>x.nombre===s.obra)||{}):{};
     const items=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0).map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantEntregada??it.cantidad,unidad:it.unidad||'Unidad',nBobina:it.nBobina,nEdenor:it.nEdenor}));
     if(!items.length)return;
     /* Usar localStorage directo para evitar race condition en loop */
@@ -6928,7 +6929,7 @@ function repararDespachosOyD(){
     const despAllR=DB.getAll('despachos');let inR=0;
     while(despAllR.find(d=>d.remito===remitoR)&&inR<10){seqR++;remitoR='R-'+String(seqR).padStart(7,'0');inR++}
     cfgR.remitoSeq=seqR;localStorage.setItem('wms_config',JSON.stringify(cfgR));
-    const desp=DB.add('despachos',{fecha:s.fechaEntrega||s.fecha||today(),fechaHora:s.fechaEntrega||nowLocal(),obra:s.obra,area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito:remitoR,items,solicitud:s.codigo,reparado:true});
+    const desp=DB.add('despachos',{fecha:s.fechaEntrega||s.fecha||today(),fechaHora:s.fechaEntrega||nowLocal(),obra:s.obra||'',area:o.area||s.areaSolicitud||'',region:o.region||'',cuadrilla:s.cuadrilla||s.pidioUsuario||'',supervisor:s.supervisor,remito:remitoR,items,solicitud:s.codigo,reparado:true});
     DB.update('solicitudes',s.id,{despachoId:desp.id,remito:s.remito||remitoR,_reparada:true});
     reparadas++;
   });
