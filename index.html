@@ -1086,7 +1086,17 @@ async function solImportarNuevas(){
     diagLog('poll-ok','Poll OK — '+nuevas+' nuevas');
     if(_solBackoff>30000&&_solPollTimer){_solBackoff=30000;clearInterval(_solPollTimer);_solPollTimer=setInterval(solImportarNuevas,30000)}
     if(nuevas>0){
-      DB.save('solicitudes',existentes);
+      /* Re-leer para no pisar verificaciones hechas mientras importaba */
+      const frescos=DB.getAll('solicitudes');
+      const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
+      const merged=existentes.map(s=>{
+        const f=fMap[s.codigo];
+        if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
+        return s;
+      });
+      const mergedCods=new Set(merged.map(s=>s.codigo).filter(Boolean));
+      frescos.forEach(f=>{if(f.codigo&&!mergedCods.has(f.codigo)&&!f._eliminar)merged.push(f);});
+      DB.save('solicitudes',merged);
       toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
       // Refrescar pantalla si estamos en solicitudes
       if(document.querySelector('.sol-tabs')) go('solicitudes');
@@ -1245,7 +1255,22 @@ async function syncEstadosDesdeSheet(){
     });
     if(cambios>0){
       const filtradas=locales.filter(s=>!s._eliminar);
-      DB.save('solicitudes',filtradas);
+      /* Re-leer el estado actual antes de guardar, para no pisar verificaciones
+         hechas mientras el sync estaba corriendo */
+      const frescos=DB.getAll('solicitudes');
+      const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
+      const merged=filtradas.map(s=>{
+        const f=fMap[s.codigo];
+        if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)){
+          /* La solicitud fue verificada/cerrada mientras el sync corría — preservar */
+          return f;
+        }
+        return s;
+      });
+      /* Agregar solicitudes frescas que no estén en filtradas (nuevas verificadas en paralelo) */
+      const mergedCods=new Set(merged.map(s=>s.codigo).filter(Boolean));
+      frescos.forEach(f=>{if(f.codigo&&!mergedCods.has(f.codigo)&&!f._eliminar)merged.push(f);});
+      DB.save('solicitudes',merged);
       localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));
       // Refrescar pantalla si estamos en solicitudes
       if(document.querySelector('.sol-tabs')) go('solicitudes');
