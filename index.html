@@ -4145,15 +4145,15 @@ SCREENS.traspcontra=()=>{
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.id}</td>
     <td>${fmtDate(r.fecha)}</td><td><code>${r.matricula}</code></td><td>${(r.descripcion||'').substring(0,25)}</td>
-    <td style="text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td>${r.contratista}</td><td class="um">${r.obs||'—'}</td>
+    <td style="text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td>${r.contratista}</td><td>${r.nroPedido||'—'}</td><td class="um">${r.obs||'—'}</td>
     <td class="act-btns">${editable?`<button onclick="editTraspContra(${r.id})" title="Editar">✏️</button><button onclick="delRecord('traspcontra',${r.id},'traspcontra')" title="Eliminar">🗑️</button>`:'—'}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🏭</div><div><h1>Traspaso a Contratista</h1><p>Material que se entrega a otra contratista por pedido de Edenor</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addTraspContra()">＋ Nuevo traspaso</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Contratista</th><th>Obs.</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="8" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Contratista</th><th>N° Pedido</th><th>Obs.</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -4166,6 +4166,7 @@ function addTraspContra(){
       <div class="field"><label>Fecha</label><input type="date" id="tc-fecha" value="${today()}"></div>
       <div class="field"><label>Contratista destino</label><select id="tc-contra">${contras.map(c=>`<option>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Autorizado por</label><input id="tc-aut" value="${currentUser.nombre}"></div>
+      <div class="field"><label>N° Pedido</label><input id="tc-pedido" placeholder="N° pedido Edenor"></div>
       <div class="field wide"><label>Observaciones</label><input id="tc-obs"></div>
     </div>
     <h4 style="margin:14px 0 8px;font-size:13px;color:var(--steel)">📦 Materiales — carga rápida</h4>
@@ -4218,9 +4219,10 @@ function saveTraspContra(){
   const fecha=document.getElementById('tc-fecha').value;
   const contra=document.getElementById('tc-contra').value;
   const aut=document.getElementById('tc-aut').value;
+  const pedido=(document.getElementById('tc-pedido').value||'').trim();
   const obs=document.getElementById('tc-obs').value;
   validItems.forEach(it=>{
-    DB.add('traspcontra',{fecha,contratista:contra,autorizadoPor:aut,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,obs});
+    DB.add('traspcontra',{fecha,contratista:contra,autorizadoPor:aut,nroPedido:pedido,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,obs});
   });
   closeModal();toast('Traspaso a contratista registrado — '+validItems.length+' ítem(s)');go('traspcontra');
 }
@@ -4232,6 +4234,7 @@ function editTraspContra(id){
       <div class="field"><label>Fecha</label><input type="date" id="tc-ed-fecha" value="${r.fecha||today()}"></div>
       <div class="field"><label>Contratista destino</label><select id="tc-ed-contra">${contras.map(c=>`<option${c===r.contratista?' selected':''}>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Autorizado por</label><input id="tc-ed-aut" value="${r.autorizadoPor||''}"></div>
+      <div class="field"><label>N° Pedido</label><input id="tc-ed-pedido" value="${r.nroPedido||''}"></div>
       <div class="field wide"><label>Observaciones</label><input id="tc-ed-obs" value="${r.obs||''}"></div>
       <div class="field"><label>Matrícula</label><input id="tc-ed-mat" value="${r.matricula||''}"></div>
       <div class="field"><label>Cantidad</label><input type="number" id="tc-ed-cant" value="${r.cantidad||0}"></div>
@@ -4246,6 +4249,7 @@ function saveEditTraspContra(id){
     fecha:document.getElementById('tc-ed-fecha').value,
     contratista:document.getElementById('tc-ed-contra').value,
     autorizadoPor:document.getElementById('tc-ed-aut').value,
+    nroPedido:(document.getElementById('tc-ed-pedido').value||'').trim(),
     obs:document.getElementById('tc-ed-obs').value,
     matricula:mat,
     descripcion:desc||r.descripcion||'',
@@ -5574,8 +5578,8 @@ function _buildDevolucionesCSV(){
 }
 function _buildTraspContraCSV(){
   const rows=DB.getAll('traspcontra');if(!rows.length)return null;
-  const hdr=['ID','Fecha','Contratista','Matrícula','Descripción','Cantidad','Remito','Observaciones'].map(_csvEsc).join(';');
-  const lines=rows.map(r=>[r.id,r.fecha,r.contratista||'',r.matricula,r.descripcion||'',r.cantidad,r.remito||'',r.obs||''].map(_csvEsc).join(';'));
+  const hdr=['ID','Fecha','Contratista','Matrícula','Descripción','Cantidad','N° Pedido','Remito','Observaciones'].map(_csvEsc).join(';');
+  const lines=rows.map(r=>[r.id,r.fecha,r.contratista||'',r.matricula,r.descripcion||'',r.cantidad,r.nroPedido||'',r.remito||'',r.obs||''].map(_csvEsc).join(';'));
   return '﻿'+hdr+'\r\n'+lines.join('\r\n');
 }
 function _downloadCSV(csv,nombre){
@@ -6391,7 +6395,7 @@ const QL_SRC={
       {k:'fecha',l:'Fecha',t:'date',d:1},{k:'tipo',l:'Tipo',d:1},{k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},
       {k:'unidad',l:'Unidad'},{k:'sector',l:'Sector'},{k:'cantidad',l:'Cantidad',n:1,d:1},{k:'entra',l:'Entrada',n:1},{k:'sale',l:'Salida',n:1},{k:'neto',l:'Neto stock',n:1},
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'inspector',l:'Inspector'},{k:'cuadrilla',l:'Cuadrilla'},{k:'supervisor',l:'Supervisor'},
-      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado material'},{k:'estadoVal',l:'Validación devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},{k:'mes',l:'Mes'}
+      {k:'contraparte',l:'Proveedor / Destino',d:1},{k:'ref',l:'Remito / Ref.',d:1},{k:'solicitud',l:'Solicitud'},{k:'autorizado',l:'Autorizado por'},{k:'estado',l:'Estado material'},{k:'estadoVal',l:'Validación devolución'},{k:'nBobina',l:'N° Bobina'},{k:'nEdenor',l:'N° Edenor'},{k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},{k:'nroPedido',l:'N° Pedido'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
       {k:'tipo',l:'Tipo de movimiento',type:'multi',opts:['Ingreso','Despacho','Devolución','Traspaso obra','Traspaso contratista']},
@@ -6414,13 +6418,13 @@ const QL_SRC={
     ],
     rows:()=>{
       const R=[];
-      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',estadoVal:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',entra:0,sale:0,neto:0},extra)};
+      const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',estadoVal:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',nroPedido:'',entra:0,sale:0,neto:0},extra)};
       DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}]).forEach(it=>R.push(base(r,{tipo:'Ingreso',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,entra:it.cantidad,neto:it.cantidad,contraparte:r.proveedor||'',ref:r.remitoOrigen||'',sector:it.sector||''}))));
       const _solCache={};const _getSol=c=>{if(!c)return{};if(!_solCache[c]){const all=DB.getAll('solicitudes');_solCache[c]=all.find(s=>s.codigo===c)||{}}return _solCache[c]};
       DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:sol.nroDocumento||'',nroReserva:sol.nroReserva||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''})))});
       DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado,estadoVal:r.estadoVal||'(directa)',nroDocumento:r.nroDocumento||'',nroReserva:r.nroReserva||''}))}));
       DB.getAll('traspasos').forEach(r=>R.push(base(r,{tipo:'Traspaso obra',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,obra:r.obraOrigen,contraparte:r.obraDestino,autorizado:r.autorizadoPor||''})));
-      DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||''})));
+      DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||'',nroPedido:r.nroPedido||''})));
       return R;
     }
   },
