@@ -4925,16 +4925,9 @@ SCREENS.solicitudes=()=>{
       const items=sols.filter(s=>{
         if(s.estado!==st)return false;
         if(st==='Entregado'){
-          /* Ocultar: cerradas, verificadas, y Dime/Mant viejas sin verificar */
           if(s.cerrada)return false;
-          if(s.nroDocumento&&s.nroReserva)return false;
-          const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-          if(esDM){
-            /* Solo mostrar Dime/Mant entregadas de hoy para verificar */
-            const hoy=today();
-            const fEntrega=(s.fechaEntrega||s.fecha||'').slice(0,10);
-            if(fEntrega&&fEntrega<hoy)return false;
-          }
+          if(s.nroDocumento&&s.nroReserva)return false; /* verificada → ocultar */
+          /* Dime/Mant: quedan visibles hasta que verifiquen (sin límite de fecha) */
         }
         return true;
       });
