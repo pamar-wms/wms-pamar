@@ -4144,16 +4144,16 @@ SCREENS.traspcontra=()=>{
   const editable=canEditOps();
   let tbody=rows.map(r=>`<tr>
     <td class="idcell">${r.id}</td>
-    <td>${fmtDate(r.fecha)}</td><td><code>${r.matricula}</code></td><td>${(r.descripcion||'').substring(0,25)}</td>
+    <td>${fmtDate(r.fecha)}</td><td>${r.remito?`<a href="#" onclick="event.preventDefault();viewRemitoTraspContra('${r.remito}')" style="color:var(--edenor);font-weight:600;text-decoration:none">${r.remito}</a>`:'—'}</td><td><code>${r.matricula}</code></td><td>${(r.descripcion||'').substring(0,25)}</td>
     <td style="text-align:right"><b>${fmtNum(r.cantidad)}</b></td><td>${r.contratista}</td><td>${r.nroPedido||'—'}</td><td class="um">${r.obs||'—'}</td>
-    <td class="act-btns">${editable?`<button onclick="editTraspContra(${r.id})" title="Editar">✏️</button><button onclick="delRecord('traspcontra',${r.id},'traspcontra')" title="Eliminar">🗑️</button>`:'—'}</td>
+    <td class="act-btns">${r.remito?`<button onclick="viewRemitoTraspContra('${r.remito}')" title="Imprimir remito">🖨️</button>`:''}${editable?`<button onclick="editTraspContra(${r.id})" title="Editar">✏️</button><button onclick="delRecord('traspcontra',${r.id},'traspcontra')" title="Eliminar">🗑️</button>`:'—'}</td>
   </tr>`).join('');
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">🏭</div><div><h1>Traspaso a Contratista</h1><p>Material que se entrega a otra contratista por pedido de Edenor</p></div></div>
     <div class="toolbar"><button class="btn primary" onclick="addTraspContra()">＋ Nuevo traspaso</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>ID</th><th>Fecha</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Contratista</th><th>N° Pedido</th><th>Obs.</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Remito</th><th>Matrícula</th><th>Descripción</th><th>Cantidad</th><th>Contratista</th><th>N° Pedido</th><th>Obs.</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="10" class="empty">Sin registros</td></tr>'}</tbody>
     </table></div>
   </div>`;
 };
@@ -4213,6 +4213,18 @@ function renderTcItemsList(){
     <button onclick="tcItems.splice(${i},1);renderTcItemsList()" style="background:#fde7e5;color:#c53727;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
   </div>`).join('');
 }
+function _nextRemitoTC(){
+  const cfgRaw=localStorage.getItem('wms_config');
+  const cfg=cfgRaw?JSON.parse(cfgRaw):{remitoSeq:0,solSeq:0};
+  let seq=(cfg.remitoTcSeq||0)+1;
+  let remito='TC-'+String(seq).padStart(5,'0');
+  const all=DB.getAll('traspcontra');
+  let intentos=0;
+  while(all.find(r=>r.remito===remito)&&intentos<10){seq++;remito='TC-'+String(seq).padStart(5,'0');intentos++}
+  cfg.remitoTcSeq=seq;
+  localStorage.setItem('wms_config',JSON.stringify(cfg));
+  return remito;
+}
 function saveTraspContra(){
   const validItems=tcItems.filter(it=>it.matricula&&it.cantidad>0);
   if(!validItems.length){toast('Agregá al menos un material','err');return}
@@ -4221,10 +4233,12 @@ function saveTraspContra(){
   const aut=document.getElementById('tc-aut').value;
   const pedido=(document.getElementById('tc-pedido').value||'').trim();
   const obs=document.getElementById('tc-obs').value;
+  const remito=_nextRemitoTC();
   validItems.forEach(it=>{
-    DB.add('traspcontra',{fecha,contratista:contra,autorizadoPor:aut,nroPedido:pedido,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,obs});
+    DB.add('traspcontra',{fecha,contratista:contra,autorizadoPor:aut,nroPedido:pedido,matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,obs,remito});
   });
-  closeModal();toast('Traspaso a contratista registrado — '+validItems.length+' ítem(s)');go('traspcontra');
+  closeModal();toast('Traspaso a contratista registrado — '+validItems.length+' ítem(s)');
+  viewRemitoTraspContra(remito);
 }
 function editTraspContra(id){
   const r=DB.get('traspcontra',id);if(!r){toast('No encontrado','err');return}
@@ -4257,6 +4271,40 @@ function saveEditTraspContra(id){
   });
   if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   closeModal();toast('Traspaso contratista actualizado');go('traspcontra');
+}
+function viewRemitoTraspContra(remNum){
+  const all=DB.getAll('traspcontra').filter(r=>r.remito===remNum);
+  if(!all.length){toast('Remito no encontrado','err');return}
+  const first=all[0];
+  const itemsHTML=all.map(r=>`<tr><td style="padding:6px 10px;font-family:Consolas,monospace;font-weight:600;border-bottom:1px solid #eee">${r.matricula}</td><td style="padding:6px 10px;border-bottom:1px solid #eee">${r.descripcion||'—'}</td><td style="padding:6px 10px;text-align:right;font-weight:700;border-bottom:1px solid #eee">${fmtNum(r.cantidad)}</td></tr>`).join('');
+  const totalCant=all.reduce((s,r)=>s+(+r.cantidad||0),0);
+  const area=document.getElementById('main-area');
+  area.innerHTML=`<div class="screen on printing" style="display:block">
+    <div class="shead"><div class="sicon">🧾</div><div><h1>Remito de Traspaso a Contratista</h1><p>Vista previa de impresión</p></div></div>
+    <div class="toolbar"><button class="btn primary" onclick="window.print()">🖨️ Imprimir</button><button class="btn" onclick="go('traspcontra')">← Volver</button></div>
+    <div class="remito" id="remito-print">
+      <div class="rem-top">
+        <div class="rem-logo"><div class="lg" style="padding:0;overflow:hidden;background:none;width:auto;height:44px"><span style="font-size:22px;font-weight:800;color:var(--steel)">PAMAR</span></div><div><div class="cn">PAMAR</div><div class="cs">Ingeniería y Construcciones — Traspaso a Contratista</div></div></div>
+        <div class="rem-num"><div class="lbl">Remito Traspaso N°</div><div class="val">${remNum}</div><div class="dt">${fmtDate(first.fecha)}</div></div>
+      </div>
+      <div class="rem-meta">
+        <div><div class="k">Contratista destino</div><div class="v"><b>${first.contratista}</b></div></div>
+        <div><div class="k">Autorizado por</div><div class="v">${first.autorizadoPor||'—'}</div></div>
+        ${first.nroPedido?`<div><div class="k">N° Pedido</div><div class="v"><b>${first.nroPedido}</b></div></div>`:''}
+        ${first.obs?`<div><div class="k">Observaciones</div><div class="v">${first.obs}</div></div>`:''}
+        <div><div class="k">Total ítems</div><div class="v">${all.length} material(es) — ${fmtNum(totalCant)} unidades</div></div>
+      </div>
+      <div class="rem-items"><table>
+        <thead><tr><th>Matrícula</th><th>Descripción</th><th style="text-align:right">Cantidad</th></tr></thead>
+        <tbody>${itemsHTML}</tbody>
+      </table></div>
+      <div class="rem-foot">
+        <div class="rem-sign"><div class="ln"></div>Entregó — Depósito PAMAR</div>
+        <div class="rem-sign"><div class="ln"></div>Recibió — ${first.contratista}</div>
+      </div>
+    </div>
+  </div>`;
+  setTimeout(()=>window.print(),400);
 }
 
 // ─── NOTIFICACIONES ──────────────────────
@@ -6424,7 +6472,7 @@ const QL_SRC={
       DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:sol.nroDocumento||'',nroReserva:sol.nroReserva||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''})))});
       DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado,estadoVal:r.estadoVal||'(directa)',nroDocumento:r.nroDocumento||'',nroReserva:r.nroReserva||''}))}));
       DB.getAll('traspasos').forEach(r=>R.push(base(r,{tipo:'Traspaso obra',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,obra:r.obraOrigen,contraparte:r.obraDestino,autorizado:r.autorizadoPor||''})));
-      DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||'',nroPedido:r.nroPedido||''})));
+      DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||'',nroPedido:r.nroPedido||'',ref:r.remito||''})));
       return R;
     }
   },
