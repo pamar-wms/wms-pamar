@@ -2946,7 +2946,7 @@ SCREENS.reservas=()=>{
   let tbody=rows.map(r=>{
     const items=r.items||[];
     const totalRes=items.reduce((s,it)=>s+it.cantidad,0);
-    const despObra=allDesp.filter(d=>d.obra===r.obra);
+    const despObra=allDesp.filter(d=>_normObra(d.obra)===_normObra(r.obra));
     let totalDesp=0;
     items.forEach(it=>{
       totalDesp+=despObra.reduce((s,d)=>s+(d.items||[]).filter(x=>String(x.matricula)===String(it.matricula)).reduce((ss,x)=>ss+x.cantidad,0),0);
@@ -3134,7 +3134,7 @@ function viewReserva(id){
   const r=DB.getAll('reservas').find(x=>x.id===id);if(!r)return;
   const items=r.items||[];
   /* Calcular despachado por matrícula */
-  const despObra=DB.getAll('despachos').filter(d=>d.obra===r.obra);
+  const despObra=DB.getAll('despachos').filter(d=>_normObra(d.obra)===_normObra(r.obra));
   const tbody=items.map(it=>{
     const yaDesp=despObra.reduce((s,d)=>s+(d.items||[]).filter(x=>String(x.matricula)===String(it.matricula)).reduce((ss,x)=>ss+x.cantidad,0),0);
     const restante=it.cantidad-yaDesp;
@@ -3179,8 +3179,13 @@ function editReserva(id){
 }
 /* Función helper: busca reserva activa para una obra.
    Si hay varias reservas para la misma obra, fusiona los ítems sumando cantidades por matrícula. */
+/* Normaliza nombre de obra para comparación tolerante:
+   quita espacios extremos, convierte separadores (· – — -) a guión,
+   colapsa espacios múltiples, y pasa a minúsculas */
+function _normObra(s){return(s||'').trim().toLowerCase().replace(/[·–—\-]+/g,'-').replace(/\s+/g,' ')}
 function getReservaObra(obraNombre){
-  const rs=DB.getAll('reservas').filter(r=>r.obra===obraNombre);
+  const norm=_normObra(obraNombre);
+  const rs=DB.getAll('reservas').filter(r=>_normObra(r.obra)===norm);
   if(!rs.length)return null;
   if(rs.length===1)return rs[0];
   const map={};
@@ -3581,7 +3586,7 @@ function despCantEnter(){
     // Sumar lo ya cargado en despItems para esta matrícula
     const yaCargado=despItems.filter(x=>x.matricula===mat).reduce((s,x)=>s+x.cantidad,0);
     // Sumar lo ya despachado antes para esta obra+matrícula
-    const yaDesp=DB.getAll('despachos').filter(d=>d.obra===obraInp.value.trim()).reduce((s,d)=>{return s+(d.items||[]).filter(x=>String(x.matricula)===String(mat)).reduce((ss,x)=>ss+x.cantidad,0)},0);
+    const yaDesp=DB.getAll('despachos').filter(d=>_normObra(d.obra)===_normObra(obraInp.value.trim())).reduce((s,d)=>{return s+(d.items||[]).filter(x=>String(x.matricula)===String(mat)).reduce((ss,x)=>ss+x.cantidad,0)},0);
     const disponible=ri.cantidad-yaDesp-yaCargado;
     if(cant>disponible){
       if(disponible<=0){toast('🚫 Matrícula '+mat+': ya se despachó toda la cantidad reservada ('+ri.cantidad+')','err');return}
@@ -3636,7 +3641,7 @@ function _saveDespacho(){
   if(!isDime&&obraNombre){
     const reserva=getReservaObra(obraNombre);
     if(!reserva){toast('🚫 No hay reserva cargada para esta obra. No se puede despachar.','err');return}
-    const despPrevios=DB.getAll('despachos').filter(d=>d.obra===obraNombre);
+    const despPrevios=DB.getAll('despachos').filter(d=>_normObra(d.obra)===_normObra(obraNombre));
     const errores=[];
     validItems.forEach(it=>{
       const ri=reserva.items.find(r=>String(r.matricula)===String(it.matricula));
@@ -4815,7 +4820,7 @@ function validarReservaSolicitud(s){
   if(!reserva)return '🚫 No hay reserva cargada para la obra "'+s.obra+'". No se puede entregar sin reserva.';
   const itemsAEntregar=(s.items||[]).filter(it=>(it.cantEntregada??it.cantidad)>0);
   if(!itemsAEntregar.length)return null;
-  const despPrevios=DB.getAll('despachos').filter(d=>d.obra===s.obra);
+  const despPrevios=DB.getAll('despachos').filter(d=>_normObra(d.obra)===_normObra(s.obra));
   const errores=[];
   itemsAEntregar.forEach(it=>{
     const cant=it.cantEntregada??it.cantidad;
