@@ -4207,78 +4207,74 @@ SCREENS.docreserva=()=>{
     s.estado==='Entregado'&&!s.cerrada&&
     (s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))
   );
-  let tbody='';
+  let pendientes=0,cargados=0;
+  let cards='';
   sols.forEach(s=>{
     const its=s.items||[];
-    its.forEach((it,idx)=>{
-      const tieneDoc=it.nroDocumento&&it.nroReserva;
-      tbody+=`<tr${tieneDoc?' style="background:#e8f5e9"':''}>
-        <td>${s.remito||'—'}</td>
-        <td>${fmtDate((s.fecha||'').slice(0,10))}</td>
-        <td>${s.areaSolicitud||'—'}</td>
-        <td>${s.cuadrilla||s.solicitanteDime||'—'}</td>
+    if(!its.length)return;
+    const pend=its.filter(it=>!it.nroDocumento||!it.nroReserva).length;
+    const ok=its.length-pend;
+    pendientes+=pend;cargados+=ok;
+    let filas=its.map((it,idx)=>{
+      const tiene=it.nroDocumento&&it.nroReserva;
+      return `<tr${tiene?' style="background:#e8f5e9"':''}>
+        <td style="text-align:center"><input type="checkbox" class="dr-chk-${s.id}" data-idx="${idx}" ${tiene?'disabled':''}></td>
         <td><code>${it.matricula}</code></td>
-        <td>${(it.descripcion||'').substring(0,30)}</td>
+        <td>${it.descripcion||''}</td>
         <td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
-        <td>${it.nroDocumento||'—'}</td>
-        <td>${it.nroReserva||'—'}</td>
-        <td class="act-btns">${tieneDoc
-          ?'<span style="color:var(--edenor);font-weight:600">✔</span>'
-          :`<button onclick="drEditItem(${s.id},${idx})" title="Cargar N° Doc y Reserva" class="btn-sm">📝 Cargar</button>`
-        }</td>
+        <td>${it.nroDocumento||'<span style="color:#b06b13">—</span>'}</td>
+        <td>${it.nroReserva||'<span style="color:#b06b13">—</span>'}</td>
       </tr>`;
-    });
+    }).join('');
+    cards+=`<div style="border:1px solid var(--line);border-radius:8px;margin-bottom:16px;overflow:hidden">
+      <div style="background:var(--edenor);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><b>${s.remito||'Sin remito'}</b> · ${fmtDate((s.fecha||'').slice(0,10))} · ${s.areaSolicitud||'—'} · 👷 ${s.cuadrilla||s.solicitanteDime||'—'}</div>
+        <div style="font-size:11px;opacity:.85">${pend?pend+' pendiente'+(pend>1?'s':''):'✔ Completo'}</div>
+      </div>
+      ${pend?`<div style="padding:10px 14px;background:var(--edenor-lt);display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--steel)">N° Documento</label><input id="dr-doc-${s.id}" class="finput" placeholder="N° Documento" style="margin-top:2px"></div>
+        <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--steel)">N° Reserva</label><input id="dr-res-${s.id}" class="finput" placeholder="N° Reserva" style="margin-top:2px"></div>
+        <button class="btn btn-primary" onclick="drSelAll(${s.id})" style="font-size:11px;padding:6px 10px">☑ Todos</button>
+        <button class="btn btn-primary" onclick="drSaveSel(${s.id})" style="font-size:12px">💾 Guardar</button>
+      </div>`:''}
+      <div class="tablewrap"><table style="margin:0">
+        <thead><tr><th style="width:35px">☑</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>N° Doc</th><th>N° Reserva</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
   });
-  const pendientes=sols.reduce((n,s)=>(s.items||[]).filter(it=>!it.nroDocumento||!it.nroReserva).length+n,0);
-  const cargados=sols.reduce((n,s)=>(s.items||[]).filter(it=>it.nroDocumento&&it.nroReserva).length+n,0);
   return `<div class="screen on" style="display:block">
-    <div class="shead"><div class="sicon">📝</div><div><h1>Cargar Doc / Reserva</h1><p>Asigná N° Documento y N° Reserva a cada material entregado (Dime/Mant)</p></div></div>
+    <div class="shead"><div class="sicon">📝</div><div><h1>Cargar Doc / Reserva</h1><p>Ingresá N° Documento y Reserva, marcá los materiales que aplican y guardá</p></div></div>
     <div style="margin:8px 0;font-size:13px;color:var(--gray)">Pendientes: <b style="color:#b06b13">${pendientes}</b> · Cargados: <b style="color:var(--edenor)">${cargados}</b></div>
-    <div class="tablewrap"><table>
-      <thead><tr><th>Remito</th><th>Fecha</th><th>Área</th><th>Cuadrilla</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>N° Doc</th><th>N° Reserva</th><th>Acc.</th></tr></thead>
-      <tbody>${tbody||'<tr><td colspan="10" class="empty">No hay entregas Dime/Mant pendientes</td></tr>'}</tbody>
-    </table></div>
+    ${cards||'<div class="empty" style="padding:30px;text-align:center">No hay entregas Dime/Mant pendientes</div>'}
   </div>`;
 };
-function drEditItem(solId,itemIdx){
-  const s=DB.get('solicitudes',solId);if(!s){toast('Solicitud no encontrada','err');return}
-  const it=(s.items||[])[itemIdx];if(!it){toast('Ítem no encontrado','err');return}
-  openModal(`
-    <h3 style="margin-top:0">📝 Cargar Doc / Reserva</h3>
-    <p style="font-size:13px;color:var(--gray)">Solicitud: ${s.codigo} · Obra: ${s.obra||'—'}<br>
-    Material: <b>${it.matricula}</b> — ${it.descripcion} · Cant: ${fmtNum(it.cantidad)}</p>
-    <label class="flabel">N° Documento</label>
-    <input id="dr-nroDoc" class="finput" placeholder="Número de documento" value="${it.nroDocumento||''}" autofocus>
-    <label class="flabel" style="margin-top:10px">N° Reserva</label>
-    <input id="dr-nroRes" class="finput" placeholder="Número de reserva" value="${it.nroReserva||''}">
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="drSaveItem(${solId},${itemIdx})">💾 Guardar</button>
-    </div>
-  `);
-  setTimeout(()=>{const el=document.getElementById('dr-nroDoc');if(el)el.focus()},100);
+function drSelAll(solId){
+  document.querySelectorAll('.dr-chk-'+solId+':not(:disabled)').forEach(c=>c.checked=true);
 }
-function drSaveItem(solId,itemIdx){
-  const nroDoc=(document.getElementById('dr-nroDoc').value||'').trim();
-  const nroRes=(document.getElementById('dr-nroRes').value||'').trim();
-  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('dr-nroDoc').focus();return}
-  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('dr-nroRes').focus();return}
+function drSaveSel(solId){
+  const nroDoc=(document.getElementById('dr-doc-'+solId).value||'').trim();
+  const nroRes=(document.getElementById('dr-res-'+solId).value||'').trim();
+  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('dr-doc-'+solId).focus();return}
+  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('dr-res-'+solId).focus();return}
+  const checks=document.querySelectorAll('.dr-chk-'+solId+':checked:not(:disabled)');
+  if(!checks.length){toast('Marcá al menos un material','err');return}
   const s=DB.get('solicitudes',solId);if(!s){toast('Solicitud no encontrada','err');return}
   const items=[...(s.items||[])];
-  if(!items[itemIdx]){toast('Ítem no encontrado','err');return}
-  items[itemIdx]={...items[itemIdx],nroDocumento:nroDoc,nroReserva:nroRes};
-  /* Si TODOS los ítems tienen doc/reserva, marcar la solicitud completa */
+  let n=0;
+  checks.forEach(c=>{
+    const idx=+c.dataset.idx;
+    if(items[idx]){items[idx]={...items[idx],nroDocumento:nroDoc,nroReserva:nroRes};n++}
+  });
   const todosOk=items.every(it=>it.nroDocumento&&it.nroReserva);
   const upd={items};
   if(todosOk){
-    upd.nroDocumento=nroDoc;
-    upd.nroReserva=nroRes;
-    upd.verificadoPor=currentUser.nombre;
-    upd.fechaVerif=nowLocal();
+    upd.nroDocumento=nroDoc;upd.nroReserva=nroRes;
+    upd.verificadoPor=currentUser.nombre;upd.fechaVerif=nowLocal();
   }
   DB.update('solicitudes',solId,upd);
-  toast('✔ Guardado — Doc: '+nroDoc+' / Reserva: '+nroRes+(todosOk?' · Solicitud completa':''));
-  closeModal();go('docreserva');
+  toast('✔ '+n+' material'+(n>1?'es':'')+' actualizado'+(n>1?'s':'')+' — Doc: '+nroDoc+' / Reserva: '+nroRes+(todosOk?' · Solicitud completa':''));
+  go('docreserva');
 }
 
 let tcItems=[];
@@ -4733,14 +4729,16 @@ function verSolicitud(id){
           <div style="font-size:10.5px;color:var(--gray);margin-bottom:10px">Se aplica a todos los materiales de esta solicitud (${(s.items||[]).length} materiales)</div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button onclick="verificarEntrega(${s.id})" style="background:${verified?'#2e7d32':'#c53727'};color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">${verified?'✔ Actualizar':'✔ Verificar'}</button>
-            ${verified?`<button onclick="cerrarSolicitud(${s.id})" style="background:#6b7885;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📁 Cerrar solicitud</button>`:''}
+            <button onclick="cerrarSolicitud(${s.id})" style="background:#6b7885;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📁 Cerrar solicitud</button>
           </div>
         </div>`;
       }
       if(s.estado==='Entregado'&&_esDM&&s.cerrada){
+        const cItems=(s.items||[]);
+        const cConDoc=cItems.filter(it=>it.nroDocumento&&it.nroReserva);
         return `<div style="background:#f4f6f8;border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0">
           <div style="font-size:12px;font-weight:700;color:#6b7885;margin-bottom:6px">📁 Solicitud cerrada</div>
-          <div style="font-size:12px;color:var(--ink)">N° Documento: <b>${s.nroDocumento||'—'}</b> · N° Reserva: <b>${s.nroReserva||'—'}</b></div>
+          <div style="font-size:12px;color:var(--ink)">${cConDoc.length?cConDoc.length+'/'+cItems.length+' materiales con Doc/Reserva':'N° Documento: <b>'+(s.nroDocumento||'—')+'</b> · N° Reserva: <b>'+(s.nroReserva||'—')+'</b>'}</div>
           <div style="font-size:10.5px;color:var(--gray);margin-top:4px">Cerrada por: ${s.cerradaPor||'—'} · ${fmtFechaHora(s.fechaCierre)}</div>
         </div>`;
       }
@@ -4997,8 +4995,14 @@ function solBuildCard(s,st){
   let verifCls='',verifTag='';
   if(st==='Entregado'&&esDimeMant){
     if(s.cerrada){verifCls=' sc-cerrada';verifTag='<span class="sc-verif-tag">📁 Cerrada</span>'}
-    else if(s.nroDocumento&&s.nroReserva){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Verificada</span>'}
-    else{verifCls=' sc-no-verif';verifTag='<span class="sc-verif-tag">⚠ Sin verificar</span>'}
+    else{
+      const _its=s.items||[];
+      const _conDoc=_its.filter(it=>it.nroDocumento&&it.nroReserva).length;
+      if(_conDoc===_its.length&&_its.length){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Completo</span>'}
+      else if(_conDoc>0){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">📝 '+_conDoc+'/'+_its.length+' cargados</span>'}
+      else if(s.nroDocumento&&s.nroReserva){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Verificada</span>'}
+      else{verifCls=' sc-no-verif';verifTag='<span class="sc-verif-tag">⚠ Sin Doc/Reserva</span>'}
+    }
   }
   return `<div class="solcard${verifCls}" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
@@ -6629,7 +6633,7 @@ const QL_SRC={
     label:'Solicitudes de material',
     cols:[
       {k:'codigo',l:'Solicitud',d:1},{k:'fecha',l:'Fecha',t:'date',d:1},{k:'estado',l:'Estado',d:1},{k:'urgencia',l:'Urgencia',d:1},
-      {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'supervisor',l:'Supervisor',d:1},
+      {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'cuadrilla',l:'Cuadrilla',d:1},{k:'supervisor',l:'Supervisor',d:1},
       {k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},{k:'unidad',l:'Unidad'},
       {k:'cantPedida',l:'Cant. pedida',n:1,d:1},{k:'cantidad',l:'Cant. aprobada',n:1,d:1},{k:'diferencia',l:'Diferencia',n:1},
       {k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},
@@ -6657,7 +6661,7 @@ const QL_SRC={
       const R=[];
       DB.getAll('solicitudes').forEach(s=>{
         const o=qlObra(s.obra);
-        const head={codigo:s.codigo,fecha:(s.fecha||'').slice(0,10),mes:(s.fecha||'').slice(0,7),estado:s.estado,urgencia:s.urgencia,obra:s.obra,area:o.area||'',region:o.region||'',inspector:o.inspector||'',supervisor:s.supervisor,aprobadoPor:s.aprobadoPor||'',modificada:s.aprobModificada?'Sí':'No',rechazadoPor:s.rechazadoPor||'',motivoRechazo:s.motivoRechazo||'',remito:s.remito||'',obs:[s.obs,s.obsAprob].filter(Boolean).join(' · ')};
+        const head={codigo:s.codigo,fecha:(s.fecha||'').slice(0,10),mes:(s.fecha||'').slice(0,7),estado:s.estado,urgencia:s.urgencia,obra:s.obra,area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:s.cuadrilla||s.solicitanteDime||'',supervisor:s.supervisor,aprobadoPor:s.aprobadoPor||'',modificada:s.aprobModificada?'Sí':'No',rechazadoPor:s.rechazadoPor||'',motivoRechazo:s.motivoRechazo||'',remito:s.remito||'',obs:[s.obs,s.obsAprob].filter(Boolean).join(' · ')};
         const its=(s.items||[]).concat(s.itemsQuitados||[]);
         const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
         const extra={_solId:s.id,_esDM,_estado:s.estado,_cerrada:!!s.cerrada};
