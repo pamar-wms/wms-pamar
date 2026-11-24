@@ -62,6 +62,8 @@
   .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
   .btn{border:1px solid var(--line);background:#fff;padding:7px 14px;border-radius:6px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--steel);font-weight:500}
   .btn:hover{background:var(--panel)}
+  .btn-sm{border:none;background:var(--edenor);color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:500}
+  .btn-sm:hover{opacity:.85}
   .btn.primary{background:var(--edenor);color:#fff;border-color:var(--edenor)}
   .btn.primary:hover{background:#1d4a30}
   .btn.ghost{background:transparent}
@@ -1086,16 +1088,31 @@ async function solImportarNuevas(){
     diagLog('poll-ok','Poll OK — '+nuevas+' nuevas');
     if(_solBackoff>30000&&_solPollTimer){_solBackoff=30000;clearInterval(_solPollTimer);_solPollTimer=setInterval(solImportarNuevas,30000)}
     if(nuevas>0){
-      /* Re-leer para no pisar verificaciones hechas mientras importaba */
-      const frescos=DB.getAll('solicitudes');
-      const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
-      const merged=existentes.map(s=>{
-        const f=fMap[s.codigo];
-        if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
-        return s;
-      });
-      const mergedCods=new Set(merged.map(s=>s.codigo).filter(Boolean));
-      frescos.forEach(f=>{if(f.codigo&&!mergedCods.has(f.codigo)&&!f._eliminar)merged.push(f);});
+      /* Merge seguro: leer DB justo antes de guardar y preservar verificadas */
+      const _doMergeImport=()=>{
+        const frescos=DB.getAll('solicitudes');
+        const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
+        const merged=existentes.map(s=>{
+          const f=fMap[s.codigo];
+          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
+          return s;
+        });
+        /* Deduplicar por código */
+        const seen=new Set();
+        const deduped=merged.filter(s=>{
+          if(!s.codigo){return true}
+          if(seen.has(s.codigo))return false;
+          seen.add(s.codigo);return true;
+        });
+        frescos.forEach(f=>{if(f.codigo&&!seen.has(f.codigo)&&!f._eliminar){deduped.push(f);seen.add(f.codigo);}});
+        return deduped;
+      };
+      let merged=_doMergeImport();
+      /* Segundo check */
+      const check2=DB.getAll('solicitudes');
+      const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
+        !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
+      if(changed){merged=_doMergeImport();console.log('[Import] Re-merge por verificación detectada');}
       DB.save('solicitudes',merged);
       toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
       // Refrescar pantalla si estamos en solicitudes
@@ -1255,24 +1272,35 @@ async function syncEstadosDesdeSheet(){
     });
     if(cambios>0){
       const filtradas=locales.filter(s=>!s._eliminar);
-      /* Re-leer el estado actual antes de guardar, para no pisar verificaciones
-         hechas mientras el sync estaba corriendo */
-      const frescos=DB.getAll('solicitudes');
-      const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
-      const merged=filtradas.map(s=>{
-        const f=fMap[s.codigo];
-        if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)){
-          /* La solicitud fue verificada/cerrada mientras el sync corría — preservar */
-          return f;
-        }
-        return s;
-      });
-      /* Agregar solicitudes frescas que no estén en filtradas (nuevas verificadas en paralelo) */
-      const mergedCods=new Set(merged.map(s=>s.codigo).filter(Boolean));
-      frescos.forEach(f=>{if(f.codigo&&!mergedCods.has(f.codigo)&&!f._eliminar)merged.push(f);});
+      /* Merge seguro: leer DB justo antes de guardar y preservar TODA solicitud
+         verificada/cerrada — repetir lectura hasta que no haya conflicto */
+      const _doMerge=()=>{
+        const frescos=DB.getAll('solicitudes');
+        const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
+        const merged=filtradas.map(s=>{
+          const f=fMap[s.codigo];
+          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
+          return s;
+        });
+        /* Deduplicar por código (evitar entradas dobles) */
+        const seen=new Set();
+        const deduped=merged.filter(s=>{
+          if(!s.codigo){return true}
+          if(seen.has(s.codigo))return false;
+          seen.add(s.codigo);return true;
+        });
+        /* Agregar solicitudes frescas que no estén en deduped */
+        frescos.forEach(f=>{if(f.codigo&&!seen.has(f.codigo)&&!f._eliminar){deduped.push(f);seen.add(f.codigo);}});
+        return deduped;
+      };
+      let merged=_doMerge();
+      /* Segundo check: si alguien verificó entre el merge y ahora, re-merge */
+      const check2=DB.getAll('solicitudes');
+      const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
+        !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
+      if(changed){merged=_doMerge();console.log('[Sync] Re-merge por verificación detectada');}
       DB.save('solicitudes',merged);
       localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));
-      // Refrescar pantalla si estamos en solicitudes
       if(document.querySelector('.sol-tabs')) go('solicitudes');
     }
     if(_importados>0) console.log('[Sync] TOTAL importados del Sheet: '+_importados+' solicitudes');
@@ -6542,8 +6570,9 @@ const QL_SRC={
         const its=(s.items||[]).concat(s.itemsQuitados||[]);
         const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
         const verifHead={verificada:_esDM?(s.nroDocumento&&s.nroReserva?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:s.nroDocumento||'',nroReserva:s.nroReserva||''};
-        if(!its.length)R.push(Object.assign({},head,verifHead,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
-        its.forEach(it=>{const ped=it.cantPedida??it.cantidad;R.push(Object.assign({},head,verifHead,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}))});
+        const extra={_solId:s.id,_esDM,_estado:s.estado,_cerrada:!!s.cerrada};
+        if(!its.length)R.push(Object.assign({},head,verifHead,extra,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
+        its.forEach(it=>{const ped=it.cantPedida??it.cantidad;R.push(Object.assign({},head,verifHead,extra,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}))});
       });
       return R;
     }
@@ -6682,13 +6711,41 @@ function runConsulta(){
   qlLast=res;
   const {rows,cols,total}=res;
   const tot={};cols.filter(c=>c.n).forEach(c=>tot[c.k]=rows.reduce((s,r)=>s+(+r[c.k]||0),0));
-  const body=rows.map(r=>`<tr>${cols.map(c=>`<td style="${c.n?'text-align:right':''}">${qlCell(c,r[c.k])}</td>`).join('')}</tr>`).join('');
-  const foot=`<tr style="font-weight:700;background:var(--edenor-lt)">${cols.map((c,i)=>`<td style="${c.n?'text-align:right':''}">${i===0?`TOTAL (${rows.length}${total>rows.length?' de '+total:''})`:c.n?fmtNum(Math.round(tot[c.k]*100)/100):''}</td>`).join('')}</tr>`;
+  /* Columna de acciones para solicitudes (sin agrupar) */
+  const isSol=res.st.fuente==='sol'&&!res.st.group;
+  const _seenSolAcc=new Set();/* para mostrar botón solo en la primera fila de cada solicitud */
+  const body=rows.map(r=>{
+    let accCell='';
+    if(isSol){
+      const sid=r._solId;
+      const yaVisto=_seenSolAcc.has(r.codigo);
+      if(!yaVisto)_seenSolAcc.add(r.codigo);
+      if(!yaVisto&&sid){
+        const btns=[];
+        /* Verificar: solo Dime/Mant entregadas sin verificar */
+        if(r._esDM&&r._estado==='Entregado'&&r.verificada==='No'&&!r._cerrada){
+          btns.push(`<button class="btn-sm" onclick="qlVerifSol(${sid})" title="Agregar N° Doc y N° Reserva">✏️ Verificar</button>`);
+        }
+        /* Cerrar: cualquier solicitud no cerrada */
+        if(!r._cerrada){
+          btns.push(`<button class="btn-sm" onclick="qlCerrarSol(${sid})" title="Cerrar solicitud" style="background:#b06b13">📁 Cerrar</button>`);
+        }
+        if(r._cerrada){btns.push(`<span style="color:var(--gray);font-size:11px">Cerrada</span>`);}
+        accCell=`<td style="white-space:nowrap">${btns.join(' ')}</td>`;
+      } else {
+        accCell='<td></td>';
+      }
+    }
+    return `<tr>${cols.map(c=>`<td style="${c.n?'text-align:right':''}">${qlCell(c,r[c.k])}</td>`).join('')}${accCell}</tr>`;
+  }).join('');
+  const accHead=isSol?'<th>Acciones</th>':'';
+  const accFoot=isSol?'<td></td>':'';
+  const foot=`<tr style="font-weight:700;background:var(--edenor-lt)">${cols.map((c,i)=>`<td style="${c.n?'text-align:right':''}">${i===0?`TOTAL (${rows.length}${total>rows.length?' de '+total:''})`:c.n?fmtNum(Math.round(tot[c.k]*100)/100):''}</td>`).join('')}${accFoot}</tr>`;
   const el=document.getElementById('ql-result');
   el.innerHTML=`<div style="font-size:12px;color:var(--gray);margin-bottom:6px">${total} resultado${total===1?'':'s'} · ${QL_SRC[res.st.fuente].label}${res.st.group?' · agrupado por '+cols[0].l:''}</div>
     <div class="tablewrap" style="overflow-x:auto"><table id="ql-table">
-    <thead><tr>${cols.map(c=>`<th style="${c.n?'text-align:right':''}">${c.l}</th>`).join('')}</tr></thead>
-    <tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Sin resultados con esos filtros</td></tr>`}${rows.length?foot:''}</tbody>
+    <thead><tr>${cols.map(c=>`<th style="${c.n?'text-align:right':''}">${c.l}</th>`).join('')}${accHead}</tr></thead>
+    <tbody>${body||`<tr><td colspan="${cols.length+(isSol?1:0)}" class="empty">Sin resultados con esos filtros</td></tr>`}${rows.length?foot:''}</tbody>
   </table></div>`;
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
   }catch(e){toast('Error al ejecutar consulta: '+e.message,'err');console.error('runConsulta error:',e)}
@@ -6737,6 +6794,54 @@ function qlLoad(qid){
   document.querySelectorAll('.ql-col').forEach(c=>c.checked=st.cols.includes(c.value));
   document.getElementById('ql-group').value=st.group||'';document.getElementById('ql-sort').value=st.sort;document.getElementById('ql-dir').value=st.dir;document.getElementById('ql-limit').value=st.limit||'0';
   runConsulta();toast('Consulta cargada: '+q.nombre);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CONSULTA LIBRE — VERIFICAR / CERRAR SOLICITUDES
+   ══════════════════════════════════════════════════════════ */
+function qlVerifSol(id){
+  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
+  openModal(`
+    <h3 style="margin-top:0">✏️ Verificar solicitud ${s.codigo}</h3>
+    <p style="font-size:13px;color:var(--gray)">Obra: ${s.obra||'—'} · Estado: ${s.estado} · Supervisor: ${s.supervisor||'—'}</p>
+    <label class="flabel">N° Documento *</label>
+    <input id="qlv-nroDoc" class="finput" placeholder="Ingresá el número de documento" value="${s.nroDocumento||''}" autofocus>
+    <label class="flabel" style="margin-top:10px">N° Reserva *</label>
+    <input id="qlv-nroRes" class="finput" placeholder="Ingresá el número de reserva" value="${s.nroReserva||''}">
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="qlSaveVerif(${id})">💾 Guardar verificación</button>
+    </div>
+  `);
+  setTimeout(()=>{const el=document.getElementById('qlv-nroDoc');if(el)el.focus()},100);
+}
+function qlSaveVerif(id){
+  const nroDoc=(document.getElementById('qlv-nroDoc').value||'').trim();
+  const nroRes=(document.getElementById('qlv-nroRes').value||'').trim();
+  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('qlv-nroDoc').focus();return}
+  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('qlv-nroRes').focus();return}
+  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
+  const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
+  const upd={nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()};
+  /* Solo generar despacho si no tiene remito previo */
+  if(!s.remito){
+    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
+    if(!esDM&&s.obra){const bloqRes=validarReservaSolicitud(s);if(bloqRes){toast(bloqRes,'err');return}}
+    const rem=generarRemitoEntrega(s);
+    upd.remito=rem.remito;
+    upd.despachoId=rem.desp.id;
+  }
+  DB.update('solicitudes',id,upd);
+  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
+  closeModal();
+  runConsulta();/* refrescar tabla */
+}
+function qlCerrarSol(id){
+  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
+  if(!confirm('¿Cerrar la solicitud '+s.codigo+'? Una vez cerrada no se puede modificar.'))return;
+  DB.update('solicitudes',id,{cerrada:true,cerradaPor:currentUser.nombre,fechaCierre:nowLocal()});
+  toast('📁 Solicitud '+s.codigo+' cerrada');
+  runConsulta();/* refrescar tabla */
 }
 
 /* ══════════════════════════════════════════════════════════
