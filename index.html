@@ -1533,7 +1533,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1551,10 +1551,10 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
-  const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
-  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
+  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   const permAdmin=['consultalibre','stockfull','movobra','medconsulta'];
   const users=DB.getAll('usuarios');
   let changed=false;
@@ -1826,6 +1826,12 @@ function migratePermisos(){
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v22','1');
   }
+  if(!localStorage.getItem('wms_mig_v23')){
+    const us=DB.getAll('usuarios');
+    us.forEach(u=>{if(u.permisos&&!u.permisos.includes('docreserva')&&['super','gerencial','admin','jefedep','op'].includes(u.rol))u.permisos.push('docreserva')});
+    DB.save('usuarios',us);
+    localStorage.setItem('wms_mig_v23','1');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1851,7 +1857,8 @@ const PERM_MODULES=[
     {id:'devoluciones',label:'Devoluciones',icon:'↩️'},
     {id:'validardev',label:'Validar devoluciones Dime/Mant',icon:'✔️'},
     {id:'traspasos',label:'Traspasos entre obras',icon:'🔄'},
-    {id:'traspcontra',label:'Traspaso a contratista',icon:'🏭'}
+    {id:'traspcontra',label:'Traspaso a contratista',icon:'🏭'},
+    {id:'docreserva',label:'Cargar Doc/Reserva',icon:'📝'}
   ]},
   {group:'Solicitudes',items:[
     {id:'solicitudes',label:'Bandeja de solicitudes',icon:'📥'},
@@ -1925,7 +1932,8 @@ const NAV_ITEMS=[
     {id:'despachos',icon:'🚚',label:'Despachos'},
     {id:'devoluciones',icon:'↩️',label:'Devoluciones'},
     {id:'traspasos',icon:'🔄',label:'Traspasos entre obras'},
-    {id:'traspcontra',icon:'🏭',label:'Traspaso a contratista'}
+    {id:'traspcontra',icon:'🏭',label:'Traspaso a contratista'},
+    {id:'docreserva',icon:'📝',label:'Cargar Doc/Reserva'}
   ]},
   {group:'Solicitudes',items:[
     {id:'solicitudes',icon:'📥',label:'Bandeja de solicitudes'},
@@ -2879,11 +2887,11 @@ function toggleAllPerms(on){
   document.querySelectorAll('.perm-chk').forEach(c=>{c.checked=on;c.parentElement.style.background=on?'var(--edenor-lt)':'#f7f9fb'});
 }
 function presetPerms(preset){
-  const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
   const mantP=['solicitudes','aprobarmant','stockfull','movobra'];
-  const jefedepP=['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const jefedepP=['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
   const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='mant'?mantP:preset==='administrativo'?adminP:supP;
@@ -4190,6 +4198,90 @@ SCREENS.traspcontra=()=>{
     </table></div>
   </div>`;
 };
+
+/* ══════════════════════════════════════════════════════════
+   CARGAR DOC / RESERVA  (por ítem individual)
+   ══════════════════════════════════════════════════════════ */
+SCREENS.docreserva=()=>{
+  const sols=DB.getAll('solicitudes').filter(s=>
+    s.estado==='Entregado'&&!s.cerrada&&
+    (s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))
+  );
+  let tbody='';
+  sols.forEach(s=>{
+    const its=s.items||[];
+    its.forEach((it,idx)=>{
+      const tieneDoc=it.nroDocumento&&it.nroReserva;
+      tbody+=`<tr${tieneDoc?' style="background:#e8f5e9"':''}>
+        <td>${s.remito||'—'}</td>
+        <td>${fmtDate((s.fecha||'').slice(0,10))}</td>
+        <td>${s.obra||'—'}</td>
+        <td>${s.areaSolicitud||'—'}</td>
+        <td>${s.supervisor||'—'}</td>
+        <td><code>${it.matricula}</code></td>
+        <td>${(it.descripcion||'').substring(0,30)}</td>
+        <td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
+        <td>${it.nroDocumento||'—'}</td>
+        <td>${it.nroReserva||'—'}</td>
+        <td class="act-btns">${tieneDoc
+          ?'<span style="color:var(--edenor);font-weight:600">✔</span>'
+          :`<button onclick="drEditItem(${s.id},${idx})" title="Cargar N° Doc y Reserva" class="btn-sm">📝 Cargar</button>`
+        }</td>
+      </tr>`;
+    });
+  });
+  const pendientes=sols.reduce((n,s)=>(s.items||[]).filter(it=>!it.nroDocumento||!it.nroReserva).length+n,0);
+  const cargados=sols.reduce((n,s)=>(s.items||[]).filter(it=>it.nroDocumento&&it.nroReserva).length+n,0);
+  return `<div class="screen on" style="display:block">
+    <div class="shead"><div class="sicon">📝</div><div><h1>Cargar Doc / Reserva</h1><p>Asigná N° Documento y N° Reserva a cada material entregado (Dime/Mant)</p></div></div>
+    <div style="margin:8px 0;font-size:13px;color:var(--gray)">Pendientes: <b style="color:#b06b13">${pendientes}</b> · Cargados: <b style="color:var(--edenor)">${cargados}</b></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Remito</th><th>Fecha</th><th>Obra</th><th>Área</th><th>Supervisor</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>N° Doc</th><th>N° Reserva</th><th>Acc.</th></tr></thead>
+      <tbody>${tbody||'<tr><td colspan="11" class="empty">No hay entregas Dime/Mant pendientes</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+};
+function drEditItem(solId,itemIdx){
+  const s=DB.get('solicitudes',solId);if(!s){toast('Solicitud no encontrada','err');return}
+  const it=(s.items||[])[itemIdx];if(!it){toast('Ítem no encontrado','err');return}
+  openModal(`
+    <h3 style="margin-top:0">📝 Cargar Doc / Reserva</h3>
+    <p style="font-size:13px;color:var(--gray)">Solicitud: ${s.codigo} · Obra: ${s.obra||'—'}<br>
+    Material: <b>${it.matricula}</b> — ${it.descripcion} · Cant: ${fmtNum(it.cantidad)}</p>
+    <label class="flabel">N° Documento</label>
+    <input id="dr-nroDoc" class="finput" placeholder="Número de documento" value="${it.nroDocumento||''}" autofocus>
+    <label class="flabel" style="margin-top:10px">N° Reserva</label>
+    <input id="dr-nroRes" class="finput" placeholder="Número de reserva" value="${it.nroReserva||''}">
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="drSaveItem(${solId},${itemIdx})">💾 Guardar</button>
+    </div>
+  `);
+  setTimeout(()=>{const el=document.getElementById('dr-nroDoc');if(el)el.focus()},100);
+}
+function drSaveItem(solId,itemIdx){
+  const nroDoc=(document.getElementById('dr-nroDoc').value||'').trim();
+  const nroRes=(document.getElementById('dr-nroRes').value||'').trim();
+  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('dr-nroDoc').focus();return}
+  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('dr-nroRes').focus();return}
+  const s=DB.get('solicitudes',solId);if(!s){toast('Solicitud no encontrada','err');return}
+  const items=[...(s.items||[])];
+  if(!items[itemIdx]){toast('Ítem no encontrado','err');return}
+  items[itemIdx]={...items[itemIdx],nroDocumento:nroDoc,nroReserva:nroRes};
+  /* Si TODOS los ítems tienen doc/reserva, marcar la solicitud completa */
+  const todosOk=items.every(it=>it.nroDocumento&&it.nroReserva);
+  const upd={items};
+  if(todosOk){
+    upd.nroDocumento=nroDoc;
+    upd.nroReserva=nroRes;
+    upd.verificadoPor=currentUser.nombre;
+    upd.fechaVerif=nowLocal();
+  }
+  DB.update('solicitudes',solId,upd);
+  toast('✔ Guardado — Doc: '+nroDoc+' / Reserva: '+nroRes+(todosOk?' · Solicitud completa':''));
+  closeModal();go('docreserva');
+}
+
 let tcItems=[];
 function addTraspContra(){
   tcItems=[];
@@ -7229,10 +7321,10 @@ function limpiarEntregadosAyer(){
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
   if(!permisos||!permisos.length){
-    const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
-    const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra'];
+    const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
+    const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra'];
     const supP=['nuevasol','missol'];
-    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','validardev','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
+    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','validardev','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
