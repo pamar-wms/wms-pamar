@@ -6660,10 +6660,18 @@ const QL_SRC={
         const head={codigo:s.codigo,fecha:(s.fecha||'').slice(0,10),mes:(s.fecha||'').slice(0,7),estado:s.estado,urgencia:s.urgencia,obra:s.obra,area:o.area||'',region:o.region||'',inspector:o.inspector||'',supervisor:s.supervisor,aprobadoPor:s.aprobadoPor||'',modificada:s.aprobModificada?'Sí':'No',rechazadoPor:s.rechazadoPor||'',motivoRechazo:s.motivoRechazo||'',remito:s.remito||'',obs:[s.obs,s.obsAprob].filter(Boolean).join(' · ')};
         const its=(s.items||[]).concat(s.itemsQuitados||[]);
         const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-        const verifHead={verificada:_esDM?(s.nroDocumento&&s.nroReserva?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:s.nroDocumento||'',nroReserva:s.nroReserva||''};
         const extra={_solId:s.id,_esDM,_estado:s.estado,_cerrada:!!s.cerrada};
-        if(!its.length)R.push(Object.assign({},head,verifHead,extra,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
-        its.forEach(it=>{const ped=it.cantPedida??it.cantidad;R.push(Object.assign({},head,verifHead,extra,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}))});
+        if(!its.length){
+          const verifHead={verificada:_esDM?(s.nroDocumento&&s.nroReserva?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:s.nroDocumento||'',nroReserva:s.nroReserva||''};
+          R.push(Object.assign({},head,verifHead,extra,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
+        }
+        its.forEach(it=>{
+          const doc=it.nroDocumento||s.nroDocumento||'';
+          const res=it.nroReserva||s.nroReserva||'';
+          const verifIt={verificada:_esDM?(doc&&res?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:doc,nroReserva:res};
+          const ped=it.cantPedida??it.cantidad;
+          R.push(Object.assign({},head,verifIt,extra,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}));
+        });
       });
       return R;
     }
