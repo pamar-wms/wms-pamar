@@ -4203,10 +4203,20 @@ SCREENS.traspcontra=()=>{
    CARGAR DOC / RESERVA  (por ítem individual)
    ══════════════════════════════════════════════════════════ */
 SCREENS.docreserva=()=>{
-  const sols=DB.getAll('solicitudes').filter(s=>
+  const filtro=window._drFiltro||'todos';
+  const allSols=DB.getAll('solicitudes').filter(s=>
     s.estado==='Entregado'&&!s.cerrada&&
     (s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))
   );
+  const sols=allSols.filter(s=>{
+    if(filtro==='todos')return true;
+    const area=(s.areaSolicitud||'').toLowerCase();
+    if(filtro==='dime')return s.esDime||area.includes('dime');
+    if(filtro==='mant')return s.esMant||area.includes('mantenimiento');
+    return true;
+  });
+  const cDime=allSols.filter(s=>s.esDime||(s.areaSolicitud||'').toLowerCase().includes('dime')).length;
+  const cMant=allSols.filter(s=>s.esMant||(s.areaSolicitud||'').toLowerCase().includes('mantenimiento')).length;
   let pendientes=0,cargados=0;
   let cards='';
   sols.forEach(s=>{
@@ -4245,8 +4255,13 @@ SCREENS.docreserva=()=>{
   });
   return `<div class="screen on" style="display:block">
     <div class="shead"><div class="sicon">📝</div><div><h1>Cargar Doc / Reserva</h1><p>Ingresá N° Documento y Reserva, marcá los materiales que aplican y guardá</p></div></div>
-    <div style="margin:8px 0;font-size:13px;color:var(--gray)">Pendientes: <b style="color:#b06b13">${pendientes}</b> · Cargados: <b style="color:var(--edenor)">${cargados}</b></div>
-    ${cards||'<div class="empty" style="padding:30px;text-align:center">No hay entregas Dime/Mant pendientes</div>'}
+    <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center">
+      <button class="btn ${filtro==='todos'?'btn-primary':'ghost'}" onclick="window._drFiltro='todos';go('docreserva')" style="font-size:12px;padding:6px 14px">Todos (${allSols.length})</button>
+      <button class="btn ${filtro==='dime'?'btn-primary':'ghost'}" onclick="window._drFiltro='dime';go('docreserva')" style="font-size:12px;padding:6px 14px">Dime Mide (${cDime})</button>
+      <button class="btn ${filtro==='mant'?'btn-primary':'ghost'}" onclick="window._drFiltro='mant';go('docreserva')" style="font-size:12px;padding:6px 14px">Mantenimiento (${cMant})</button>
+    </div>
+    <div style="margin:4px 0 10px;font-size:13px;color:var(--gray)">Pendientes: <b style="color:#b06b13">${pendientes}</b> · Cargados: <b style="color:var(--edenor)">${cargados}</b></div>
+    ${cards||'<div class="empty" style="padding:30px;text-align:center">No hay entregas pendientes</div>'}
   </div>`;
 };
 function drSelAll(solId){
