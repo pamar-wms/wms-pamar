@@ -1113,6 +1113,9 @@ async function solImportarNuevas(){
       const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
         !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
       if(changed){merged=_doMergeImport();console.log('[Import] Re-merge por verificación detectada');}
+      /* Filtro final: nunca guardar solicitudes que estén en wms_sol_deleted */
+      const _delFinal=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+      if(_delFinal.size) merged=merged.filter(s=>!s.codigo||!_delFinal.has(s.codigo));
       DB.save('solicitudes',merged);
       toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
       // Refrescar pantalla si estamos en solicitudes
@@ -1289,6 +1292,9 @@ async function syncEstadosDesdeSheet(){
       const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
         !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
       if(changed){merged=_doMerge();console.log('[Sync] Re-merge por verificación detectada');}
+      /* Filtro final: nunca guardar solicitudes que estén en wms_sol_deleted */
+      const _delFinal2=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+      if(_delFinal2.size) merged=merged.filter(s=>!s.codigo||!_delFinal2.has(s.codigo));
       DB.save('solicitudes',merged);
       localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));
       if(document.querySelector('.sol-tabs')) go('solicitudes');
