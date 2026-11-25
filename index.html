@@ -4222,7 +4222,7 @@ SCREENS.traspcontra=()=>{
    ══════════════════════════════════════════════════════════ */
 SCREENS.docreserva=()=>{
   const filtro=window._drFiltro||'todos';
-  const allSols=DB.getAll('solicitudes').filter(s=>
+  const allSols=getSolsClean().filter(s=>
     s.estado==='Entregado'&&!s.cerrada&&
     (s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))
   );
@@ -4617,6 +4617,11 @@ function solItemsDet(s){
   return (s.items||[]).map(it=>{const m=mats.find(x=>String(x.matricula)===String(it.matricula))||{};return{...it,sector:m.sector||'Sin sector',stock:st[String(it.matricula)]??null,unidad:it.unidad||(m.unidad==='Metro'?'m':'u')}})
     .sort((a,b)=>a.sector.localeCompare(b.sector,'es',{numeric:true})||String(a.matricula).localeCompare(String(b.matricula),'es',{numeric:true}));
 }
+/* Helper: solicitudes filtradas sin las eliminadas localmente */
+function getSolsClean(){
+  const del=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
+  return del.size?DB.getAll('solicitudes').filter(s=>!s.codigo||!del.has(s.codigo)):DB.getAll('solicitudes');
+}
 function canDeleteSol(){return ['super','gerencial','admin'].includes(currentUser.rol)}
 function canEditSol(s){
   if(['super','gerencial','admin','jefedep'].includes(currentUser.rol))return true;
@@ -4631,8 +4636,13 @@ function delSolicitud(id){
     const deleted=JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]');
     if(!deleted.includes(s.codigo)){deleted.push(s.codigo);localStorage.setItem('wms_sol_deleted',JSON.stringify(deleted));}
     syncEliminarSheet(s.codigo);
+    /* Eliminar TODAS las copias con este código (por si hay duplicados) */
+    const todas=DB.getAll('solicitudes').filter(x=>x.codigo!==s.codigo);
+    DB.save('solicitudes',todas);
+  } else {
+    DB.del('solicitudes',id);
   }
-  DB.del('solicitudes',id);toast('Solicitud eliminada');go('solicitudes');
+  toast('Solicitud eliminada');closeModal();go('solicitudes');
 }
 function editarSolicitud(id){
   const s=DB.get('solicitudes',id);if(!s)return;
@@ -5122,7 +5132,7 @@ function medBorrarPend(pendId){
   go('solicitudes');
 }
 SCREENS.solicitudes=()=>{
-  const allSols=DB.getAll('solicitudes');
+  const allSols=getSolsClean();
   const tabAreas=['Todas','Obra y Distribución','Mantenimiento','Dime Mide','Medidores'];
   const tabLabels=['Todas','OyD','Mantenimiento','Dime Mide','Medidores'];
   const tabIcons=['📋','🏗️','🔧','📐','⚡'];
