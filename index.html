@@ -1094,7 +1094,7 @@ async function solImportarNuevas(){
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=existentes.map(s=>{
           const f=fMap[s.codigo];
-          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
+          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada||(f.items||[]).some(it=>it.nroDocumento||it.nroReserva))) return f;
           return s;
         });
         /* Deduplicar por código */
@@ -1160,18 +1160,14 @@ async function syncEstadosDesdeSheet(){
     if(_dimeLocal.length) console.log('[Sync] Dime/Mant en LOCAL: '+_dimeLocal.map(s=>s.codigo+'('+s.estado+(s.cerrada?',CERRADA':'')+')').join(', '));
     /* Log: qué hay en wms_sol_deleted */
     if(deleted.size) console.log('[Sync] wms_sol_deleted ('+deleted.size+'): '+[...deleted].sort().join(', '));
-    /* Reparar: quitar de la lista de borradas los códigos que en el Sheet NO están Eliminada */
-    let deletedFixed=false;
-    deleted.forEach(cod=>{
-      const inSheet=sheetMap[cod];
-      if(inSheet&&inSheet.estado!=='Eliminada'){deleted.delete(cod);deletedFixed=true;}
-    });
-    if(deletedFixed){localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));}
+    /* NO quitar de wms_sol_deleted aunque el Sheet no tenga Eliminada —
+       puede ser que el Sheet aún no procesó la eliminación local.
+       Solo re-importar si el usuario lo pide manualmente. */
     let cambios=0;
     locales.forEach(s=>{
       if(!s.codigo) return;
-      /* Solicitudes cerradas o verificadas: no tocar NUNCA desde el Sheet */
-      if(s.cerrada||s.nroDocumento||s.verificadoPor) return;
+      /* Solicitudes cerradas o verificadas (incl. per-item doc/reserva): no tocar NUNCA desde el Sheet */
+      if(s.cerrada||s.nroDocumento||s.verificadoPor||(s.items||[]).some(it=>it.nroDocumento||it.nroReserva)) return;
       // Corregir pidioUsuario si quedó como genérico
       const solSheet=sheetMap[s.codigo];
       if(solSheet && s.pidioUsuario==='Cuadrilla (formulario)'){
@@ -1231,16 +1227,10 @@ async function syncEstadosDesdeSheet(){
       /* Calcular antigüedad desde el código */
       const mFecha=solSheet.codigo.match(/SOL-(\d{4})(\d{2})(\d{2})/);
       const dias=mFecha?Math.floor((new Date()-new Date(mFecha[1]+'-'+mFecha[2]+'-'+mFecha[3]))/(86400000)):999;
-      /* Si está en wms_sol_deleted, re-importar si es reciente (<30 días) y tiene estado activo */
+      /* Si está en wms_sol_deleted, NO re-importar — fue eliminada localmente */
       if(deleted.has(solSheet.codigo)){
-        const estadoActivo=['Pendiente','Pend. aprobación','En preparación','Listo','Entregado'].includes(solSheet.estado);
-        if(dias<=30&&estadoActivo){
-          deleted.delete(solSheet.codigo);
-          console.log('[Sync] Re-importando '+solSheet.codigo+' ('+solSheet.estado+', '+dias+' días, estaba en borradas)');
-        }else{
-          console.log('[Sync] Saltando '+solSheet.codigo+' ('+solSheet.estado+', '+dias+' días, en borradas)');
-          return;
-        }
+        console.log('[Sync] Saltando '+solSheet.codigo+' (borrada localmente, estado Sheet: '+solSheet.estado+')');
+        return;
       }
       let items=[];
       try{items=JSON.parse(solSheet.materiales||'[]').map(it=>({matricula:String(it.matricula||''),descripcion:it.descripcion||it.material||'',cantidad:+it.cantidad||0,unidad:it.unidad||'u'}));}catch(e){}
@@ -1279,7 +1269,7 @@ async function syncEstadosDesdeSheet(){
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=filtradas.map(s=>{
           const f=fMap[s.codigo];
-          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada)) return f;
+          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada||(f.items||[]).some(it=>it.nroDocumento||it.nroReserva))) return f;
           return s;
         });
         /* Deduplicar por código (evitar entradas dobles) */
@@ -1831,6 +1821,28 @@ function migratePermisos(){
     us.forEach(u=>{if(u.permisos&&!u.permisos.includes('docreserva')&&['super','gerencial','admin','jefedep','op'].includes(u.rol))u.permisos.push('docreserva')});
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v23','1');
+  }
+  /* v24: deduplicar solicitudes por código (quedarse con la más completa) */
+  if(!localStorage.getItem('wms_mig_v24')){
+    const sols=DB.getAll('solicitudes');
+    const seen={};let dupes=0;
+    sols.forEach(s=>{
+      if(!s.codigo)return;
+      if(!seen[s.codigo]){seen[s.codigo]=s;return;}
+      dupes++;
+      const prev=seen[s.codigo];
+      /* Quedarse con la que tiene más datos (preparada, remito, doc/reserva, items con datos) */
+      const score=x=>(x.preparadoPor?2:0)+(x.remito?2:0)+(x.nroDocumento?1:0)+(x.cerrada?1:0)+((x.items||[]).filter(it=>it.nroDocumento).length);
+      if(score(s)>score(prev)){seen[s.codigo]=s;}
+    });
+    if(dupes>0){
+      const clean=Object.values(seen);
+      /* Agregar solicitudes sin código también */
+      sols.forEach(s=>{if(!s.codigo)clean.push(s);});
+      DB.save('solicitudes',clean);
+      console.log('[Migración v24] Eliminados '+dupes+' duplicados de solicitudes');
+    }
+    localStorage.setItem('wms_mig_v24','1');
   }
 }
 
