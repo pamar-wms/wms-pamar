@@ -6637,7 +6637,7 @@ const QL_SRC={
       const base=(r,extra)=>{const o=qlObra(extra.obra);const m=qlMat(extra.matricula);return Object.assign({fecha:r.fecha,mes:(r.fecha||'').slice(0,7),unidad:qlUM(extra.matricula),sector:m.sector||r.sector||'',area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:'',supervisor:'',obra:'',contraparte:'',ref:'',solicitud:'',autorizado:'',estado:'',estadoVal:'',nBobina:'',nEdenor:'',nroDocumento:'',nroReserva:'',nroPedido:'',entra:0,sale:0,neto:0},extra)};
       DB.getAll('ingresos').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sector:r.sector}]).forEach(it=>R.push(base(r,{tipo:'Ingreso',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,entra:it.cantidad,neto:it.cantidad,contraparte:r.proveedor||'',ref:r.remitoOrigen||'',sector:it.sector||''}))));
       const _solCache={};const _getSol=c=>{if(!c)return{};if(!_solCache[c]){const all=DB.getAll('solicitudes');_solCache[c]=all.find(s=>s.codigo===c)||{}}return _solCache[c]};
-      DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:sol.nroDocumento||'',nroReserva:sol.nroReserva||''}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''})))});
+      DB.getAll('despachos').forEach(d=>{const sol=_getSol(d.solicitud);(d.items||[]).forEach(it=>{const _si=(sol.items||[]).find(si=>String(si.matricula)===String(it.matricula));const _doc=(_si&&_si.nroDocumento)||sol.nroDocumento||'';const _res=(_si&&_si.nroReserva)||sol.nroReserva||'';R.push(Object.assign(base(d,{tipo:'Despacho',matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,sale:it.cantidad,neto:-it.cantidad,obra:d.obra,contraparte:d.obra,ref:d.remito||'',solicitud:d.solicitud||'',cuadrilla:d.cuadrilla||'',supervisor:d.supervisor||'',nBobina:it.nBobina||'',nEdenor:it.nEdenor||'',nroDocumento:_doc,nroReserva:_res}),{area:d.area||qlObra(d.obra).area||'',region:d.region||qlObra(d.obra).region||''}))})});
       DB.getAll('devoluciones').forEach(r=>(r.items||[{matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,estado:r.estado}]).forEach(it=>{const ok=it.estado==='Bueno – reingresa';R.push(base(r,{tipo:'Devolución',matricula:it.matricula,descripcion:it.descripcion,cantidad:-it.cantidad,entra:ok?it.cantidad:0,neto:ok?it.cantidad:0,obra:r.obra,contraparte:r.obra,estado:it.estado,estadoVal:r.estadoVal||'(directa)',nroDocumento:r.nroDocumento||'',nroReserva:r.nroReserva||''}))}));
       DB.getAll('traspasos').forEach(r=>R.push(base(r,{tipo:'Traspaso obra',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,obra:r.obraOrigen,contraparte:r.obraDestino,autorizado:r.autorizadoPor||''})));
       DB.getAll('traspcontra').forEach(r=>R.push(base(r,{tipo:'Traspaso contratista',matricula:r.matricula,descripcion:r.descripcion,cantidad:r.cantidad,sale:r.cantidad,neto:-r.cantidad,contraparte:r.contratista,autorizado:r.autorizadoPor||'',nroPedido:r.nroPedido||'',ref:r.remito||''})));
@@ -6676,7 +6676,7 @@ const QL_SRC={
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'cuadrilla',l:'Cuadrilla',d:1},{k:'supervisor',l:'Supervisor',d:1},
       {k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},{k:'unidad',l:'Unidad'},
       {k:'cantPedida',l:'Cant. pedida',n:1,d:1},{k:'cantidad',l:'Cant. aprobada',n:1,d:1},{k:'diferencia',l:'Diferencia',n:1},
-      {k:'nroDocumento',l:'N° Documento'},{k:'nroReserva',l:'N° Reserva'},
+      {k:'nroDocumento',l:'N° Documento',d:1},{k:'nroReserva',l:'N° Reserva',d:1},
       {k:'aprobadoPor',l:'Aprobó'},{k:'modificada',l:'Modificada'},{k:'rechazadoPor',l:'Rechazó'},{k:'motivoRechazo',l:'Motivo rechazo'},
       {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'verificada',l:'Verificada'},{k:'cerrada',l:'Cerrada'},{k:'mes',l:'Mes'}
     ],
@@ -6854,41 +6854,13 @@ function runConsulta(){
   qlLast=res;
   const {rows,cols,total}=res;
   const tot={};cols.filter(c=>c.n).forEach(c=>tot[c.k]=rows.reduce((s,r)=>s+(+r[c.k]||0),0));
-  /* Columna de acciones para solicitudes (sin agrupar) */
-  const isSol=res.st.fuente==='sol'&&!res.st.group;
-  const _seenSolAcc=new Set();/* para mostrar botón solo en la primera fila de cada solicitud */
-  const body=rows.map(r=>{
-    let accCell='';
-    if(isSol){
-      const sid=r._solId;
-      const yaVisto=_seenSolAcc.has(r.codigo);
-      if(!yaVisto)_seenSolAcc.add(r.codigo);
-      if(!yaVisto&&sid){
-        const btns=[];
-        /* Verificar: solo Dime/Mant entregadas sin verificar */
-        if(r._esDM&&r._estado==='Entregado'&&r.verificada==='No'&&!r._cerrada){
-          btns.push(`<button class="btn-sm" onclick="qlVerifSol(${sid})" title="Agregar N° Doc y N° Reserva">✏️ Verificar</button>`);
-        }
-        /* Cerrar: cualquier solicitud no cerrada */
-        if(!r._cerrada){
-          btns.push(`<button class="btn-sm" onclick="qlCerrarSol(${sid})" title="Cerrar solicitud" style="background:#b06b13">📁 Cerrar</button>`);
-        }
-        if(r._cerrada){btns.push(`<span style="color:var(--gray);font-size:11px">Cerrada</span>`);}
-        accCell=`<td style="white-space:nowrap">${btns.join(' ')}</td>`;
-      } else {
-        accCell='<td></td>';
-      }
-    }
-    return `<tr>${cols.map(c=>`<td style="${c.n?'text-align:right':''}">${qlCell(c,r[c.k])}</td>`).join('')}${accCell}</tr>`;
-  }).join('');
-  const accHead=isSol?'<th>Acciones</th>':'';
-  const accFoot=isSol?'<td></td>':'';
-  const foot=`<tr style="font-weight:700;background:var(--edenor-lt)">${cols.map((c,i)=>`<td style="${c.n?'text-align:right':''}">${i===0?`TOTAL (${rows.length}${total>rows.length?' de '+total:''})`:c.n?fmtNum(Math.round(tot[c.k]*100)/100):''}</td>`).join('')}${accFoot}</tr>`;
+  const body=rows.map(r=>`<tr>${cols.map(c=>`<td style="${c.n?'text-align:right':''}">${qlCell(c,r[c.k])}</td>`).join('')}</tr>`).join('');
+  const foot=`<tr style="font-weight:700;background:var(--edenor-lt)">${cols.map((c,i)=>`<td style="${c.n?'text-align:right':''}">${i===0?`TOTAL (${rows.length}${total>rows.length?' de '+total:''})`:c.n?fmtNum(Math.round(tot[c.k]*100)/100):''}</td>`).join('')}</tr>`;
   const el=document.getElementById('ql-result');
   el.innerHTML=`<div style="font-size:12px;color:var(--gray);margin-bottom:6px">${total} resultado${total===1?'':'s'} · ${QL_SRC[res.st.fuente].label}${res.st.group?' · agrupado por '+cols[0].l:''}</div>
     <div class="tablewrap" style="overflow-x:auto"><table id="ql-table">
-    <thead><tr>${cols.map(c=>`<th style="${c.n?'text-align:right':''}">${c.l}</th>`).join('')}${accHead}</tr></thead>
-    <tbody>${body||`<tr><td colspan="${cols.length+(isSol?1:0)}" class="empty">Sin resultados con esos filtros</td></tr>`}${rows.length?foot:''}</tbody>
+    <thead><tr>${cols.map(c=>`<th style="${c.n?'text-align:right':''}">${c.l}</th>`).join('')}</tr></thead>
+    <tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Sin resultados con esos filtros</td></tr>`}${rows.length?foot:''}</tbody>
   </table></div>`;
   setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
   }catch(e){toast('Error al ejecutar consulta: '+e.message,'err');console.error('runConsulta error:',e)}
@@ -6937,54 +6909,6 @@ function qlLoad(qid){
   document.querySelectorAll('.ql-col').forEach(c=>c.checked=st.cols.includes(c.value));
   document.getElementById('ql-group').value=st.group||'';document.getElementById('ql-sort').value=st.sort;document.getElementById('ql-dir').value=st.dir;document.getElementById('ql-limit').value=st.limit||'0';
   runConsulta();toast('Consulta cargada: '+q.nombre);
-}
-
-/* ══════════════════════════════════════════════════════════
-   CONSULTA LIBRE — VERIFICAR / CERRAR SOLICITUDES
-   ══════════════════════════════════════════════════════════ */
-function qlVerifSol(id){
-  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
-  openModal(`
-    <h3 style="margin-top:0">✏️ Verificar solicitud ${s.codigo}</h3>
-    <p style="font-size:13px;color:var(--gray)">Obra: ${s.obra||'—'} · Estado: ${s.estado} · Supervisor: ${s.supervisor||'—'}</p>
-    <label class="flabel">N° Documento *</label>
-    <input id="qlv-nroDoc" class="finput" placeholder="Ingresá el número de documento" value="${s.nroDocumento||''}" autofocus>
-    <label class="flabel" style="margin-top:10px">N° Reserva *</label>
-    <input id="qlv-nroRes" class="finput" placeholder="Ingresá el número de reserva" value="${s.nroReserva||''}">
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="qlSaveVerif(${id})">💾 Guardar verificación</button>
-    </div>
-  `);
-  setTimeout(()=>{const el=document.getElementById('qlv-nroDoc');if(el)el.focus()},100);
-}
-function qlSaveVerif(id){
-  const nroDoc=(document.getElementById('qlv-nroDoc').value||'').trim();
-  const nroRes=(document.getElementById('qlv-nroRes').value||'').trim();
-  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('qlv-nroDoc').focus();return}
-  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('qlv-nroRes').focus();return}
-  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
-  const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
-  const upd={nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()};
-  /* Solo generar despacho si no tiene remito previo */
-  if(!s.remito){
-    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(!esDM&&s.obra){const bloqRes=validarReservaSolicitud(s);if(bloqRes){toast(bloqRes,'err');return}}
-    const rem=generarRemitoEntrega(s);
-    upd.remito=rem.remito;
-    upd.despachoId=rem.desp.id;
-  }
-  DB.update('solicitudes',id,upd);
-  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
-  closeModal();
-  runConsulta();/* refrescar tabla */
-}
-function qlCerrarSol(id){
-  const s=DB.get('solicitudes',id);if(!s){toast('Solicitud no encontrada','err');return}
-  if(!confirm('¿Cerrar la solicitud '+s.codigo+'? Una vez cerrada no se puede modificar.'))return;
-  DB.update('solicitudes',id,{cerrada:true,cerradaPor:currentUser.nombre,fechaCierre:nowLocal()});
-  toast('📁 Solicitud '+s.codigo+' cerrada');
-  runConsulta();/* refrescar tabla */
 }
 
 /* ══════════════════════════════════════════════════════════
