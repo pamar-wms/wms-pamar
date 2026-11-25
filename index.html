@@ -1094,8 +1094,7 @@ async function solImportarNuevas(){
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=existentes.map(s=>{
           const f=fMap[s.codigo];
-          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada||(f.items||[]).some(it=>it.nroDocumento||it.nroReserva))) return f;
-          return s;
+          return f||s;
         });
         /* Deduplicar por código */
         const seen=new Set();
@@ -1160,7 +1159,7 @@ async function syncEstadosDesdeSheet(){
     const deleted=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
     const _dimeLocal=locales.filter(s=>s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud));
     console.log('[Sync] Estado: '+locales.length+' sols locales, '+deleted.size+' en borradas, '+_dimeLocal.length+' Dime/Mant locales TOTAL');
-    if(_dimeLocal.length) console.log('[Sync] Dime/Mant en LOCAL: '+_dimeLocal.map(s=>s.codigo+'('+s.estado+(s.cerrada?',CERRADA':'')+')').join(', '));
+    if(_dimeLocal.length) console.log('[Sync] Dime/Mant en LOCAL: '+_dimeLocal.map(s=>s.codigo+'('+s.estado+')').join(', '));
     /* Log: qué hay en wms_sol_deleted */
     if(deleted.size) console.log('[Sync] wms_sol_deleted ('+deleted.size+'): '+[...deleted].sort().join(', '));
     /* NO quitar de wms_sol_deleted aunque el Sheet no tenga Eliminada —
@@ -1169,8 +1168,6 @@ async function syncEstadosDesdeSheet(){
     let cambios=0;
     locales.forEach(s=>{
       if(!s.codigo) return;
-      /* Solicitudes cerradas o verificadas (incl. per-item doc/reserva): no tocar NUNCA desde el Sheet */
-      if(s.cerrada||s.nroDocumento||s.verificadoPor||(s.items||[]).some(it=>it.nroDocumento||it.nroReserva)) return;
       // Corregir pidioUsuario si quedó como genérico
       const solSheet=sheetMap[s.codigo];
       if(solSheet && s.pidioUsuario==='Cuadrilla (formulario)'){
@@ -1272,8 +1269,7 @@ async function syncEstadosDesdeSheet(){
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=filtradas.map(s=>{
           const f=fMap[s.codigo];
-          if(f&&(f.nroDocumento||f.nroReserva||f.verificadoPor||f.cerrada||(f.items||[]).some(it=>it.nroDocumento||it.nroReserva))) return f;
-          return s;
+          return f||s;
         });
         /* Deduplicar por código (evitar entradas dobles) */
         const seen=new Set();
@@ -1529,7 +1525,7 @@ function seed(){
   DB.save('traspcontra',[]);
   DB.save('solicitudes',[]);
 
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   DB.save('usuarios',[
     {id:1,nombre:'Guillermo',email:'guillenille@gmail.com',usuario:'guillermo',clave:'admin123',rol:'super',activo:true,permisos:permAll}
   ]);
@@ -1547,10 +1543,10 @@ function seed(){
 
 /* Migración: agrega permisos a usuarios existentes que no lo tengan */
 function migratePermisos(){
-  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
-  const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const permAll=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios','aprobardime','aprobarmant','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const permOp=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const permSup=['nuevasol','missol'];
-  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
+  const permJefeDep=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto'];
   const permAdmin=['consultalibre','stockfull','movobra','medconsulta'];
   const users=DB.getAll('usuarios');
   let changed=false;
@@ -1824,7 +1820,7 @@ function migratePermisos(){
   }
   if(!localStorage.getItem('wms_mig_v23')){
     const us=DB.getAll('usuarios');
-    us.forEach(u=>{if(u.permisos&&!u.permisos.includes('docreserva')&&['super','gerencial','admin','jefedep','op'].includes(u.rol))u.permisos.push('docreserva')});
+    /* docreserva removido */
     DB.save('usuarios',us);
     localStorage.setItem('wms_mig_v23','1');
   }
@@ -1875,8 +1871,7 @@ const PERM_MODULES=[
     {id:'devoluciones',label:'Devoluciones',icon:'↩️'},
     {id:'validardev',label:'Validar devoluciones Dime/Mant',icon:'✔️'},
     {id:'traspasos',label:'Traspasos entre obras',icon:'🔄'},
-    {id:'traspcontra',label:'Traspaso a contratista',icon:'🏭'},
-    {id:'docreserva',label:'Cargar Doc/Reserva',icon:'📝'}
+    {id:'traspcontra',label:'Traspaso a contratista',icon:'🏭'}
   ]},
   {group:'Solicitudes',items:[
     {id:'solicitudes',label:'Bandeja de solicitudes',icon:'📥'},
@@ -1950,8 +1945,7 @@ const NAV_ITEMS=[
     {id:'despachos',icon:'🚚',label:'Despachos'},
     {id:'devoluciones',icon:'↩️',label:'Devoluciones'},
     {id:'traspasos',icon:'🔄',label:'Traspasos entre obras'},
-    {id:'traspcontra',icon:'🏭',label:'Traspaso a contratista'},
-    {id:'docreserva',icon:'📝',label:'Cargar Doc/Reserva'}
+    {id:'traspcontra',icon:'🏭',label:'Traspaso a contratista'}
   ]},
   {group:'Solicitudes',items:[
     {id:'solicitudes',icon:'📥',label:'Bandeja de solicitudes'},
@@ -2905,11 +2899,11 @@ function toggleAllPerms(on){
   document.querySelectorAll('.perm-chk').forEach(c=>{c.checked=on;c.parentElement.style.background=on?'var(--edenor-lt)':'#f7f9fb'});
 }
 function presetPerms(preset){
-  const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
+  const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra','medidores','medingreso','medsalida','meddevol','medconsulta'];
   const supP=['nuevasol','missol'];
   const dimeP=['solicitudes','aprobardime','stockfull','movobra'];
   const mantP=['solicitudes','aprobarmant','stockfull','movobra'];
-  const jefedepP=['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
+  const jefedepP=['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','extraccion','materiales','cuadrillas','supervisores','obras','sectores','proveedores','areas','regiones','medidores','medingreso','medsalida','meddevol','medconsulta','editarlisto','editmaestro'];
   const adminP=['consultalibre','stockfull','movobra','extraccion','medconsulta'];
   if(preset==='super'||preset==='gerencial'||preset==='admin'){toggleAllPerms(true);return}
   const allow=preset==='jefedep'?jefedepP:preset==='op'?opP:preset==='dime'?dimeP:preset==='mant'?mantP:preset==='administrativo'?adminP:supP;
@@ -4220,96 +4214,6 @@ SCREENS.traspcontra=()=>{
 /* ══════════════════════════════════════════════════════════
    CARGAR DOC / RESERVA  (por ítem individual)
    ══════════════════════════════════════════════════════════ */
-SCREENS.docreserva=()=>{
-  const filtro=window._drFiltro||'todos';
-  const allSols=getSolsClean().filter(s=>
-    s.estado==='Entregado'&&!s.cerrada&&
-    (s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud))
-  );
-  const sols=allSols.filter(s=>{
-    if(filtro==='todos')return true;
-    const area=(s.areaSolicitud||'').toLowerCase();
-    if(filtro==='dime')return s.esDime||area.includes('dime');
-    if(filtro==='mant')return s.esMant||area.includes('mantenimiento');
-    return true;
-  });
-  const cDime=allSols.filter(s=>s.esDime||(s.areaSolicitud||'').toLowerCase().includes('dime')).length;
-  const cMant=allSols.filter(s=>s.esMant||(s.areaSolicitud||'').toLowerCase().includes('mantenimiento')).length;
-  let pendientes=0,cargados=0;
-  let cards='';
-  sols.forEach(s=>{
-    const its=s.items||[];
-    if(!its.length)return;
-    const pend=its.filter(it=>!it.nroDocumento||!it.nroReserva).length;
-    const ok=its.length-pend;
-    pendientes+=pend;cargados+=ok;
-    let filas=its.map((it,idx)=>{
-      const tiene=it.nroDocumento&&it.nroReserva;
-      return `<tr${tiene?' style="background:#e8f5e9"':''}>
-        <td style="text-align:center"><input type="checkbox" class="dr-chk-${s.id}" data-idx="${idx}" ${tiene?'disabled':''}></td>
-        <td><code>${it.matricula}</code></td>
-        <td>${it.descripcion||''}</td>
-        <td style="text-align:right"><b>${fmtNum(it.cantidad)}</b></td>
-        <td>${it.nroDocumento||'<span style="color:#b06b13">—</span>'}</td>
-        <td>${it.nroReserva||'<span style="color:#b06b13">—</span>'}</td>
-      </tr>`;
-    }).join('');
-    cards+=`<div style="border:1px solid var(--line);border-radius:8px;margin-bottom:16px;overflow:hidden">
-      <div style="background:var(--edenor);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div><b>${s.remito||'Sin remito'}</b> · ${fmtDate((s.fecha||'').slice(0,10))} · ${s.areaSolicitud||'—'} · 👷 ${s.cuadrilla||s.solicitanteDime||'—'}</div>
-        <div style="font-size:11px;opacity:.85">${pend?pend+' pendiente'+(pend>1?'s':''):'✔ Completo'}</div>
-      </div>
-      ${pend?`<div style="padding:10px 14px;background:var(--edenor-lt);display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-        <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--steel)">N° Documento</label><input id="dr-doc-${s.id}" class="finput" placeholder="N° Documento" style="margin-top:2px"></div>
-        <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--steel)">N° Reserva</label><input id="dr-res-${s.id}" class="finput" placeholder="N° Reserva" style="margin-top:2px"></div>
-        <button class="btn btn-primary" onclick="drSelAll(${s.id})" style="font-size:11px;padding:6px 10px">☑ Todos</button>
-        <button class="btn btn-primary" onclick="drSaveSel(${s.id})" style="font-size:12px">💾 Guardar</button>
-      </div>`:''}
-      <div class="tablewrap"><table style="margin:0">
-        <thead><tr><th style="width:35px">☑</th><th>Matrícula</th><th>Descripción</th><th>Cant.</th><th>N° Doc</th><th>N° Reserva</th></tr></thead>
-        <tbody>${filas}</tbody>
-      </table></div>
-    </div>`;
-  });
-  return `<div class="screen on" style="display:block">
-    <div class="shead"><div class="sicon">📝</div><div><h1>Cargar Doc / Reserva</h1><p>Ingresá N° Documento y Reserva, marcá los materiales que aplican y guardá</p></div></div>
-    <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center">
-      <button class="btn ${filtro==='todos'?'btn-primary':'ghost'}" onclick="window._drFiltro='todos';go('docreserva')" style="font-size:12px;padding:6px 14px">Todos (${allSols.length})</button>
-      <button class="btn ${filtro==='dime'?'btn-primary':'ghost'}" onclick="window._drFiltro='dime';go('docreserva')" style="font-size:12px;padding:6px 14px">Dime Mide (${cDime})</button>
-      <button class="btn ${filtro==='mant'?'btn-primary':'ghost'}" onclick="window._drFiltro='mant';go('docreserva')" style="font-size:12px;padding:6px 14px">Mantenimiento (${cMant})</button>
-    </div>
-    <div style="margin:4px 0 10px;font-size:13px;color:var(--gray)">Pendientes: <b style="color:#b06b13">${pendientes}</b> · Cargados: <b style="color:var(--edenor)">${cargados}</b></div>
-    ${cards||'<div class="empty" style="padding:30px;text-align:center">No hay entregas pendientes</div>'}
-  </div>`;
-};
-function drSelAll(solId){
-  document.querySelectorAll('.dr-chk-'+solId+':not(:disabled)').forEach(c=>c.checked=true);
-}
-function drSaveSel(solId){
-  const nroDoc=(document.getElementById('dr-doc-'+solId).value||'').trim();
-  const nroRes=(document.getElementById('dr-res-'+solId).value||'').trim();
-  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('dr-doc-'+solId).focus();return}
-  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('dr-res-'+solId).focus();return}
-  const checks=document.querySelectorAll('.dr-chk-'+solId+':checked:not(:disabled)');
-  if(!checks.length){toast('Marcá al menos un material','err');return}
-  const s=DB.get('solicitudes',solId);if(!s){toast('Solicitud no encontrada','err');return}
-  const items=[...(s.items||[])];
-  let n=0;
-  checks.forEach(c=>{
-    const idx=+c.dataset.idx;
-    if(items[idx]){items[idx]={...items[idx],nroDocumento:nroDoc,nroReserva:nroRes};n++}
-  });
-  const todosOk=items.every(it=>it.nroDocumento&&it.nroReserva);
-  const upd={items};
-  if(todosOk){
-    upd.nroDocumento=nroDoc;upd.nroReserva=nroRes;
-    upd.verificadoPor=currentUser.nombre;upd.fechaVerif=nowLocal();
-  }
-  DB.update('solicitudes',solId,upd);
-  toast('✔ '+n+' material'+(n>1?'es':'')+' actualizado'+(n>1?'s':'')+' — Doc: '+nroDoc+' / Reserva: '+nroRes+(todosOk?' · Solicitud completa':''));
-  go('docreserva');
-}
-
 let tcItems=[];
 function addTraspContra(){
   tcItems=[];
@@ -4756,34 +4660,6 @@ function verSolicitud(id){
     </div>`})()}
     <div style="font-size:10.5px;color:var(--gray);margin-top:4px">${editQ?'Ajustá la cantidad que se entrega (0 = no se entrega). Al marcar listo, la solicitud pasa a <b>Listo para entregar</b>. El remito se genera cuando el cuadrillero firma.':s.estado==='Pendiente'?'Al imprimir el picking la solicitud pasa automáticamente a <b>En preparación</b>.':'Ordenado por sector. En rojo: stock insuficiente.'}</div>
     ${s.preparadoPor?`<div style="font-size:11px;color:var(--gray);margin-top:6px">🔧 Picking: ${s.preparadoPor} · ${fmtFechaHora(s.fechaPrep)}${s.remitidoPor?` &nbsp; 🧾 Remito: ${s.remitidoPor} · ${fmtFechaHora(s.fechaRemito)}`:''}${s.entregadoPor?` &nbsp; 🚚 Entregó: ${s.entregadoPor} · ${fmtFechaHora(s.fechaEntrega)}`:''}</div>${s.receptorNombre?`<div style="font-size:11px;color:var(--edenor);margin-top:4px">✍️ Retiró: <b>${s.receptorNombre}</b>${s.receptorDni?' · DNI: '+s.receptorDni:''}${s.firmaReceptor?' · <span style="color:#059669">Firma registrada</span>':''}</div>`:''}`:''}
-    ${(()=>{
-      const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-      if(s.estado==='Entregado'&&_esDM&&!s.cerrada){
-        const _its=s.items||[];
-        const _conDoc=_its.filter(it=>it.nroDocumento&&it.nroReserva).length;
-        const _completo=_conDoc===_its.length&&_its.length;
-        const borderColor=_completo?'#a3d9a3':(_conDoc>0?'#f1dfb0':'#e0e0e0');
-        const bgColor=_completo?'#f0f9f0':(_conDoc>0?'#fffbf0':'#f8f9fa');
-        const txtColor=_completo?'#2e7d32':(_conDoc>0?'#b07a00':'#6b7885');
-        const statusTxt=_completo?'✔ Doc/Reserva completo ('+_its.length+' materiales)':(_conDoc>0?'📝 '+_conDoc+'/'+_its.length+' materiales con Doc/Reserva':'⏳ Sin Doc/Reserva cargado — usar pantalla Cargar Doc/Reserva');
-        return `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:14px;margin:10px 0">
-          <div style="font-size:12px;font-weight:700;color:${txtColor};margin-bottom:8px">${statusTxt}</div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button onclick="cerrarSolicitud(${s.id})" style="background:#6b7885;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📁 Cerrar solicitud</button>
-          </div>
-        </div>`;
-      }
-      if(s.estado==='Entregado'&&_esDM&&s.cerrada){
-        const cItems=(s.items||[]);
-        const cConDoc=cItems.filter(it=>it.nroDocumento&&it.nroReserva);
-        return `<div style="background:#f4f6f8;border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0">
-          <div style="font-size:12px;font-weight:700;color:#6b7885;margin-bottom:6px">📁 Solicitud cerrada</div>
-          <div style="font-size:12px;color:var(--ink)">${cConDoc.length?cConDoc.length+'/'+cItems.length+' materiales con Doc/Reserva':'N° Documento: <b>'+(s.nroDocumento||'—')+'</b> · N° Reserva: <b>'+(s.nroReserva||'—')+'</b>'}</div>
-          <div style="font-size:10.5px;color:var(--gray);margin-top:4px">Cerrada por: ${s.cerradaPor||'—'} · ${fmtFechaHora(s.fechaCierre)}</div>
-        </div>`;
-      }
-      return '';
-    })()}
     <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Cerrar</button>${s.estado==='Pendiente'||s.estado==='Listo'||s.estado==='Entregado'?'':`<button class="btn ghost" onclick="imprimirSolicitud(${s.id})">🖨️ Reimprimir picking</button>`}${s.remito?`<button class="btn ghost" onclick="closeModal();verRemitoSol('${s.remito}')">🧾 Ver remito</button>`:''}${act?act.replace(/class="pr"/g,'class="btn primary"').replace(/<button onclick/g,'<button class="btn ghost" onclick'):''}</div>`);
 }
 function volverPreparacion(id){
@@ -5030,20 +4906,7 @@ function solBuildCard(s,st){
   const btns=solActionBtns(s,false);
   const actions=btns?`<div class="sc-actions">${btns}</div>`:(st===EST_APROB?`<div class="sc-wait">Esperando aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}</div>`:'');
   const pidio=s.pidioUsuario||s.supervisor;
-  /* Verificación post-entrega para Dime/Mant */
-  const esDimeMant=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
   let verifCls='',verifTag='';
-  if(st==='Entregado'&&esDimeMant){
-    if(s.cerrada){verifCls=' sc-cerrada';verifTag='<span class="sc-verif-tag">📁 Cerrada</span>'}
-    else{
-      const _its=s.items||[];
-      const _conDoc=_its.filter(it=>it.nroDocumento&&it.nroReserva).length;
-      if(_conDoc===_its.length&&_its.length){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Completo</span>'}
-      else if(_conDoc>0){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">📝 '+_conDoc+'/'+_its.length+' cargados</span>'}
-      else if(s.nroDocumento&&s.nroReserva){verifCls=' sc-verificada';verifTag='<span class="sc-verif-tag">✔ Verificada</span>'}
-      else{verifCls=' sc-no-verif';verifTag='<span class="sc-verif-tag">⚠ Sin Doc/Reserva</span>'}
-    }
-  }
   return `<div class="solcard${verifCls}" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
     <div class="sc-obra">${s.obra||s.areaSolicitud||'—'}</div>
@@ -5141,13 +5004,9 @@ SCREENS.solicitudes=()=>{
   const solVisible=s=>{
     if(s.estado==='Rechazada')return false;
     if(s.estado==='Entregado'){
-      if(s.cerrada)return false;
-      /* Verificada (tiene doc+reserva) y de día anterior → ocultar */
-      if(s.nroDocumento&&s.nroReserva){
-        const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
-        if(fE&&fE<hoy)return false;
-      }
-      /* NO verificada → mantener visible hasta que se verifique o se auto-cierre (7 días) */
+      /* Entregadas de un día anterior → ocultar automáticamente */
+      const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
+      if(fE&&fE<hoy)return false;
     }
     return true;
   };
@@ -5169,11 +5028,7 @@ SCREENS.solicitudes=()=>{
       if(!showAprob&&st===EST_APROB)return;
       const items=sols.filter(s=>{
         if(s.estado!==st)return false;
-        if(st==='Entregado'){
-          if(s.cerrada)return false;
-          if(s.nroDocumento&&s.nroReserva)return false; /* verificada → ocultar */
-          /* Dime/Mant: quedan visibles hasta que verifiquen (sin límite de fecha) */
-        }
+        /* Entregadas de un día anterior se ocultan por solVisible */
         return true;
       });
       let cards=items.map(s=>solBuildCard(s,st)).join('');
@@ -6676,9 +6531,8 @@ const QL_SRC={
       {k:'obra',l:'Obra',d:1},{k:'area',l:'Área'},{k:'region',l:'Región'},{k:'cuadrilla',l:'Cuadrilla',d:1},{k:'supervisor',l:'Supervisor',d:1},
       {k:'matricula',l:'Matrícula',d:1},{k:'descripcion',l:'Descripción',d:1},{k:'unidad',l:'Unidad'},
       {k:'cantPedida',l:'Cant. pedida',n:1,d:1},{k:'cantidad',l:'Cant. aprobada',n:1,d:1},{k:'diferencia',l:'Diferencia',n:1},
-      {k:'nroDocumento',l:'N° Documento',d:1},{k:'nroReserva',l:'N° Reserva',d:1},
       {k:'aprobadoPor',l:'Aprobó'},{k:'modificada',l:'Modificada'},{k:'rechazadoPor',l:'Rechazó'},{k:'motivoRechazo',l:'Motivo rechazo'},
-      {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'verificada',l:'Verificada'},{k:'cerrada',l:'Cerrada'},{k:'mes',l:'Mes'}
+      {k:'remito',l:'Remito'},{k:'obs',l:'Observaciones'},{k:'inspector',l:'Inspector'},{k:'mes',l:'Mes'}
     ],
     filters:()=>[
       {k:'estado',l:'Estado',type:'multi',opts:[EST_APROB,'Pendiente','En preparación','Listo','Entregado','Rechazada','Eliminada']},
@@ -6692,10 +6546,6 @@ const QL_SRC={
       {k:'modificada',l:'Modificada por aprobador',type:'select',opts:['Sí','No']},
       {k:'codigo',l:'N° solicitud / remito',type:'text',match:['codigo','remito']},
       {k:'inspector',l:'Inspector',type:'text',match:['inspector']},
-      {k:'nroDocumento',l:'N° Documento',type:'text',match:['nroDocumento']},
-      {k:'nroReserva',l:'N° Reserva',type:'text',match:['nroReserva']},
-      {k:'verificada',l:'Verificada',type:'select',opts:['Sí','No']},
-      {k:'cerrada',l:'Cerrada',type:'select',opts:['Sí','No']}
     ],
     rows:()=>{
       const R=[];
@@ -6703,18 +6553,12 @@ const QL_SRC={
         const o=qlObra(s.obra);
         const head={codigo:s.codigo,fecha:(s.fecha||'').slice(0,10),mes:(s.fecha||'').slice(0,7),estado:s.estado,urgencia:s.urgencia,obra:s.obra,area:o.area||'',region:o.region||'',inspector:o.inspector||'',cuadrilla:s.cuadrilla||s.solicitanteDime||'',supervisor:s.supervisor,aprobadoPor:s.aprobadoPor||'',modificada:s.aprobModificada?'Sí':'No',rechazadoPor:s.rechazadoPor||'',motivoRechazo:s.motivoRechazo||'',remito:s.remito||'',obs:[s.obs,s.obsAprob].filter(Boolean).join(' · ')};
         const its=(s.items||[]).concat(s.itemsQuitados||[]);
-        const _esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-        const extra={_solId:s.id,_esDM,_estado:s.estado,_cerrada:!!s.cerrada};
         if(!its.length){
-          const verifHead={verificada:_esDM?(s.nroDocumento&&s.nroReserva?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:s.nroDocumento||'',nroReserva:s.nroReserva||''};
-          R.push(Object.assign({},head,verifHead,extra,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
+          R.push(Object.assign({},head,{matricula:'',descripcion:'',unidad:'',cantPedida:0,cantidad:0,diferencia:0}));
         }
         its.forEach(it=>{
-          const doc=it.nroDocumento||s.nroDocumento||'';
-          const res=it.nroReserva||s.nroReserva||'';
-          const verifIt={verificada:_esDM?(doc&&res?'Sí':'No'):'',cerrada:s.cerrada?'Sí':'No',nroDocumento:doc,nroReserva:res};
           const ped=it.cantPedida??it.cantidad;
-          R.push(Object.assign({},head,verifIt,extra,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}));
+          R.push(Object.assign({},head,{matricula:it.matricula,descripcion:it.descripcion,unidad:it.unidad||'',cantPedida:ped,cantidad:it.cantidad,diferencia:it.cantidad-ped}));
         });
       });
       return R;
@@ -6964,12 +6808,6 @@ function verificarEntrega(id){
   toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
   closeModal();go('solicitudes');
 }
-function cerrarSolicitud(id){
-  if(!confirm('¿Cerrar esta solicitud? Una vez cerrada no se puede modificar.'))return;
-  DB.update('solicitudes',id,{cerrada:true,cerradaPor:currentUser.nombre,fechaCierre:nowLocal()});
-  toast('📁 Solicitud cerrada');
-  closeModal();go('solicitudes');
-}
 /* Auto-cerrar solicitudes Dime/Mant entregadas viejas sin verificar */
 /* ═══════════════════════════════════════════════════════════════
    HEALTH CHECK — Diagnóstico integral al login
@@ -7040,48 +6878,7 @@ function healthCheck(){
   diagLog('health-ok',resumen);
   return{ok:problemas.length===0,problemas,ms};
 }
-function autoCerrarEntregadasViejas(){
-  const hoy=today();
-  const sols=DB.getAll('solicitudes');
-  let cerradas=0;
-  sols.forEach(s=>{
-    if(s.estado!=='Entregado'||s.cerrada)return;
-    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(!esDM)return;
-    const fEntrega=(s.fechaEntrega||s.fecha||'').slice(0,10);
-    if(!fEntrega||fEntrega>=hoy)return;
-    /* Si ya fue verificada (tiene nroDocumento Y nroReserva) → cerrar */
-    if(s.nroDocumento&&s.nroReserva){
-      DB.update('solicitudes',s.id,{cerrada:true,cerradaPor:'Sistema (auto)',fechaCierre:nowLocal()});
-      cerradas++;
-      return;
-    }
-    /* Si NO fue verificada, darle 7 días antes de auto-cerrar */
-    const diasPasados=Math.floor((new Date(hoy)-new Date(fEntrega))/(86400000));
-    if(diasPasados>=7){
-      DB.update('solicitudes',s.id,{cerrada:true,cerradaPor:'Sistema (auto-7d)',fechaCierre:nowLocal()});
-      cerradas++;
-    }
-  });
-  if(cerradas)console.log('[Auto-cierre] '+cerradas+' solicitudes Dime/Mant entregadas viejas cerradas automáticamente');
-  /* Reparar: reabrir las que fueron cerradas por el sistema sin verificar (menos de 7 días) */
-  let reabiertas=0;
-  DB.getAll('solicitudes').forEach(s=>{
-    if(s.estado!=='Entregado'||!s.cerrada)return;
-    if(s.cerradaPor!=='Sistema (auto)')return;
-    const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(!esDM)return;
-    if(s.nroDocumento&&s.nroReserva)return; /* ya verificada, está bien cerrada */
-    const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
-    if(!fE)return;
-    const dias=Math.floor((new Date(hoy)-new Date(fE))/(86400000));
-    if(dias<7){
-      DB.update('solicitudes',s.id,{cerrada:false,cerradaPor:'',fechaCierre:''});
-      reabiertas++;
-    }
-  });
-  if(reabiertas)console.log('[Reparación] '+reabiertas+' solicitud(es) Dime/Mant reabierta(s) — faltaba verificar');
-}
+function autoCerrarEntregadasViejas(){/* desactivado — verificación eliminada */}
 /* ── Unificar reservas duplicadas (misma obra+nroReserva) ── */
 function unificarReservasDuplicadas(){
   const all=DB.getAll('reservas');
@@ -7266,28 +7063,14 @@ function limpiarEntregadosAyer(){
   let borrados=0;
   all.forEach(s=>{
     if(s.estado!=='Entregado')return;
-    // Dime/Mant: solo borrar si están cerradas (grises) y de un día anterior
+    /* Todas las entregadas de un día anterior se eliminan automáticamente */
+    const fE=(s.fechaEntrega||s.fecha||'').slice(0,10);
+    if(!fE||fE>=hoy)return;
+    /* OyD: no borrar sin despacho generado → stock no se descontaría */
     const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-    if(esDM&&!s.cerrada)return;
-    if(esDM&&s.cerrada){
-      /* Solo borrar si fue verificada O si lleva más de 7 días cerrada */
-      if(!s.nroDocumento&&!s.nroReserva){
-        const fc=(s.fechaCierre||'').slice(0,10);
-        const diasCerrada=fc?Math.floor((new Date(hoy)-new Date(fc))/(86400000)):0;
-        if(diasCerrada<7)return; /* mantener para que la verifiquen */
-      }
-      const fc=(s.fechaCierre||'').slice(0,10);if(!fc||fc>=hoy)return;
-      DB.del('solicitudes',s.id);borrados++;return;
-    }
-    // OyD: solo borrar si tiene fechaEntrega (no usar fecha de pedido como fallback)
-    // y solo si ya tiene despacho generado (para no perder entregas sin descontar stock)
-    if(!s.fechaEntrega)return;
-    const dia=s.fechaEntrega.slice(0,10);
-    if(dia&&dia<hoy){
-      if(!s.despachoId&&!s.remito)return; // no borrar sin despacho → stock no se descontaría
-      DB.del('solicitudes',s.id);
-      borrados++;
-    }
+    if(!esDM&&!s.despachoId&&!s.remito)return;
+    DB.del('solicitudes',s.id);
+    borrados++;
   });
   if(borrados)console.log('[WMS] Limpieza automática: '+borrados+' solicitud(es) entregada(s) de días anteriores eliminada(s)');
   /* Purgar wms_sol_deleted: mantener máximo 200 entradas más recientes */
@@ -7296,10 +7079,10 @@ function limpiarEntregadosAyer(){
 function loginAs(nombre,rol,permisos){
   // If no permisos provided (legacy), derive from role
   if(!permisos||!permisos.length){
-    const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
-    const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra'];
+    const allP=['materiales','cuadrillas','supervisores','obras','sectores','proveedores','reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','nuevasol','missol','stockfull','movobra','consultalibre','usuarios'];
+    const opP=['reservas','ingresos','despachos','devoluciones','traspasos','traspcontra','solicitudes','stockfull','movobra'];
     const supP=['nuevasol','missol'];
-    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','validardev','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','docreserva','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
+    permisos=['super','gerencial','admin'].includes(rol)?allP.concat('aprobardime','aprobarmant','validardev','editarlisto','editmaestro'):rol==='jefedep'?['reservas','ingresos','despachos','devoluciones','validardev','traspasos','traspcontra','solicitudes','stockfull','movobra','consultalibre','materiales','cuadrillas','supervisores','obras','sectores','proveedores','editarlisto','editmaestro']:rol==='op'?opP:rol==='dime'?['solicitudes','aprobardime','stockfull','movobra']:rol==='mant'?['solicitudes','aprobarmant','stockfull','movobra']:rol==='administrativo'?['consultalibre','stockfull','movobra']:supP;
   }
   const _u=DB.getAll('usuarios').find(x=>x.nombre===nombre);
   currentUser={id:_u?_u.id:null,nombre,rol,permisos,vistaApp:_u?(_u.vistaApp||'app'):'app'};
