@@ -1027,7 +1027,7 @@ async function solImportarNuevas(){
   try{
     const resp=await fetch(GSCRIPT_URL+'?action=solicitudes');
     const data=await resp.json();
-    if(!data.solicitudes||!data.solicitudes.length){_solImporting=false;return;}
+    if(!data.solicitudes||!data.solicitudes.length){_solImporting=false;_solSyncLock=false;return;}
 
     const existentes=DB.getAll('solicitudes');
     const codigos=new Set(existentes.map(s=>s.codigo));
@@ -1123,7 +1123,7 @@ async function syncEstadosDesdeSheet(){
     const resp=await fetch(GSCRIPT_URL+'?action=mis_solicitudes',{signal:ctrl.signal});
     clearTimeout(tmout);
     const data=await resp.json();
-    if(!data.solicitudes||!data.solicitudes.length){console.log('[Sync] Sheet devolvió 0 solicitudes');_syncingEstados=false;return;}
+    if(!data.solicitudes||!data.solicitudes.length){console.log('[Sync] Sheet devolvió 0 solicitudes');_syncingEstados=false;_solSyncLock=false;return;}
     console.log('[Sync] Sheet devolvió '+data.solicitudes.length+' solicitudes');
     const sheetMap={};
     data.solicitudes.forEach(s=>{sheetMap[s.codigo]=s;});
@@ -4765,7 +4765,7 @@ function _confirmarConFirma(id){
   if(esDM){
     // Dime/Mant: marcar Entregado SIN generar despacho — stock se afecta al verificar
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-    syncEstadoSheet(s.codigo,'Entregado');
+    syncEstadoSheet(s.codigo,'Entregado',s.items);
     closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️ (stock pendiente de verificación)');go('solicitudes');
   } else {
     // OyD: valida contra reserva antes de entregar
@@ -4773,7 +4773,7 @@ function _confirmarConFirma(id){
     if(bloqRes){closeModal();toast(bloqRes,'err');return}
     const rem=generarRemitoEntrega(s);
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),firmaReceptor:firmaData,receptorNombre:nombre,receptorDni:dni||null,remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-    syncEstadoSheet(s.codigo,'Entregado');
+    syncEstadoSheet(s.codigo,'Entregado',s.items);
     closeModal();toast(s.codigo+' entregada — firmó: '+nombre+' ✍️');
     viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
   }
@@ -4787,7 +4787,7 @@ function _confirmarSinFirma(id){
   if(esDM){
     // Dime/Mant: marcar Entregado SIN generar despacho
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-    syncEstadoSheet(s.codigo,'Entregado');
+    syncEstadoSheet(s.codigo,'Entregado',s.items);
     closeModal();toast(s.codigo+' entregada (stock pendiente de verificación)');go('solicitudes');
   } else {
     // OyD: valida contra reserva antes de entregar
@@ -4795,7 +4795,7 @@ function _confirmarSinFirma(id){
     if(bloqRes){toast(bloqRes,'err');return}
     const rem=generarRemitoEntrega(s);
     notifSol(DB.update('solicitudes',id,{estado:'Entregado',entregadoPor:currentUser.nombre,fechaEntrega:nowLocal(),remito:rem.remito,despachoId:rem.desp.id,remitidoPor:currentUser.nombre,fechaRemito:nowLocal()}),'entregado');
-    syncEstadoSheet(s.codigo,'Entregado');
+    syncEstadoSheet(s.codigo,'Entregado',s.items);
     closeModal();toast(s.codigo+' entregada');
     viewRemito(rem.desp.id,'solicitudes');setTimeout(()=>window.print(),300);
   }
@@ -5396,26 +5396,23 @@ function _sendSolicitud(){
     if(usrEdn)solData.usuarioEdenor=usrEdn.trim();
   }
   DB.add('solicitudes',solData);
-  /* Enviar al Sheet para que otras PCs la reciban con el mismo código */
-  fetch(GSCRIPT_URL,{
-    method:'POST', mode:'no-cors',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      codigo:solData.codigo,
-      fecha:solData.fecha,
-      cuadrilla:solData.cuadrilla||solData.pidioUsuario||'',
-      obra:solData.obra||'',
-      urgencia:solData.urgencia||'Normal',
-      materiales:JSON.stringify(solData.items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,unidad:it.unidad||'u'}))),
-      observaciones:solData.obs||'',
-      estado:solData.estado,
-      areaSolicitud:solData.areaSolicitud||'',
-      supervisor:solData.supervisor||'',
-      esDime:solData.esDime,
-      solicitanteDime:solData.solicitanteDime||'',
-      usuarioEdenor:solData.usuarioEdenor||''
-    })
-  }).catch(e=>console.log('Sync nueva sol error:',e));
+  /* Enviar al Sheet para que otras PCs la reciban con el mismo código — via _sheetQueue para no pisar updates en curso */
+  _sheetQueue.push({
+    codigo:solData.codigo,
+    fecha:solData.fecha,
+    cuadrilla:solData.cuadrilla||solData.pidioUsuario||'',
+    obra:solData.obra||'',
+    urgencia:solData.urgencia||'Normal',
+    materiales:JSON.stringify(solData.items.map(it=>({matricula:it.matricula,descripcion:it.descripcion,cantidad:it.cantidad,unidad:it.unidad||'u'}))),
+    observaciones:solData.obs||'',
+    estado:solData.estado,
+    areaSolicitud:solData.areaSolicitud||'',
+    supervisor:solData.supervisor||'',
+    esDime:solData.esDime,
+    solicitanteDime:solData.solicitanteDime||'',
+    usuarioEdenor:solData.usuarioEdenor||''
+  });
+  _sheetFlush();
   notifSol(DB.getAll('solicitudes').slice(-1)[0],'nueva');
   toast((esDime||isMant)?`Solicitud enviada · espera aprobación de ${esDime?'Dime Mide':'Mantenimiento'}`:'Solicitud enviada al depósito');
   go(can('missol')&&currentUser.rol==='sup'?'missol':can('solicitudes')?'solicitudes':can('missol')?'missol':'home');
