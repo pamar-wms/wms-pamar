@@ -1093,8 +1093,7 @@ async function solImportarNuevas(){
         const frescos=DB.getAll('solicitudes');
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=existentes.map(s=>{
-          const f=fMap[s.codigo];
-          return f||s;
+          return s;
         });
         /* Deduplicar por código */
         const seen=new Set();
@@ -1268,8 +1267,7 @@ async function syncEstadosDesdeSheet(){
         const frescos=DB.getAll('solicitudes');
         const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
         const merged=filtradas.map(s=>{
-          const f=fMap[s.codigo];
-          return f||s;
+          return s;
         });
         /* Deduplicar por código (evitar entradas dobles) */
         const seen=new Set();
