@@ -257,14 +257,7 @@
   .solcol-h.prep{background:#2e75b6}
   .solcol-h.listo{background:#70ad47}
   .solcol-h.entr{background:#6b7885}
-  .solcard.sc-no-verif{border-left:4px solid #c53727;background:#fef2f2}
-  .solcard.sc-no-verif:hover{background:#fde7e5}
-  .solcard.sc-no-verif .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#fde7e5;color:#c53727;padding:1px 6px;border-radius:6px;margin-left:6px}
-  .solcard.sc-verificada{border-left:4px solid #2e7d32;background:#f0f9f0}
-  .solcard.sc-verificada:hover{background:#e6f4e6}
-  .solcard.sc-verificada .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#e6f4e6;color:#2e7d32;padding:1px 6px;border-radius:6px;margin-left:6px}
-  .solcard.sc-cerrada{border-left:4px solid #6b7885;background:#f4f6f8;opacity:.7}
-  .solcard.sc-cerrada .sc-verif-tag{display:inline-block;font-size:9px;font-weight:700;background:#e8ecef;color:#6b7885;padding:1px 6px;border-radius:6px;margin-left:6px}
+  /* verificación eliminada — clases sc-no-verif, sc-verificada, sc-cerrada removidas */
   .solcol-h .cnt{background:rgba(255,255,255,.3);padding:1px 8px;border-radius:10px;font-size:10.5px}
   .solcol-body{padding:8px}
   .solcard{background:#f7f9fb;border:1px solid #e3e8ee;border-left:3px solid var(--edenor);border-radius:6px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:.12s}
@@ -1088,32 +1081,15 @@ async function solImportarNuevas(){
     diagLog('poll-ok','Poll OK — '+nuevas+' nuevas');
     if(_solBackoff>30000&&_solPollTimer){_solBackoff=30000;clearInterval(_solPollTimer);_solPollTimer=setInterval(solImportarNuevas,30000)}
     if(nuevas>0){
-      /* Merge seguro: leer DB justo antes de guardar y preservar verificadas */
-      const _doMergeImport=()=>{
-        const frescos=DB.getAll('solicitudes');
-        const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
-        const merged=existentes.map(s=>{
-          return s;
-        });
-        /* Deduplicar por código */
-        const seen=new Set();
-        const deduped=merged.filter(s=>{
-          if(!s.codigo){return true}
-          if(seen.has(s.codigo))return false;
-          seen.add(s.codigo);return true;
-        });
-        frescos.forEach(f=>{if(f.codigo&&!seen.has(f.codigo)&&!f._eliminar){deduped.push(f);seen.add(f.codigo);}});
-        return deduped;
-      };
-      let merged=_doMergeImport();
-      /* Segundo check */
-      const check2=DB.getAll('solicitudes');
-      const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
-        !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
-      if(changed){merged=_doMergeImport();console.log('[Import] Re-merge por verificación detectada');}
-      /* Filtro final: nunca guardar solicitudes que estén en wms_sol_deleted */
+      /* Deduplicar por código y filtrar borradas */
+      const seen=new Set();
       const _delFinal=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
-      if(_delFinal.size) merged=merged.filter(s=>!s.codigo||!_delFinal.has(s.codigo));
+      const merged=existentes.filter(s=>{
+        if(s.codigo&&_delFinal.has(s.codigo)) return false;
+        if(!s.codigo) return true;
+        if(seen.has(s.codigo)) return false;
+        seen.add(s.codigo); return true;
+      });
       DB.save('solicitudes',merged);
       toast('📥 '+nuevas+' solicitud'+(nuevas>1?'es':'')+' nueva'+(nuevas>1?'s':'')+' de cuadrillas');
       // Refrescar pantalla si estamos en solicitudes
@@ -1260,35 +1236,16 @@ async function syncEstadosDesdeSheet(){
       cambios++;
     });
     if(cambios>0){
-      const filtradas=locales.filter(s=>!s._eliminar);
-      /* Merge seguro: leer DB justo antes de guardar y preservar TODA solicitud
-         verificada/cerrada — repetir lectura hasta que no haya conflicto */
-      const _doMerge=()=>{
-        const frescos=DB.getAll('solicitudes');
-        const fMap={};frescos.forEach(f=>{if(f.codigo)fMap[f.codigo]=f;});
-        const merged=filtradas.map(s=>{
-          return s;
-        });
-        /* Deduplicar por código (evitar entradas dobles) */
-        const seen=new Set();
-        const deduped=merged.filter(s=>{
-          if(!s.codigo){return true}
-          if(seen.has(s.codigo))return false;
-          seen.add(s.codigo);return true;
-        });
-        /* Agregar solicitudes frescas que no estén en deduped */
-        frescos.forEach(f=>{if(f.codigo&&!seen.has(f.codigo)&&!f._eliminar){deduped.push(f);seen.add(f.codigo);}});
-        return deduped;
-      };
-      let merged=_doMerge();
-      /* Segundo check: si alguien verificó entre el merge y ahora, re-merge */
-      const check2=DB.getAll('solicitudes');
-      const changed=check2.some(f=>f.codigo&&(f.nroDocumento||f.verificadoPor||f.cerrada)&&
-        !merged.find(m=>m.codigo===f.codigo&&m.nroDocumento===f.nroDocumento&&m.verificadoPor===f.verificadoPor));
-      if(changed){merged=_doMerge();console.log('[Sync] Re-merge por verificación detectada');}
-      /* Filtro final: nunca guardar solicitudes que estén en wms_sol_deleted */
+      /* Filtrar eliminadas, deduplicar por código */
+      const seen=new Set();
       const _delFinal2=new Set(JSON.parse(localStorage.getItem('wms_sol_deleted')||'[]'));
-      if(_delFinal2.size) merged=merged.filter(s=>!s.codigo||!_delFinal2.has(s.codigo));
+      const merged=locales.filter(s=>{
+        if(s._eliminar) return false;
+        if(s.codigo&&_delFinal2.has(s.codigo)) return false;
+        if(!s.codigo) return true;
+        if(seen.has(s.codigo)) return false;
+        seen.add(s.codigo); return true;
+      });
       DB.save('solicitudes',merged);
       localStorage.setItem('wms_sol_deleted',JSON.stringify([...deleted]));
       if(document.querySelector('.sol-tabs')) go('solicitudes');
@@ -4589,8 +4546,8 @@ function guardarEdSol(id){
   const s=DB.get('solicitudes',id);
   if(!s){toast('No se encontró la solicitud','err');return}
   const obsNueva=[s.obs,obsEd?`[Editado por ${currentUser.nombre} ${fmtFechaHora(nowLocal())}] ${obsEd}`:null].filter(Boolean).join(' · ');
-  // Preservar campos de verificación si existían
-  items.forEach((it,i)=>{const orig=(s.items||[]). find(o=>String(o.matricula)===String(it.matricula));if(orig){if(orig.nroDocumento)it.nroDocumento=orig.nroDocumento;if(orig.nroReserva)it.nroReserva=orig.nroReserva;if(orig.cantPedida!==undefined)it.cantPedida=orig.cantPedida;if(orig.nBobina)it.nBobina=orig.nBobina;if(orig.nEdenor)it.nEdenor=orig.nEdenor}});
+  // Preservar campos adicionales del item original
+  items.forEach((it,i)=>{const orig=(s.items||[]).find(o=>String(o.matricula)===String(it.matricula));if(orig){if(orig.cantPedida!==undefined)it.cantPedida=orig.cantPedida;if(orig.nBobina)it.nBobina=orig.nBobina;if(orig.nEdenor)it.nEdenor=orig.nEdenor}});
   const result=DB.update('solicitudes',s.id,{items,obs:obsNueva,editadoPor:currentUser.nombre,fechaEdit:nowLocal()});
   if(!result){toast('Error al guardar — intentá de nuevo','err');return}
   if(s.codigo) syncEstadoSheet(s.codigo, s.estado, items);
@@ -4904,8 +4861,7 @@ function solBuildCard(s,st){
   const btns=solActionBtns(s,false);
   const actions=btns?`<div class="sc-actions">${btns}</div>`:(st===EST_APROB?`<div class="sc-wait">Esperando aprobación de ${solGetArea(s)==='Mantenimiento'?'Mantenimiento':'Dime Mide'}</div>`:'');
   const pidio=s.pidioUsuario||s.supervisor;
-  let verifCls='',verifTag='';
-  return `<div class="solcard${verifCls}" onclick="verSolicitud(${s.id})" title="Ver detalle">
+  return `<div class="solcard" onclick="verSolicitud(${s.id})" title="Ver detalle">
     <div class="sc-top"><span class="sc-id">${s.codigo}</span><span class="sc-urg ${urgCls}">${s.urgencia}</span></div>
     <div class="sc-obra">${s.obra||s.areaSolicitud||'—'}</div>
     <div class="sc-who">
@@ -4915,7 +4871,6 @@ function solBuildCard(s,st){
     </div>
     ${itemsText?`<div class="sc-items">📦 ${itemsText}</div>`:''}
     ${s.aprobadoPor?`<div class="sc-ok">✔ Aprobó: ${esc(s.aprobadoPor)}${s.aprobModificada?' · <span style="color:#b07a00">cantidades modificadas</span>':''}</div>${s.obsAprob?`<div class="sc-ok" style="color:var(--gray);font-weight:400">💬 ${esc(s.obsAprob)}</div>`:''}`:''}
-    ${verifTag}
     ${actions}
   </div>`;
 }
@@ -6784,29 +6739,7 @@ function quickLogin(usuario,clave){
   document.getElementById('lg-pass').value=clave;
   doLogin();
 }
-/* Auto-limpieza: eliminar solicitudes "Entregado" de días anteriores al iniciar */
-function verificarEntrega(id){
-  const nroDoc=(document.getElementById('verif-nroDoc').value||'').trim();
-  const nroRes=(document.getElementById('verif-nroRes').value||'').trim();
-  if(!nroDoc){toast('Ingresá el número de documento','err');document.getElementById('verif-nroDoc').focus();return}
-  if(!nroRes){toast('Ingresá el número de reserva','err');document.getElementById('verif-nroRes').focus();return}
-  const s=DB.get('solicitudes',id);if(!s)return;
-  const esDM=s.esDime||s.esMant||['Dime Mide','Mantenimiento'].includes(s.areaSolicitud);
-  const items=(s.items||[]).map(it=>({...it,nroDocumento:nroDoc,nroReserva:nroRes}));
-  const upd={nroDocumento:nroDoc,nroReserva:nroRes,items,verificadoPor:currentUser.nombre,fechaVerif:nowLocal()};
-  // Solo generar despacho si la solicitud NO tiene remito previo (evita duplicar stock)
-  if(!s.remito){
-    /* Si no es Dime/Mant, validar reserva antes de generar despacho */
-    if(!esDM&&s.obra){const bloqRes=validarReservaSolicitud(s);if(bloqRes){toast(bloqRes,'err');return}}
-    const rem=generarRemitoEntrega(s);
-    upd.remito=rem.remito;
-    upd.despachoId=rem.desp.id;
-  }
-  DB.update('solicitudes',id,upd);
-  toast('✔ Verificación guardada — Doc: '+nroDoc+' / Reserva: '+nroRes);
-  closeModal();go('solicitudes');
-}
-/* Auto-cerrar solicitudes Dime/Mant entregadas viejas sin verificar */
+/* verificarEntrega eliminada — verificación de solicitudes removida */
 /* ═══════════════════════════════════════════════════════════════
    HEALTH CHECK — Diagnóstico integral al login
    Detecta inconsistencias y las repara automáticamente
